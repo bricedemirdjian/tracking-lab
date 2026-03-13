@@ -595,7 +595,7 @@ async function startScraping() {
     btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span> Scraping...';
     showStatus("Scraping en cours... Les donnees s'actualisent en temps reel.", "info");
     try {
-        const res = await fetch("/api/scrape", { method: "POST", headers: { "Content-Type": "application/json" } });
+        const res = await fetch("/api/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
         const data = await res.json();
         if (data.status === "already_running") {
             showStatus("Scraping deja en cours...", "info");
