@@ -1,0 +1,8 @@
+flask==3.1.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+yt-dlp==2024.12.23
+lxml==5.3.0
+gunicorn==22.0.0
+authlib==1.4.1
+flask-login==0.6.3

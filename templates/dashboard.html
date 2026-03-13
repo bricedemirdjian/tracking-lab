@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Lab</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="logo">
+            <div class="logo-icon">TL</div>
+            <div>
+                <h1>Tracking Lab</h1>
+                <span class="subtitle">Suivi des performances de votre lab interne</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="refresh-indicator" onclick="refreshNow()" title="Cliquez pour rafraichir maintenant">
+                <div class="refresh-bar-bg">
+                    <div class="refresh-bar" id="refreshBar"></div>
+                </div>
+                <span class="refresh-label">MAJ dans <strong id="refreshCountdown">30s</strong></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="openAccountsModal()">
+                Gerer les comptes
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openImportModal()">
+                Importer CSV
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
+                Exporter CSV
+            </button>
+            <button class="btn btn-primary" id="scrapeBtn" onclick="startScraping()">
+                Scraper les donnees
+            </button>
+            <div class="user-info">
+                {% if user.avatar_url %}
+                <img src="{{ user.avatar_url }}" class="user-avatar" alt="" referrerpolicy="no-referrer">
+                {% endif %}
+                <span class="user-name">{{ user.name or user.email }}</span>
+                <a href="/logout" class="btn btn-secondary btn-sm" title="Deconnexion">&#x2190;</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+
+        <!-- Filters -->
+        <div class="filters-bar">
+            <div class="filter-group">
+                <label>Compte</label>
+                <select id="filterAccount">
+                    <option value="all">Tous les comptes</option>
+                </select>
+            </div>
+            <div class="filter-group filter-date">
+                <label>&#128197; Date debut</label>
+                <input type="date" id="filterDateFrom" placeholder="Date debut">
+            </div>
+            <div class="filter-group filter-date">
+                <label>&#128197; Date fin</label>
+                <input type="date" id="filterDateTo" placeholder="Date fin">
+            </div>
+            <div class="filter-group" style="margin-left:auto">
+                <label>&nbsp;</label>
+                <button class="btn btn-secondary btn-sm" onclick="state.dateFrom=null;state.dateTo=null;document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';state.selectedAccount='all';document.getElementById('filterAccount').value='all';loadDashboard();">
+                    Reinitialiser les filtres
+                </button>
+            </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Contenus</div>
+                <div class="kpi-value" id="kpiVideos">0</div>
+                <div class="kpi-icon">&#127909;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Vues totales</div>
+                <div class="kpi-value" id="kpiViews">0</div>
+                <div class="kpi-icon">&#128064;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Likes</div>
+                <div class="kpi-value" id="kpiLikes">0</div>
+                <div class="kpi-icon">&#10084;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Commentaires</div>
+                <div class="kpi-value" id="kpiComments">0</div>
+                <div class="kpi-icon">&#128172;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Partages</div>
+                <div class="kpi-value" id="kpiShares">0</div>
+                <div class="kpi-icon">&#128257;</div>
+            </div>
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Taux d'engagement</div>
+                <div class="kpi-value" id="kpiEngagement">0%</div>
+                <div class="kpi-icon">&#128200;</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="overview">Vue d'ensemble</button>
+            <button class="tab-btn" data-tab="charts">Graphiques</button>
+            <button class="tab-btn" data-tab="table">Tableau detaille</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="tab-content active" id="tab-overview">
+            <!-- Account Cards -->
+            <div class="section-title">
+                Comptes suivis <span class="badge" id="accountsBadge">0 comptes</span>
+            </div>
+            <div class="accounts-grid" id="accountCards"></div>
+
+            <!-- Best Videos -->
+            <div class="section-title" style="margin-top:32px">
+                Meilleures videos <span class="badge" id="bestVideosBadge">Top 10</span>
+            </div>
+            <div class="table-container" style="margin-bottom:32px">
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rang</th>
+                                <th>Compte</th>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Vues</th>
+                                <th>Likes</th>
+                                <th>Engagement</th>
+                                <th>Lien</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bestVideosBody">
+                            <tr>
+                                <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted)">
+                                    Chargement...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Main Charts -->
+            <div class="charts-grid">
+                <div class="chart-card full-width">
+                    <h3>Evolution des vues par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="viewsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Taux d'engagement par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="engagementByAccountChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Repartition de l'engagement</h3>
+                    <div class="chart-container">
+                        <canvas id="engagementChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card full-width">
+                    <h3>Comparaison des comptes (Vues, Likes, Partages)</h3>
+                    <div class="chart-container">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Charts -->
+        <div class="tab-content" id="tab-charts">
+            <div class="charts-grid">
+                <div class="chart-card full-width">
+                    <h3>Engagement journalier (Likes, Commentaires, Partages)</h3>
+                    <div class="chart-container">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Likes par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="likesPerAccountChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Nombre de contenus par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="contentPerAccountChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card full-width">
+                    <h3>Vues moyennes par video et par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="avgViewsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Partages par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="sharesPerAccountChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Commentaires par compte</h3>
+                    <div class="chart-container">
+                        <canvas id="commentsPerAccountChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Table -->
+        <div class="tab-content" id="tab-table">
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>Toutes les videos</h3>
+                    <span id="videoCount" class="badge" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:12px;color:var(--text-secondary)">0 videos</span>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-sort="account_username">Compte <span class="sort-arrow"></span></th>
+                                <th data-sort="create_time">Date <span class="sort-arrow"></span></th>
+                                <th data-sort="views">Vues <span class="sort-arrow"></span></th>
+                                <th data-sort="likes">Likes <span class="sort-arrow"></span></th>
+                                <th>Engagement</th>
+                                <th data-sort="comments">Commentaires <span class="sort-arrow"></span></th>
+                                <th data-sort="shares">Partages <span class="sort-arrow"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="videosTableBody">
+                            <tr>
+                                <td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted)">
+                                    Chargement...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay hidden" id="importModal">
+        <div class="modal">
+            <h2>Importer des donnees CSV</h2>
+            <p>Format attendu: username;video_id;description;date;views;likes;comments;shares;saves (separateur: point-virgule)</p>
+            <div class="file-upload" onclick="document.getElementById('csvFileInput').click()">
+                <input type="file" id="csvFileInput" accept=".csv">
+                <p style="font-size:32px;margin-bottom:8px">&#128196;</p>
+                <p>Cliquez pour selectionner un fichier CSV</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeImportModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="handleImport()">Importer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accounts Management Modal -->
+    <div class="modal-overlay hidden" id="accountsModal">
+        <div class="modal">
+            <h2>Gerer les comptes TikTok</h2>
+            <p>Ajoutez ou supprimez les comptes TikTok a suivre.</p>
+            <div id="accountsList" class="accounts-list"></div>
+            <div class="add-account-form">
+                <input type="text" id="newAccountInput" placeholder="@nom_utilisateur" onkeydown="if(event.key==='Enter')addAccount()">
+                <button class="btn btn-primary btn-sm" onclick="addAccount()">Ajouter</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeAccountsModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
