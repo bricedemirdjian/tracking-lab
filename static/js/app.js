@@ -93,8 +93,9 @@ async function loadDashboard() {
             fetchAPI("/api/stats", params),
             fetchAPI("/api/videos", { ...params, sort_by: state.sortBy, sort_order: state.sortOrder }),
             fetchAPI("/api/evolution", params),
-            fetchAPI("/api/best-videos", { ...params, limit: state.bestVideosLimit }),
-            fetchAPI("/api/latest-videos", { ...params, limit: state.latestVideosLimit }),
+            // Best & Latest videos: only filter by account, NOT by date (always show global best/latest)
+            fetchAPI("/api/best-videos", { account: state.selectedAccount, limit: state.bestVideosLimit }),
+            fetchAPI("/api/latest-videos", { account: state.selectedAccount, limit: state.latestVideosLimit }),
         ]);
 
         if (!accounts) return; // Redirected to login
@@ -305,7 +306,7 @@ function renderViewsChart(evolution) {
 
     if (state.charts.views) state.charts.views.destroy();
 
-    // Evolution data now comes from daily_snapshots (cumulative totals per day)
+    // Evolution data from daily_snapshots (cumulative totals per scraping day)
     const dateMap = {};
     const accountsInData = new Set();
     evolution.forEach(d => {
@@ -316,18 +317,22 @@ function renderViewsChart(evolution) {
 
     const dates = Object.keys(dateMap).sort();
     const datasets = [];
+    const fewPoints = dates.length <= 7;
 
     accountsInData.forEach(username => {
         datasets.push({
             label: "@" + username,
             data: dates.map(d => dateMap[d][username] || 0),
             borderColor: getAccountColor(username),
-            backgroundColor: getAccountColor(username) + "20",
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 3,
-            pointHoverRadius: 6,
+            backgroundColor: "transparent",
+            borderWidth: 2.5,
+            fill: false,
+            tension: 0.35,
+            pointRadius: fewPoints ? 5 : 3,
+            pointHoverRadius: 7,
+            pointBackgroundColor: getAccountColor(username),
+            pointBorderColor: "#12121e",
+            pointBorderWidth: 2,
         });
     });
 
@@ -339,30 +344,38 @@ function renderViewsChart(evolution) {
             maintainAspectRatio: false,
             interaction: { mode: "index", intersect: false },
             plugins: {
-                legend: { labels: { color: "#8888aa", font: { size: 11 } } },
+                legend: {
+                    position: "bottom",
+                    labels: { color: "#8888aa", font: { size: 11 }, padding: 16, usePointStyle: true, pointStyle: "circle" },
+                },
                 tooltip: {
-                    backgroundColor: "#1a1a2e",
+                    backgroundColor: "#1a1a2eee",
                     titleColor: "#f0f0f5",
-                    bodyColor: "#8888aa",
+                    bodyColor: "#c0c0d0",
                     borderColor: "#2a2a40",
                     borderWidth: 1,
+                    padding: 10,
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ": " + formatNumber(ctx.raw) + " vues",
+                        label: ctx => " " + ctx.dataset.label + ": " + formatNumber(ctx.raw) + " vues",
                     },
                 },
                 datalabels: {
-                    color: "#f0f0f5",
-                    font: { size: 9, weight: "bold" },
+                    // Only show label on the LAST data point to avoid overlap
+                    display: ctx => ctx.dataIndex === ctx.dataset.data.length - 1 && ctx.dataset.data[ctx.dataIndex] > 0,
+                    color: ctx => ctx.dataset.borderColor,
+                    font: { size: 10, weight: "bold" },
                     anchor: "end",
-                    align: "top",
-                    offset: 2,
+                    align: "right",
+                    offset: 6,
                     formatter: v => formatCompact(v),
-                    display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
                 },
             },
             scales: {
                 x: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", font: { size: 10 } } },
-                y: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatCompact(v) } },
+                y: {
+                    grid: { color: "#1a1a2e" },
+                    ticks: { color: "#555570", callback: v => formatCompact(v) },
+                },
             },
         },
     });
@@ -556,24 +569,40 @@ function renderTable(videos) {
     countEl.textContent = videos.length + " videos";
 
     if (videos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted)">Aucune video trouvee. Lancez un scraping ou importez un CSV.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-muted)">Aucune video trouvee. Lancez un scraping ou importez un CSV.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = videos.map(v => {
-        const colorIdx = getAccountColorIndex(v.account_username);
+        const color = getAccountColor(v.account_username);
         const totalEngagement = (v.likes || 0) + (v.comments || 0) + (v.shares || 0) + (v.saves || 0);
         const engRate = v.views > 0 ? ((totalEngagement / v.views) * 100).toFixed(2) : "0.00";
+        const desc = (v.description || "").length > 50 ? v.description.substring(0, 50) + "..." : (v.description || "");
+        const thumb = v.thumbnail_url || "";
+        const url = v.video_url || "#";
 
         return `
             <tr>
-                <td><span class="account-tag"><span class="dot color-${colorIdx}"></span>@${v.account_username}</span></td>
+                <td>
+                    <div class="table-video-cell">
+                        <a href="${url}" target="_blank" class="table-thumb">
+                            ${thumb ? `<img src="${thumb}" alt="" onerror="this.style.display='none'">` : ""}
+                            <span class="table-thumb-ph">&#127909;</span>
+                        </a>
+                        <div class="table-video-meta">
+                            <div class="table-account" style="color:${color}">@${v.account_username}</div>
+                            <div class="table-desc" title="${(v.description || '').replace(/"/g, '&quot;')}">${desc}</div>
+                        </div>
+                    </div>
+                </td>
                 <td>${formatDate(v.create_time)}</td>
-                <td><span class="metric">${formatNumber(v.views)}</span></td>
-                <td><span class="metric">${formatNumber(v.likes)}</span></td>
-                <td><span class="metric" style="color:var(--tiktok-blue)">${engRate}%</span></td>
-                <td><span class="metric">${formatNumber(v.comments)}</span></td>
-                <td><span class="metric">${formatNumber(v.shares)}</span></td>
+                <td class="text-right"><span class="metric">${formatNumber(v.views)}</span></td>
+                <td class="text-right"><span class="metric">${formatNumber(v.likes)}</span></td>
+                <td class="text-right"><span class="metric" style="color:var(--tiktok-blue)">${engRate}%</span></td>
+                <td class="text-right"><span class="metric">${formatNumber(v.comments)}</span></td>
+                <td class="text-right"><span class="metric">${formatNumber(v.shares)}</span></td>
+                <td class="text-right"><span class="metric">${formatNumber(v.saves || 0)}</span></td>
+                <td><a href="${url}" target="_blank" class="table-link" title="Voir sur TikTok">&#x2197;</a></td>
             </tr>
         `;
     }).join("");
