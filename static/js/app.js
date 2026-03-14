@@ -844,4 +844,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     loadDashboard();
     startAutoRefresh();
+    // Auto-scrape au chargement de la page
+    autoScrapeOnLoad();
 });
+
+async function autoScrapeOnLoad() {
+    try {
+        // Verifier si un scraping est deja en cours
+        const status = await fetchAPI("/api/scrape-status");
+        if (status && status.active) {
+            // Scraping deja en cours, juste suivre la progression
+            const btn = document.getElementById("scrapeBtn");
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span> Scraping...';
+            lastCompletedCount = status.completed || 0;
+            startScrapePolling();
+            return;
+        }
+        // Lancer le scraping automatiquement
+        startScraping();
+    } catch (e) {
+        console.error("Auto-scrape error:", e);
+    }
+}
