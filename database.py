@@ -299,9 +299,98 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
     conn.close()
     return [dict(v) for v in videos]
 
+def _compute_period_deltas(date_from, date_to, user_id=None, account_username=None):
+    """Compute engagement deltas between two dates using daily_snapshots.
+    Returns dict keyed by account_username with deltas for all metrics.
+
+    Logic: delta = snapshot_at(date_to) - snapshot_before(date_from)
+    This gives the engagement GAINED during the period, regardless of when videos were posted.
+    """
+    conn = get_connection()
+    query = """
+        SELECT account_username, snapshot_date, total_videos, total_views,
+               total_likes, total_comments, total_shares, total_saves
+        FROM daily_snapshots WHERE 1=1
+    """
+    params = []
+    if user_id is not None:
+        query += " AND user_id = ?"
+        params.append(user_id)
+    if account_username and account_username != "all":
+        query += " AND account_username = ?"
+        params.append(account_username)
+    query += " ORDER BY account_username, snapshot_date ASC"
+
+    snapshots = conn.execute(query, params).fetchall()
+    conn.close()
+
+    if not snapshots:
+        return {}
+
+    # Group by account
+    account_snaps = {}
+    for s in snapshots:
+        acc = s['account_username']
+        if acc not in account_snaps:
+            account_snaps[acc] = []
+        account_snaps[acc].append(dict(s))
+
+    metrics = ['total_videos', 'total_views', 'total_likes', 'total_comments', 'total_shares', 'total_saves']
+    results = {}
+
+    for acc, snaps in account_snaps.items():
+        # Find end snapshot: latest snapshot ON or BEFORE date_to
+        end_snap = None
+        if date_to:
+            for s in reversed(snaps):
+                if s['snapshot_date'] <= date_to:
+                    end_snap = s
+                    break
+        else:
+            end_snap = snaps[-1] if snaps else None
+
+        # Find start snapshot: latest snapshot STRICTLY BEFORE date_from
+        start_snap = None
+        if date_from:
+            for s in reversed(snaps):
+                if s['snapshot_date'] < date_from:
+                    start_snap = s
+                    break
+        # If no start_snap, baseline is 0 (all engagement up to end counts)
+
+        if end_snap is None:
+            continue
+
+        delta = {'account_username': acc}
+        for m in metrics:
+            end_val = end_snap.get(m, 0) or 0
+            start_val = (start_snap.get(m, 0) or 0) if start_snap else 0
+            delta[m] = max(0, end_val - start_val)
+
+        # Compute averages based on current total videos (not delta)
+        current_videos = end_snap.get('total_videos', 0) or 1
+        delta['avg_views'] = delta['total_views'] / max(1, current_videos)
+        delta['avg_likes'] = delta['total_likes'] / max(1, current_videos)
+        delta['avg_comments'] = delta['total_comments'] / max(1, current_videos)
+        delta['avg_shares'] = delta['total_shares'] / max(1, current_videos)
+        delta['avg_saves'] = delta['total_saves'] / max(1, current_videos)
+
+        results[acc] = delta
+
+    return results
+
+
 def get_aggregated_stats(account_username=None, date_from=None, date_to=None, user_id=None):
-    """Get per-account aggregated stats from the videos table.
-    Date filters apply to video publication date (create_time)."""
+    """Get per-account aggregated stats.
+    Without dates: current totals from videos table.
+    With dates: engagement GAINED during the period (deltas from daily_snapshots)."""
+
+    if date_from or date_to:
+        deltas = _compute_period_deltas(date_from, date_to, user_id, account_username)
+        if deltas:
+            return list(deltas.values())
+        # Fallback to videos table if no snapshots exist
+
     conn = get_connection()
     query = """
         SELECT
@@ -326,12 +415,6 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
     if account_username and account_username != "all":
         query += " AND account_username = ?"
         params.append(account_username)
-    if date_from:
-        query += " AND create_time >= ?"
-        params.append(date_from)
-    if date_to:
-        query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
     query += " GROUP BY account_username"
 
     results = conn.execute(query, params).fetchall()
@@ -339,8 +422,23 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
     return [dict(r) for r in results]
 
 def get_global_stats(date_from=None, date_to=None, user_id=None):
-    """Get global stats from the videos table.
-    Date filters apply to video publication date (create_time)."""
+    """Get global stats.
+    Without dates: current totals from videos table.
+    With dates: engagement GAINED during the period (deltas from daily_snapshots)."""
+
+    if date_from or date_to:
+        deltas = _compute_period_deltas(date_from, date_to, user_id)
+        if deltas:
+            result = {
+                'total_videos': 0, 'total_views': 0, 'total_likes': 0,
+                'total_comments': 0, 'total_shares': 0, 'total_saves': 0,
+            }
+            for acc_delta in deltas.values():
+                for key in result:
+                    result[key] += acc_delta.get(key, 0)
+            return result
+        # Fallback to videos table if no snapshots exist
+
     conn = get_connection()
     query = """
         SELECT
@@ -356,12 +454,6 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
     if user_id is not None:
         query += " AND user_id = ?"
         params.append(user_id)
-    if date_from:
-        query += " AND create_time >= ?"
-        params.append(date_from)
-    if date_to:
-        query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
 
     result = conn.execute(query, params).fetchone()
     conn.close()
