@@ -301,38 +301,74 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
 
 def get_aggregated_stats(account_username=None, date_from=None, date_to=None, user_id=None):
     conn = get_connection()
-    query = """
-        SELECT
-            account_username,
-            COUNT(*) as total_videos,
-            COALESCE(SUM(views), 0) as total_views,
-            COALESCE(SUM(likes), 0) as total_likes,
-            COALESCE(SUM(comments), 0) as total_comments,
-            COALESCE(SUM(shares), 0) as total_shares,
-            COALESCE(SUM(saves), 0) as total_saves,
-            COALESCE(AVG(views), 0) as avg_views,
-            COALESCE(AVG(likes), 0) as avg_likes,
-            COALESCE(AVG(comments), 0) as avg_comments,
-            COALESCE(AVG(shares), 0) as avg_shares,
-            COALESCE(AVG(saves), 0) as avg_saves
-        FROM videos WHERE 1=1
-    """
-    params = []
 
-    if user_id is not None:
-        query += " AND user_id = ?"
-        params.append(user_id)
-    if account_username and account_username != "all":
-        query += " AND account_username = ?"
-        params.append(account_username)
-    if date_from:
-        query += " AND create_time >= ?"
-        params.append(date_from)
-    if date_to:
-        query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
-
-    query += " GROUP BY account_username"
+    if date_from or date_to:
+        # Use daily_snapshots: get the LATEST snapshot within the date range per account
+        query = """
+            SELECT
+                s.account_username,
+                s.total_videos,
+                s.total_views,
+                s.total_likes,
+                s.total_comments,
+                s.total_shares,
+                s.total_saves,
+                CASE WHEN s.total_videos > 0 THEN CAST(s.total_views AS REAL) / s.total_videos ELSE 0 END as avg_views,
+                CASE WHEN s.total_videos > 0 THEN CAST(s.total_likes AS REAL) / s.total_videos ELSE 0 END as avg_likes,
+                CASE WHEN s.total_videos > 0 THEN CAST(s.total_comments AS REAL) / s.total_videos ELSE 0 END as avg_comments,
+                CASE WHEN s.total_videos > 0 THEN CAST(s.total_shares AS REAL) / s.total_videos ELSE 0 END as avg_shares,
+                CASE WHEN s.total_videos > 0 THEN CAST(s.total_saves AS REAL) / s.total_videos ELSE 0 END as avg_saves
+            FROM daily_snapshots s
+            INNER JOIN (
+                SELECT account_username, MAX(snapshot_date) as max_date
+                FROM daily_snapshots WHERE 1=1
+        """
+        params = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        if account_username and account_username != "all":
+            query += " AND account_username = ?"
+            params.append(account_username)
+        if date_from:
+            query += " AND snapshot_date >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND snapshot_date <= ?"
+            params.append(date_to)
+        query += " GROUP BY account_username"
+        query += """
+            ) latest ON s.account_username = latest.account_username AND s.snapshot_date = latest.max_date
+        """
+        if user_id is not None:
+            query += " WHERE s.user_id = ?"
+            params.append(user_id)
+    else:
+        # No date filter: use current video stats
+        query = """
+            SELECT
+                account_username,
+                COUNT(*) as total_videos,
+                COALESCE(SUM(views), 0) as total_views,
+                COALESCE(SUM(likes), 0) as total_likes,
+                COALESCE(SUM(comments), 0) as total_comments,
+                COALESCE(SUM(shares), 0) as total_shares,
+                COALESCE(SUM(saves), 0) as total_saves,
+                COALESCE(AVG(views), 0) as avg_views,
+                COALESCE(AVG(likes), 0) as avg_likes,
+                COALESCE(AVG(comments), 0) as avg_comments,
+                COALESCE(AVG(shares), 0) as avg_shares,
+                COALESCE(AVG(saves), 0) as avg_saves
+            FROM videos WHERE 1=1
+        """
+        params = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        if account_username and account_username != "all":
+            query += " AND account_username = ?"
+            params.append(account_username)
+        query += " GROUP BY account_username"
 
     results = conn.execute(query, params).fetchall()
     conn.close()
@@ -340,44 +376,74 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
 
 def get_global_stats(date_from=None, date_to=None, user_id=None):
     conn = get_connection()
-    query = """
-        SELECT
-            COUNT(*) as total_videos,
-            COALESCE(SUM(views), 0) as total_views,
-            COALESCE(SUM(likes), 0) as total_likes,
-            COALESCE(SUM(comments), 0) as total_comments,
-            COALESCE(SUM(shares), 0) as total_shares,
-            COALESCE(SUM(saves), 0) as total_saves
-        FROM videos WHERE 1=1
-    """
-    params = []
-    if user_id is not None:
-        query += " AND user_id = ?"
-        params.append(user_id)
-    if date_from:
-        query += " AND create_time >= ?"
-        params.append(date_from)
-    if date_to:
-        query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
+
+    if date_from or date_to:
+        # Use daily_snapshots: get the LATEST snapshot per account within range, then sum
+        query = """
+            SELECT
+                COALESCE(SUM(s.total_videos), 0) as total_videos,
+                COALESCE(SUM(s.total_views), 0) as total_views,
+                COALESCE(SUM(s.total_likes), 0) as total_likes,
+                COALESCE(SUM(s.total_comments), 0) as total_comments,
+                COALESCE(SUM(s.total_shares), 0) as total_shares,
+                COALESCE(SUM(s.total_saves), 0) as total_saves
+            FROM daily_snapshots s
+            INNER JOIN (
+                SELECT account_username, MAX(snapshot_date) as max_date
+                FROM daily_snapshots WHERE 1=1
+        """
+        params = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        if date_from:
+            query += " AND snapshot_date >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND snapshot_date <= ?"
+            params.append(date_to)
+        query += " GROUP BY account_username"
+        query += """
+            ) latest ON s.account_username = latest.account_username AND s.snapshot_date = latest.max_date
+        """
+        if user_id is not None:
+            query += " WHERE s.user_id = ?"
+            params.append(user_id)
+    else:
+        # No date filter: use current video stats
+        query = """
+            SELECT
+                COUNT(*) as total_videos,
+                COALESCE(SUM(views), 0) as total_views,
+                COALESCE(SUM(likes), 0) as total_likes,
+                COALESCE(SUM(comments), 0) as total_comments,
+                COALESCE(SUM(shares), 0) as total_shares,
+                COALESCE(SUM(saves), 0) as total_saves
+            FROM videos WHERE 1=1
+        """
+        params = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
 
     result = conn.execute(query, params).fetchone()
     conn.close()
     return dict(result)
 
 def get_daily_evolution(account_username=None, date_from=None, date_to=None, user_id=None):
+    """Get daily evolution from daily_snapshots (stats by scraping date, not video publication date)."""
     conn = get_connection()
     query = """
         SELECT
-            DATE(create_time) as date,
+            snapshot_date as date,
             account_username,
-            COUNT(*) as videos,
-            COALESCE(SUM(views), 0) as views,
-            COALESCE(SUM(likes), 0) as likes,
-            COALESCE(SUM(comments), 0) as comments,
-            COALESCE(SUM(shares), 0) as shares,
-            COALESCE(SUM(saves), 0) as saves
-        FROM videos WHERE create_time IS NOT NULL
+            total_videos as videos,
+            total_views as views,
+            total_likes as likes,
+            total_comments as comments,
+            total_shares as shares,
+            total_saves as saves
+        FROM daily_snapshots WHERE 1=1
     """
     params = []
     if user_id is not None:
@@ -387,13 +453,13 @@ def get_daily_evolution(account_username=None, date_from=None, date_to=None, use
         query += " AND account_username = ?"
         params.append(account_username)
     if date_from:
-        query += " AND create_time >= ?"
+        query += " AND snapshot_date >= ?"
         params.append(date_from)
     if date_to:
-        query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
+        query += " AND snapshot_date <= ?"
+        params.append(date_to)
 
-    query += " GROUP BY DATE(create_time), account_username ORDER BY date ASC"
+    query += " ORDER BY snapshot_date ASC"
 
     results = conn.execute(query, params).fetchall()
     conn.close()

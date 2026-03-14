@@ -234,9 +234,19 @@ function renderVideoCards(videos, containerId, badgeId, badgePrefix) {
         const url = v.video_url || "#";
         const rankHtml = badgePrefix === "Top " ? `<div class="vcard-rank" style="${i < 3 ? 'background:var(--warning);color:#000' : ''}">${i < 3 ? ['&#129351;','&#129352;','&#129353;'][i] : '#' + (i + 1)}</div>` : "";
 
+        // Use <img> tag with onerror fallback for reliable thumbnail display
+        const thumbHtml = thumb
+            ? `<img src="${thumb}" alt="" class="vcard-thumb-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : "";
+        const placeholderStyle = thumb ? 'style="display:none"' : 'style="display:flex"';
+
         return `
             <div class="video-card">
-                <a href="${url}" target="_blank" class="vcard-thumb" style="background-image:url('${thumb}')">
+                <a href="${url}" target="_blank" class="vcard-thumb">
+                    ${thumbHtml}
+                    <div class="vcard-thumb-placeholder" ${placeholderStyle}>
+                        <span>&#127909;</span>
+                    </div>
                     ${rankHtml}
                     <div class="vcard-views">&#9654; ${formatCompact(v.views || 0) || "0"}</div>
                 </a>
@@ -295,6 +305,7 @@ function renderViewsChart(evolution) {
 
     if (state.charts.views) state.charts.views.destroy();
 
+    // Evolution data now comes from daily_snapshots (cumulative totals per day)
     const dateMap = {};
     const accountsInData = new Set();
     evolution.forEach(d => {
@@ -336,7 +347,7 @@ function renderViewsChart(evolution) {
                     borderColor: "#2a2a40",
                     borderWidth: 1,
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ": " + formatNumber(ctx.raw),
+                        label: ctx => ctx.dataset.label + ": " + formatNumber(ctx.raw) + " vues",
                     },
                 },
                 datalabels: {
@@ -351,7 +362,7 @@ function renderViewsChart(evolution) {
             },
             scales: {
                 x: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", font: { size: 10 } } },
-                y: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatNumber(v) } },
+                y: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatCompact(v) } },
             },
         },
     });
@@ -500,6 +511,8 @@ function renderTimelineChart(evolution) {
     const ctx = document.getElementById("timelineChart");
     if (!ctx) return;
     if (state.charts.timeline) state.charts.timeline.destroy();
+
+    // Aggregate snapshot data per date (sum across accounts)
     const dateMap = {};
     evolution.forEach(d => {
         if (!dateMap[d.date]) dateMap[d.date] = { likes: 0, comments: 0, shares: 0 };
@@ -508,6 +521,7 @@ function renderTimelineChart(evolution) {
         dateMap[d.date].shares += d.shares;
     });
     const dates = Object.keys(dateMap).sort();
+
     state.charts.timeline = new Chart(ctx, {
         type: "bar",
         data: {
@@ -528,7 +542,7 @@ function renderTimelineChart(evolution) {
             },
             scales: {
                 x: { stacked: true, grid: { display: false }, ticks: { color: "#555570", font: { size: 10 } } },
-                y: { stacked: true, grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatNumber(v) } },
+                y: { stacked: true, grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatCompact(v) } },
             },
         },
     });

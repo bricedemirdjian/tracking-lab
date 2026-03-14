@@ -93,7 +93,24 @@ def process_ytdlp_data(username, videos_data, user_id=None):
         saves = vdata.get("forward_count", 0) or 0
         duration = vdata.get("duration", 0) or 0
         description = vdata.get("description", "") or vdata.get("title", "") or ""
+        # Extract thumbnail: try 'thumbnail' first, then 'thumbnails' array
         thumbnail = vdata.get("thumbnail", None)
+        if not thumbnail:
+            thumbnails_list = vdata.get("thumbnails", [])
+            if thumbnails_list:
+                # Prefer originCover > cover > first available
+                for t in thumbnails_list:
+                    if t.get("id") == "originCover":
+                        thumbnail = t.get("url")
+                        break
+                if not thumbnail:
+                    for t in thumbnails_list:
+                        if t.get("id") == "cover":
+                            thumbnail = t.get("url")
+                            break
+                if not thumbnail:
+                    thumbnail = thumbnails_list[0].get("url")
+
         video_url = vdata.get("webpage_url", None)
 
         upsert_video(
