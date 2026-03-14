@@ -34,6 +34,11 @@ let state = {
     charts: {},
     bestVideosLimit: 10,
     latestVideosLimit: 10,
+    // Table state
+    tableSearch: "",
+    tablePage: 1,
+    tablePerPage: 25,
+    tableVideos: [],
 };
 
 // Utility functions
@@ -562,28 +567,81 @@ function renderTimelineChart(evolution) {
     });
 }
 
-// Render Table
+// Render Table with search, pagination and engagement bars
 function renderTable(videos) {
+    state.tableVideos = videos;
+    state.tablePage = 1;
+    renderTablePage();
+}
+
+function getFilteredTableVideos() {
+    const q = state.tableSearch.toLowerCase().trim();
+    if (!q) return state.tableVideos;
+    return state.tableVideos.filter(v =>
+        (v.account_username || "").toLowerCase().includes(q) ||
+        (v.description || "").toLowerCase().includes(q) ||
+        (v.video_id || "").toLowerCase().includes(q)
+    );
+}
+
+function renderTablePage() {
     const tbody = document.getElementById("videosTableBody");
     const countEl = document.getElementById("videoCount");
+    const paginationEl = document.getElementById("tablePagination");
 
-    countEl.textContent = videos.length + " videos";
+    const filtered = getFilteredTableVideos();
+    const total = filtered.length;
+    const perPage = state.tablePerPage;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
 
-    if (videos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-muted)">Aucune video trouvee. Lancez un scraping ou importez un CSV.</td></tr>`;
+    // Clamp current page
+    if (state.tablePage > totalPages) state.tablePage = totalPages;
+    if (state.tablePage < 1) state.tablePage = 1;
+
+    const startIdx = (state.tablePage - 1) * perPage;
+    const pageVideos = filtered.slice(startIdx, startIdx + perPage);
+
+    // Update count badge
+    if (state.tableSearch) {
+        countEl.textContent = total + " / " + state.tableVideos.length + " videos";
+    } else {
+        countEl.textContent = total + " videos";
+    }
+
+    // Find max engagement rate for bar scaling
+    const maxEng = Math.max(1, ...filtered.map(v => {
+        const eng = (v.likes || 0) + (v.comments || 0) + (v.shares || 0) + (v.saves || 0);
+        return v.views > 0 ? (eng / v.views) * 100 : 0;
+    }));
+
+    if (total === 0) {
+        if (state.tableSearch) {
+            tbody.innerHTML = `<tr><td colspan="9"><div class="table-empty-search"><div class="empty-icon">&#128269;</div><p>Aucun resultat pour "${state.tableSearch}"</p></div></td></tr>`;
+        } else {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-muted)">Aucune video trouvee. Lancez un scraping ou importez un CSV.</td></tr>`;
+        }
+        renderTablePagination(totalPages);
         return;
     }
 
-    tbody.innerHTML = videos.map(v => {
+    tbody.innerHTML = pageVideos.map((v, idx) => {
+        const rowNum = startIdx + idx + 1;
         const color = getAccountColor(v.account_username);
         const totalEngagement = (v.likes || 0) + (v.comments || 0) + (v.shares || 0) + (v.saves || 0);
-        const engRate = v.views > 0 ? ((totalEngagement / v.views) * 100).toFixed(2) : "0.00";
-        const desc = (v.description || "").length > 50 ? v.description.substring(0, 50) + "..." : (v.description || "");
+        const engRate = v.views > 0 ? ((totalEngagement / v.views) * 100) : 0;
+        const engRateStr = engRate.toFixed(2);
+        const desc = (v.description || "").length > 60 ? v.description.substring(0, 60) + "..." : (v.description || "Sans description");
         const thumb = v.thumbnail_url || "";
         const url = v.video_url || "#";
 
+        // Engagement color class
+        const engClass = engRate >= 5 ? "eng-high" : engRate >= 2 ? "eng-mid" : "eng-low";
+        const engBarColor = engRate >= 5 ? "var(--success)" : engRate >= 2 ? "var(--warning)" : "var(--tiktok-pink)";
+        const engBarWidth = Math.min(100, (engRate / Math.min(maxEng, 15)) * 100);
+
         return `
             <tr>
+                <td><span class="table-row-num">${rowNum}</span></td>
                 <td>
                     <div class="table-video-cell">
                         <a href="${url}" target="_blank" class="table-thumb">
@@ -599,7 +657,14 @@ function renderTable(videos) {
                 <td>${formatDate(v.create_time)}</td>
                 <td class="text-right"><span class="metric">${formatNumber(v.views)}</span></td>
                 <td class="text-right"><span class="metric">${formatNumber(v.likes)}</span></td>
-                <td class="text-right"><span class="metric" style="color:var(--tiktok-blue)">${engRate}%</span></td>
+                <td class="text-right">
+                    <div class="table-eng-cell">
+                        <span class="table-eng-value ${engClass}">${engRateStr}%</span>
+                        <div class="table-eng-bar">
+                            <div class="table-eng-bar-fill" style="width:${engBarWidth}%;background:${engBarColor}"></div>
+                        </div>
+                    </div>
+                </td>
                 <td class="text-right"><span class="metric">${formatNumber(v.comments)}</span></td>
                 <td class="text-right"><span class="metric">${formatNumber(v.shares)}</span></td>
                 <td class="text-right"><span class="metric">${formatNumber(v.saves || 0)}</span></td>
@@ -607,6 +672,58 @@ function renderTable(videos) {
             </tr>
         `;
     }).join("");
+
+    renderTablePagination(totalPages);
+}
+
+function renderTablePagination(totalPages) {
+    const el = document.getElementById("tablePagination");
+    if (!el) return;
+
+    const filtered = getFilteredTableVideos();
+    const total = filtered.length;
+    const startIdx = (state.tablePage - 1) * state.tablePerPage;
+    const endIdx = Math.min(startIdx + state.tablePerPage, total);
+
+    let pagesHtml = "";
+    // Show max 5 page buttons
+    let startPage = Math.max(1, state.tablePage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let i = startPage; i <= endPage; i++) {
+        pagesHtml += `<button class="table-page-btn ${i === state.tablePage ? 'active' : ''}" onclick="goToTablePage(${i})">${i}</button>`;
+    }
+
+    el.innerHTML = `
+        <span class="table-pagination-info">${total > 0 ? (startIdx + 1) + '-' + endIdx + ' sur ' + total : '0 videos'}</span>
+        <button class="table-page-btn" onclick="goToTablePage(${state.tablePage - 1})" ${state.tablePage <= 1 ? 'disabled' : ''}>&#8249;</button>
+        ${pagesHtml}
+        <button class="table-page-btn" onclick="goToTablePage(${state.tablePage + 1})" ${state.tablePage >= totalPages ? 'disabled' : ''}>&#8250;</button>
+    `;
+}
+
+function goToTablePage(page) {
+    const filtered = getFilteredTableVideos();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / state.tablePerPage));
+    if (page < 1 || page > totalPages) return;
+    state.tablePage = page;
+    renderTablePage();
+    // Scroll to top of table
+    const tableEl = document.querySelector(".table-container");
+    if (tableEl) tableEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function onTableSearch(value) {
+    state.tableSearch = value;
+    state.tablePage = 1;
+    renderTablePage();
+}
+
+function onTablePerPageChange(value) {
+    state.tablePerPage = parseInt(value);
+    state.tablePage = 1;
+    renderTablePage();
 }
 
 // Event handlers

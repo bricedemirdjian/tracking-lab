@@ -1189,17 +1189,137 @@ td .description-cell {
 /* ===== Improved Table ===== */
 .text-right { text-align: right !important; }
 
+/* Table toolbar: search + pagination controls */
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.table-search {
+    flex: 1;
+    min-width: 180px;
+    max-width: 320px;
+    position: relative;
+}
+
+.table-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.table-search input {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 12px 8px 34px;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.table-search input:focus {
+    border-color: var(--tiktok-blue);
+    box-shadow: 0 0 0 2px rgba(37, 244, 238, 0.15);
+}
+
+.table-search input::placeholder {
+    color: var(--text-muted);
+}
+
+.table-pagination {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.table-pagination-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.table-page-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+
+.table-page-btn:hover:not(:disabled) {
+    border-color: var(--tiktok-blue);
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+}
+
+.table-page-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.table-page-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.table-per-page {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+}
+
+.table-per-page label {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.table-per-page select {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Video cell in table */
 .table-video-cell {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 220px;
+    gap: 12px;
+    min-width: 260px;
 }
 
 .table-thumb {
-    width: 40px;
-    height: 52px;
-    border-radius: 6px;
+    width: 48px;
+    height: 64px;
+    border-radius: 8px;
     overflow: hidden;
     flex-shrink: 0;
     background: var(--bg-secondary);
@@ -1208,11 +1328,14 @@ td .description-cell {
     justify-content: center;
     text-decoration: none;
     position: relative;
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border);
 }
 
 .table-thumb:hover {
-    transform: scale(1.08);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border-color: var(--accent);
 }
 
 .table-thumb img {
@@ -1225,47 +1348,141 @@ td .description-cell {
 }
 
 .table-thumb-ph {
-    font-size: 16px;
-    opacity: 0.35;
+    font-size: 18px;
+    opacity: 0.3;
     position: absolute;
 }
 
 .table-video-meta {
     min-width: 0;
+    flex: 1;
 }
 
 .table-account {
-    font-weight: 600;
-    font-size: 12px;
+    font-weight: 700;
+    font-size: 13px;
     line-height: 1.3;
 }
 
 .table-desc {
     font-size: 11px;
     color: var(--text-muted);
-    margin-top: 2px;
-    max-width: 200px;
+    margin-top: 3px;
+    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.4;
 }
 
+/* Engagement mini bar in table */
+.table-eng-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.table-eng-value {
+    font-weight: 700;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.table-eng-bar {
+    width: 48px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.table-eng-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+/* Engagement color coding */
+.eng-high { color: var(--success); }
+.eng-mid { color: var(--warning); }
+.eng-low { color: var(--tiktok-pink); }
+
 .table-link {
-    font-size: 15px;
+    font-size: 18px;
     text-decoration: none;
-    opacity: 0.4;
-    transition: opacity 0.2s;
-    display: inline-block;
+    opacity: 0.3;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
 }
 
 .table-link:hover {
     opacity: 1;
+    background: var(--bg-secondary);
+}
+
+/* Table row styles */
+tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
 }
 
 tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.01);
+    background: rgba(255, 255, 255, 0.015);
 }
 
 tbody tr:hover {
-    background: var(--bg-card-hover);
+    background: rgba(37, 244, 238, 0.03);
+}
+
+tbody td {
+    padding: 14px 16px;
+    font-size: 13px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Table header sticky */
+thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* Metric pill style for numeric values */
+td .metric {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+}
+
+/* Row number */
+.table-row-num {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+    text-align: center;
+}
+
+/* Table empty search state */
+.table-empty-search {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+}
+
+.table-empty-search .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.table-empty-search p {
+    font-size: 14px;
 }
