@@ -92,7 +92,8 @@ async function loadDashboard() {
             fetchAPI("/api/accounts"),
             fetchAPI("/api/stats", params),
             fetchAPI("/api/videos", { ...params, sort_by: state.sortBy, sort_order: state.sortOrder }),
-            fetchAPI("/api/evolution", params),
+            // Evolution chart: only filter by account, NOT by date (always show full history)
+            fetchAPI("/api/evolution", { account: state.selectedAccount }),
             // Best & Latest videos: only filter by account, NOT by date (always show global best/latest)
             fetchAPI("/api/best-videos", { account: state.selectedAccount, limit: state.bestVideosLimit }),
             fetchAPI("/api/latest-videos", { account: state.selectedAccount, limit: state.latestVideosLimit }),
