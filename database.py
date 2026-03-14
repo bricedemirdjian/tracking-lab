@@ -383,13 +383,14 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
 def get_aggregated_stats(account_username=None, date_from=None, date_to=None, user_id=None):
     """Get per-account aggregated stats.
     Without dates: current totals from videos table.
-    With dates: engagement GAINED during the period (deltas from daily_snapshots)."""
+    With dates: engagement GAINED during the period (deltas from daily_snapshots).
+    Fallback: filter videos by create_time when no snapshots available."""
 
     if date_from or date_to:
         deltas = _compute_period_deltas(date_from, date_to, user_id, account_username)
         if deltas:
             return list(deltas.values())
-        # Fallback to videos table if no snapshots exist
+        # Fallback to videos table filtered by create_time
 
     conn = get_connection()
     query = """
@@ -415,6 +416,12 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
     if account_username and account_username != "all":
         query += " AND account_username = ?"
         params.append(account_username)
+    if date_from:
+        query += " AND create_time >= ?"
+        params.append(date_from)
+    if date_to:
+        query += " AND create_time <= ?"
+        params.append(date_to + " 23:59:59")
     query += " GROUP BY account_username"
 
     results = conn.execute(query, params).fetchall()
@@ -424,7 +431,8 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
 def get_global_stats(date_from=None, date_to=None, user_id=None):
     """Get global stats.
     Without dates: current totals from videos table.
-    With dates: engagement GAINED during the period (deltas from daily_snapshots)."""
+    With dates: engagement GAINED during the period (deltas from daily_snapshots).
+    Fallback: filter videos by create_time when no snapshots available."""
 
     if date_from or date_to:
         deltas = _compute_period_deltas(date_from, date_to, user_id)
@@ -437,7 +445,7 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
                 for key in result:
                     result[key] += acc_delta.get(key, 0)
             return result
-        # Fallback to videos table if no snapshots exist
+        # Fallback to videos table filtered by create_time
 
     conn = get_connection()
     query = """
@@ -454,6 +462,12 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
     if user_id is not None:
         query += " AND user_id = ?"
         params.append(user_id)
+    if date_from:
+        query += " AND create_time >= ?"
+        params.append(date_from)
+    if date_to:
+        query += " AND create_time <= ?"
+        params.append(date_to + " 23:59:59")
 
     result = conn.execute(query, params).fetchone()
     conn.close()
