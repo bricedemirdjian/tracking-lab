@@ -313,10 +313,13 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 18px 20px;
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .account-card:hover,
@@ -329,95 +332,119 @@ body {
 .account-card.active::after {
     content: '';
     position: absolute;
-    top: -1px;
-    left: -1px;
-    right: -1px;
-    bottom: -1px;
+    top: -1px; left: -1px; right: -1px; bottom: -1px;
     border-radius: var(--radius);
     border: 2px solid var(--accent);
     pointer-events: none;
 }
 
+/* Header : avatar + nom + badge contenus */
 .account-card .account-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: 10px;
 }
 
 .account-card .avatar {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--tiktok-blue), var(--tiktok-pink));
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: white;
     flex-shrink: 0;
+}
+
+.account-card .account-info {
+    flex: 1;
+    min-width: 0;
 }
 
 .account-card .account-name {
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .account-card .account-handle {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
 }
 
-.account-eng-badge {
-    margin-left: auto;
-    background: linear-gradient(135deg, var(--tiktok-blue), var(--tiktok-pink));
-    color: white;
-    font-size: 13px;
-    font-weight: 800;
-    padding: 4px 12px;
+.account-contenus-badge {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
     border-radius: 20px;
     white-space: nowrap;
-}
-
-.account-stats-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.stat-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 10px;
-    background: var(--bg-secondary);
-    border-radius: 6px;
-    transition: background 0.15s;
-}
-
-.stat-row:hover {
-    background: var(--bg-card-hover);
-}
-
-.stat-row .stat-icon {
-    font-size: 12px;
-    width: 18px;
-    text-align: center;
     flex-shrink: 0;
 }
 
-.stat-row .stat-label-inline {
-    font-size: 11px;
-    color: var(--text-muted);
-    flex: 1;
+/* Metriques principales : 3 colonnes */
+.account-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
 }
 
-.stat-row .stat-value-inline {
-    font-size: 13px;
-    font-weight: 700;
+.account-metric {
+    text-align: center;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 10px 4px;
+}
+
+.account-metric .metric-value {
+    font-size: 20px;
+    font-weight: 800;
     color: var(--text-primary);
+    line-height: 1.1;
     font-variant-numeric: tabular-nums;
+}
+
+.account-metric .metric-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 3px;
+}
+
+/* Couleur accent par metrique */
+.account-metric.metric-views .metric-value { color: var(--tiktok-blue); }
+.account-metric.metric-likes .metric-value { color: var(--tiktok-pink); }
+.account-metric.metric-eng .metric-value { color: var(--success); }
+
+/* Ligne secondaire compacte */
+.account-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-top: 2px;
+    border-top: 1px solid var(--border);
+}
+
+.account-secondary .sep {
+    opacity: 0.3;
+}
+
+.account-secondary span {
+    white-space: nowrap;
+}
+
+.account-secondary .sec-value {
+    color: var(--text-secondary);
+    font-weight: 600;
 }
 
 /* Charts Section */

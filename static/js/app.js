@@ -167,49 +167,39 @@ function renderAccountCards(accounts, perAccount) {
         const totalEng = (s.total_likes || 0) + (s.total_comments || 0) + (s.total_shares || 0) + (s.total_saves || 0);
         const engRate = (s.total_views || 0) > 0 ? ((totalEng / s.total_views) * 100).toFixed(2) : "0.00";
         const avgViews = (s.total_videos || 0) > 0 ? Math.round((s.total_views || 0) / s.total_videos) : 0;
+        const nbVideos = s.total_videos || 0;
 
         html += `
             <div class="account-card ${state.selectedAccount === account.username ? 'active' : ''}"
                  onclick="selectAccount('${account.username}')">
                 <div class="account-header">
                     <div class="avatar" style="background:${color}">${initial}</div>
-                    <div>
+                    <div class="account-info">
                         <div class="account-name">${displayName}</div>
                         <div class="account-handle">@${account.username}</div>
                     </div>
-                    <div class="account-eng-badge">${engRate}%</div>
+                    <div class="account-contenus-badge">${nbVideos} contenu${nbVideos > 1 ? 's' : ''}</div>
                 </div>
-                <div class="account-stats-grid">
-                    <div class="stat-row">
-                        <span class="stat-icon">&#127909;</span>
-                        <span class="stat-label-inline">Contenus</span>
-                        <span class="stat-value-inline">${formatNumber(s.total_videos || 0)}</span>
+                <div class="account-metrics">
+                    <div class="account-metric metric-views">
+                        <div class="metric-value">${formatCompact(s.total_views || 0) || "0"}</div>
+                        <div class="metric-label">vues</div>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-icon">&#128064;</span>
-                        <span class="stat-label-inline">Vues</span>
-                        <span class="stat-value-inline">${formatNumber(s.total_views || 0)}</span>
+                    <div class="account-metric metric-likes">
+                        <div class="metric-value">${formatCompact(s.total_likes || 0) || "0"}</div>
+                        <div class="metric-label">likes</div>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-icon">&#10084;</span>
-                        <span class="stat-label-inline">Likes</span>
-                        <span class="stat-value-inline">${formatNumber(s.total_likes || 0)}</span>
+                    <div class="account-metric metric-eng">
+                        <div class="metric-value">${engRate}%</div>
+                        <div class="metric-label">engage.</div>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-icon">&#128172;</span>
-                        <span class="stat-label-inline">Commentaires</span>
-                        <span class="stat-value-inline">${formatNumber(s.total_comments || 0)}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-icon">&#128257;</span>
-                        <span class="stat-label-inline">Partages</span>
-                        <span class="stat-value-inline">${formatNumber(s.total_shares || 0)}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-icon">&#128200;</span>
-                        <span class="stat-label-inline">Moy. vues/video</span>
-                        <span class="stat-value-inline">${formatNumber(avgViews)}</span>
-                    </div>
+                </div>
+                <div class="account-secondary">
+                    <span>&#128172; <span class="sec-value">${formatNumber(s.total_comments || 0)}</span></span>
+                    <span class="sep">&#183;</span>
+                    <span>&#128257; <span class="sec-value">${formatNumber(s.total_shares || 0)}</span></span>
+                    <span class="sep">&#183;</span>
+                    <span>&#128200; <span class="sec-value">${formatCompact(avgViews) || "0"}</span>/vid</span>
                 </div>
             </div>
         `;
