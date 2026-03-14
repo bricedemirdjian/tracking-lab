@@ -22,11 +22,14 @@ def fetch_account_data_ytdlp(username):
                 "--no-download",
                 "--no-warnings",
                 "--quiet",
+                "--socket-timeout", "30",
+                "--retries", "1",
+                "--no-check-certificates",
                 url,
             ],
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=120,
         )
 
         if result.returncode != 0:
@@ -160,8 +163,8 @@ def scrape_all_accounts_for_user(user_id, on_start=None, on_done=None):
     print("=" * 60)
 
     results = {}
-    # Scrape up to 3 accounts in parallel
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Scrape up to 5 accounts in parallel for speed
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(_scrape_one_account_with_callback, acc['username'], user_id, on_start, on_done): acc['username']
             for acc in accounts

@@ -39,6 +39,9 @@ let state = {
     tablePage: 1,
     tablePerPage: 25,
     tableVideos: [],
+    // Best videos date filter
+    bestDateFrom: null,
+    bestDateTo: null,
     // Latest videos date filter
     latestDateFrom: null,
     latestDateTo: null,
@@ -102,8 +105,13 @@ async function loadDashboard() {
             fetchAPI("/api/videos", { ...params, sort_by: state.sortBy, sort_order: state.sortOrder }),
             // Evolution chart: only filter by account, NOT by date (always show full history)
             fetchAPI("/api/evolution", { account: state.selectedAccount }),
-            // Best videos: only filter by account, NOT by date (always show global best)
-            fetchAPI("/api/best-videos", { account: state.selectedAccount, limit: state.bestVideosLimit }),
+            // Best videos: filter by account + optional dedicated date filter
+            fetchAPI("/api/best-videos", {
+                account: state.selectedAccount,
+                limit: state.bestVideosLimit,
+                date_from: state.bestDateFrom,
+                date_to: state.bestDateTo,
+            }),
             // Latest videos: filter by account + optional dedicated date filter
             fetchAPI("/api/latest-videos", {
                 account: state.selectedAccount,
@@ -295,6 +303,20 @@ function setBestVideosLimit(n) {
     loadDashboard();
 }
 
+function onBestDateFilter() {
+    state.bestDateFrom = document.getElementById("bestDateFrom").value || null;
+    state.bestDateTo = document.getElementById("bestDateTo").value || null;
+    loadDashboard();
+}
+
+function clearBestDateFilter() {
+    state.bestDateFrom = null;
+    state.bestDateTo = null;
+    document.getElementById("bestDateFrom").value = "";
+    document.getElementById("bestDateTo").value = "";
+    loadDashboard();
+}
+
 function setLatestVideosLimit(n) {
     state.latestVideosLimit = n;
     document.querySelectorAll("#latestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
@@ -335,7 +357,7 @@ function renderViewsChart(evolution) {
 
     if (state.charts.views) state.charts.views.destroy();
 
-    // Evolution data from daily_snapshots (cumulative totals per scraping day)
+    // Build cumulative data per account per date
     const dateMap = {};
     const accountsInData = new Set();
     evolution.forEach(d => {
@@ -345,29 +367,47 @@ function renderViewsChart(evolution) {
     });
 
     const dates = Object.keys(dateMap).sort();
-    const datasets = [];
-    const fewPoints = dates.length <= 7;
+    const accounts = Array.from(accountsInData);
 
-    accountsInData.forEach(username => {
-        datasets.push({
-            label: "@" + username,
-            data: dates.map(d => dateMap[d][username] || 0),
-            borderColor: getAccountColor(username),
-            backgroundColor: "transparent",
-            borderWidth: 2.5,
-            fill: false,
-            tension: 0.35,
-            pointRadius: fewPoints ? 5 : 3,
-            pointHoverRadius: 7,
-            pointBackgroundColor: getAccountColor(username),
-            pointBorderColor: "#12121e",
-            pointBorderWidth: 2,
+    // Compute daily DELTAS (gains per day) from cumulative snapshots
+    const deltaMap = {};
+    dates.forEach((date, i) => {
+        deltaMap[date] = {};
+        accounts.forEach(username => {
+            const current = dateMap[date][username] || 0;
+            const prev = i > 0 ? (dateMap[dates[i - 1]][username] || 0) : 0;
+            deltaMap[date][username] = Math.max(0, current - prev);
         });
     });
 
+    // If only 1 snapshot, show cumulative (can't compute delta)
+    const showDelta = dates.length > 1;
+    const dataSource = showDelta ? deltaMap : dateMap;
+    // Skip first date for delta (it's always the full cumulative as baseline)
+    const displayDates = showDelta ? dates.slice(1) : dates;
+
+    if (displayDates.length === 0) {
+        state.charts.views = new Chart(ctx, {
+            type: "bar",
+            data: { labels: ["Pas assez de donnees"], datasets: [] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } },
+        });
+        return;
+    }
+
+    const datasets = accounts.map(username => ({
+        label: "@" + username,
+        data: displayDates.map(d => dataSource[d][username] || 0),
+        backgroundColor: getAccountColor(username) + "cc",
+        borderColor: getAccountColor(username),
+        borderWidth: 1,
+        borderRadius: 4,
+        borderSkipped: false,
+    }));
+
     state.charts.views = new Chart(ctx, {
-        type: "line",
-        data: { labels: dates.map(d => formatDate(d)), datasets },
+        type: "bar",
+        data: { labels: displayDates.map(d => formatDate(d)), datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -375,7 +415,7 @@ function renderViewsChart(evolution) {
             plugins: {
                 legend: {
                     position: "bottom",
-                    labels: { color: "#8888aa", font: { size: 11 }, padding: 16, usePointStyle: true, pointStyle: "circle" },
+                    labels: { color: "#8888aa", font: { size: 11 }, padding: 16, usePointStyle: true, pointStyle: "rectRounded" },
                 },
                 tooltip: {
                     backgroundColor: "#1a1a2eee",
@@ -385,25 +425,38 @@ function renderViewsChart(evolution) {
                     borderWidth: 1,
                     padding: 10,
                     callbacks: {
-                        label: ctx => " " + ctx.dataset.label + ": " + formatNumber(ctx.raw) + " vues",
+                        label: ctx => " " + ctx.dataset.label + ": +" + formatNumber(ctx.raw) + " vues",
+                        footer: items => {
+                            const total = items.reduce((s, i) => s + i.raw, 0);
+                            return "Total: +" + formatNumber(total) + " vues";
+                        },
                     },
                 },
                 datalabels: {
-                    // Only show label on the LAST data point to avoid overlap
-                    display: ctx => ctx.dataIndex === ctx.dataset.data.length - 1 && ctx.dataset.data[ctx.dataIndex] > 0,
-                    color: ctx => ctx.dataset.borderColor,
-                    font: { size: 10, weight: "bold" },
-                    anchor: "end",
-                    align: "right",
-                    offset: 6,
-                    formatter: v => formatCompact(v),
+                    display: ctx => ctx.dataset.data[ctx.dataIndex] > 0 && dates.length <= 14,
+                    color: "#fff",
+                    font: { size: 9, weight: "bold" },
+                    anchor: "center",
+                    align: "center",
+                    formatter: v => v > 0 ? formatCompact(v) : "",
                 },
             },
             scales: {
-                x: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", font: { size: 10 } } },
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: "#555570", font: { size: 10 }, maxRotation: 45 },
+                },
                 y: {
+                    stacked: true,
                     grid: { color: "#1a1a2e" },
                     ticks: { color: "#555570", callback: v => formatCompact(v) },
+                    title: {
+                        display: true,
+                        text: showDelta ? "Vues gagnees / jour" : "Vues totales",
+                        color: "#555570",
+                        font: { size: 11 },
+                    },
                 },
             },
         },

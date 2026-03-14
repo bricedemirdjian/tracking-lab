@@ -128,11 +128,20 @@
                 <div class="section-title" style="margin-bottom:0">
                     Meilleures videos <span class="badge" id="bestVideosBadge">Top 10</span>
                 </div>
-                <div class="limit-selector" id="bestVideosLimit">
-                    <button class="limit-btn" data-limit="5" onclick="setBestVideosLimit(5)">5</button>
-                    <button class="limit-btn active" data-limit="10" onclick="setBestVideosLimit(10)">10</button>
-                    <button class="limit-btn" data-limit="20" onclick="setBestVideosLimit(20)">20</button>
-                    <button class="limit-btn" data-limit="50" onclick="setBestVideosLimit(50)">50</button>
+                <div class="section-header-controls">
+                    <div class="inline-date-filter">
+                        <label>Du</label>
+                        <input type="date" id="bestDateFrom" onchange="onBestDateFilter()">
+                        <label>Au</label>
+                        <input type="date" id="bestDateTo" onchange="onBestDateFilter()">
+                        <button class="btn btn-secondary btn-sm" onclick="clearBestDateFilter()" title="Reinitialiser">&#10005;</button>
+                    </div>
+                    <div class="limit-selector" id="bestVideosLimit">
+                        <button class="limit-btn" data-limit="5" onclick="setBestVideosLimit(5)">5</button>
+                        <button class="limit-btn active" data-limit="10" onclick="setBestVideosLimit(10)">10</button>
+                        <button class="limit-btn" data-limit="20" onclick="setBestVideosLimit(20)">20</button>
+                        <button class="limit-btn" data-limit="50" onclick="setBestVideosLimit(50)">50</button>
+                    </div>
                 </div>
             </div>
             <div class="video-cards-grid" id="bestVideosGrid">
@@ -167,7 +176,7 @@
             <!-- Main Charts -->
             <div class="charts-grid">
                 <div class="chart-card full-width">
-                    <h3>Evolution des vues totales par compte</h3>
+                    <h3>Vues gagnees par jour et par compte</h3>
                     <div class="chart-container">
                         <canvas id="viewsChart"></canvas>
                     </div>
