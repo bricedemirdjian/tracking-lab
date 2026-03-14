@@ -163,8 +163,8 @@ def scrape_all_accounts_for_user(user_id, on_start=None, on_done=None):
     print("=" * 60)
 
     results = {}
-    # Scrape up to 5 accounts in parallel for speed
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # Scrape up to 6 accounts in parallel for speed
+    with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(_scrape_one_account_with_callback, acc['username'], user_id, on_start, on_done): acc['username']
             for acc in accounts
