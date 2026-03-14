@@ -124,33 +124,35 @@
             <div class="accounts-grid" id="accountCards"></div>
 
             <!-- Best Videos -->
-            <div class="section-title" style="margin-top:32px">
-                Meilleures videos <span class="badge" id="bestVideosBadge">Top 10</span>
-            </div>
-            <div class="table-container" style="margin-bottom:32px">
-                <div class="table-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Rang</th>
-                                <th>Compte</th>
-                                <th>Date</th>
-                                <th>Description</th>
-                                <th>Vues</th>
-                                <th>Likes</th>
-                                <th>Engagement</th>
-                                <th>Lien</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bestVideosBody">
-                            <tr>
-                                <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted)">
-                                    Chargement...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="section-header" style="margin-top:32px">
+                <div class="section-title" style="margin-bottom:0">
+                    Meilleures videos <span class="badge" id="bestVideosBadge">Top 10</span>
                 </div>
+                <div class="limit-selector" id="bestVideosLimit">
+                    <button class="limit-btn" data-limit="5" onclick="setBestVideosLimit(5)">5</button>
+                    <button class="limit-btn active" data-limit="10" onclick="setBestVideosLimit(10)">10</button>
+                    <button class="limit-btn" data-limit="20" onclick="setBestVideosLimit(20)">20</button>
+                    <button class="limit-btn" data-limit="50" onclick="setBestVideosLimit(50)">50</button>
+                </div>
+            </div>
+            <div class="video-cards-grid" id="bestVideosGrid">
+                <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
+            </div>
+
+            <!-- Latest Videos -->
+            <div class="section-header" style="margin-top:32px">
+                <div class="section-title" style="margin-bottom:0">
+                    Dernieres videos <span class="badge" id="latestVideosBadge">0</span>
+                </div>
+                <div class="limit-selector" id="latestVideosLimit">
+                    <button class="limit-btn" data-limit="5" onclick="setLatestVideosLimit(5)">5</button>
+                    <button class="limit-btn active" data-limit="10" onclick="setLatestVideosLimit(10)">10</button>
+                    <button class="limit-btn" data-limit="20" onclick="setLatestVideosLimit(20)">20</button>
+                    <button class="limit-btn" data-limit="50" onclick="setLatestVideosLimit(50)">50</button>
+                </div>
+            </div>
+            <div class="video-cards-grid" id="latestVideosGrid">
+                <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
             </div>
 
             <!-- Main Charts -->

@@ -447,6 +447,131 @@ body {
     font-weight: 600;
 }
 
+/* Section header avec selecteur */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.limit-selector {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.limit-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.limit-btn:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.limit-btn.active { background: var(--accent); color: white; }
+
+/* Video Cards Grid */
+.video-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 32px;
+}
+
+.video-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.video-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+    transform: translateY(-3px);
+}
+
+.vcard-thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 9 / 12;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-secondary);
+    position: relative;
+    text-decoration: none;
+}
+
+.vcard-rank {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.vcard-views {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.75);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+}
+
+.vcard-body {
+    padding: 10px 12px;
+}
+
+.vcard-account {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.vcard-date {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.vcard-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    max-height: 28px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.vcard-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.vcard-stats span {
+    white-space: nowrap;
+}
+
 /* Charts Section */
 .charts-grid {
     display: grid;

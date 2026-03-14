@@ -32,6 +32,8 @@ let state = {
     sortOrder: "DESC",
     activeTab: "overview",
     charts: {},
+    bestVideosLimit: 10,
+    latestVideosLimit: 10,
 };
 
 // Utility functions
@@ -86,12 +88,13 @@ async function loadDashboard() {
     };
 
     try {
-        const [accounts, stats, videos, evolution, bestVideos] = await Promise.all([
+        const [accounts, stats, videos, evolution, bestVideos, latestVideos] = await Promise.all([
             fetchAPI("/api/accounts"),
             fetchAPI("/api/stats", params),
             fetchAPI("/api/videos", { ...params, sort_by: state.sortBy, sort_order: state.sortOrder }),
             fetchAPI("/api/evolution", params),
-            fetchAPI("/api/best-videos", params),
+            fetchAPI("/api/best-videos", { ...params, limit: state.bestVideosLimit }),
+            fetchAPI("/api/latest-videos", { ...params, limit: state.latestVideosLimit }),
         ]);
 
         if (!accounts) return; // Redirected to login
@@ -109,6 +112,7 @@ async function loadDashboard() {
         renderKPIs(stats.global);
         renderAccountCards(accounts, stats.per_account);
         renderBestVideos(bestVideos);
+        renderLatestVideos(latestVideos);
         renderCharts(stats, evolution);
         renderTable(videos);
     } catch (err) {
@@ -208,39 +212,67 @@ function renderAccountCards(accounts, perAccount) {
     container.innerHTML = html;
 }
 
-// Best Videos
-function renderBestVideos(videos) {
-    const tbody = document.getElementById("bestVideosBody");
-    const badge = document.getElementById("bestVideosBadge");
-    if (!tbody) return;
+// Render video cards (shared between best & latest)
+function renderVideoCards(videos, containerId, badgeId, badgePrefix) {
+    const container = document.getElementById(containerId);
+    const badge = document.getElementById(badgeId);
+    if (!container) return;
 
-    badge.textContent = "Top " + videos.length;
+    if (badge) badge.textContent = badgePrefix + videos.length;
 
     if (videos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted)">Aucune video trouvee</td></tr>`;
+        container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">Aucune video trouvee</div>`;
         return;
     }
 
-    tbody.innerHTML = videos.map((v, i) => {
-        const colorIdx = getAccountColorIndex(v.account_username);
+    container.innerHTML = videos.map((v, i) => {
+        const color = getAccountColor(v.account_username);
         const totalEng = (v.likes || 0) + (v.comments || 0) + (v.shares || 0) + (v.saves || 0);
         const engRate = v.views > 0 ? ((totalEng / v.views) * 100).toFixed(2) : "0.00";
-        const desc = (v.description || "").length > 50 ? v.description.substring(0, 50) + "..." : (v.description || "-");
-        const link = v.video_url ? `<a href="${v.video_url}" target="_blank" style="color:var(--tiktok-blue);text-decoration:none">&#128279; Voir</a>` : "-";
+        const desc = (v.description || "").length > 60 ? v.description.substring(0, 60) + "..." : (v.description || "");
+        const thumb = v.thumbnail_url || "";
+        const url = v.video_url || "#";
+        const rankHtml = badgePrefix === "Top " ? `<div class="vcard-rank" style="${i < 3 ? 'background:var(--warning);color:#000' : ''}">${i < 3 ? ['&#129351;','&#129352;','&#129353;'][i] : '#' + (i + 1)}</div>` : "";
 
         return `
-            <tr>
-                <td><span style="color:${i < 3 ? 'var(--warning)' : 'var(--text-muted)'};font-weight:bold">${i < 3 ? ['&#129351;','&#129352;','&#129353;'][i] : '#' + (i + 1)}</span></td>
-                <td><span class="account-tag"><span class="dot color-${colorIdx}"></span>@${v.account_username}</span></td>
-                <td>${formatDate(v.create_time)}</td>
-                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:12px" title="${(v.description || '').replace(/"/g, '&quot;')}">${desc}</td>
-                <td><span class="metric" style="font-weight:700">${formatNumber(v.views)}</span></td>
-                <td><span class="metric">${formatNumber(v.likes)}</span></td>
-                <td><span class="metric" style="color:var(--tiktok-blue)">${engRate}%</span></td>
-                <td>${link}</td>
-            </tr>
+            <div class="video-card">
+                <a href="${url}" target="_blank" class="vcard-thumb" style="background-image:url('${thumb}')">
+                    ${rankHtml}
+                    <div class="vcard-views">&#9654; ${formatCompact(v.views || 0) || "0"}</div>
+                </a>
+                <div class="vcard-body">
+                    <div class="vcard-account" style="color:${color}">@${v.account_username}</div>
+                    <div class="vcard-date">${formatDate(v.create_time)}</div>
+                    <div class="vcard-desc" title="${(v.description || '').replace(/"/g, '&quot;')}">${desc}</div>
+                    <div class="vcard-stats">
+                        <span>&#10084; ${formatCompact(v.likes || 0) || "0"}</span>
+                        <span>&#128172; ${formatCompact(v.comments || 0) || "0"}</span>
+                        <span style="color:var(--tiktok-blue);font-weight:700">${engRate}%</span>
+                    </div>
+                </div>
+            </div>
         `;
     }).join("");
+}
+
+function renderBestVideos(videos) {
+    renderVideoCards(videos, "bestVideosGrid", "bestVideosBadge", "Top ");
+}
+
+function renderLatestVideos(videos) {
+    renderVideoCards(videos, "latestVideosGrid", "latestVideosBadge", "");
+}
+
+function setBestVideosLimit(n) {
+    state.bestVideosLimit = n;
+    document.querySelectorAll("#bestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadDashboard();
+}
+
+function setLatestVideosLimit(n) {
+    state.latestVideosLimit = n;
+    document.querySelectorAll("#latestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadDashboard();
 }
 
 // Charts

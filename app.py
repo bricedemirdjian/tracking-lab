@@ -135,6 +135,18 @@ def api_best_videos():
     return jsonify(videos[:limit])
 
 
+@app.route("/api/latest-videos")
+@login_required
+def api_latest_videos():
+    account = request.args.get("account", "all")
+    date_from = request.args.get("date_from", None)
+    date_to = request.args.get("date_to", None)
+    limit = int(request.args.get("limit", 10))
+
+    videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="DESC", user_id=current_user.id)
+    return jsonify(videos[:limit])
+
+
 @app.route("/api/scrape", methods=["POST"])
 @login_required
 def api_scrape():
