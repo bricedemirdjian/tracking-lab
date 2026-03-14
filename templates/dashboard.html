@@ -144,11 +144,20 @@
                 <div class="section-title" style="margin-bottom:0">
                     Dernieres videos <span class="badge" id="latestVideosBadge">0</span>
                 </div>
-                <div class="limit-selector" id="latestVideosLimit">
-                    <button class="limit-btn" data-limit="5" onclick="setLatestVideosLimit(5)">5</button>
-                    <button class="limit-btn active" data-limit="10" onclick="setLatestVideosLimit(10)">10</button>
-                    <button class="limit-btn" data-limit="20" onclick="setLatestVideosLimit(20)">20</button>
-                    <button class="limit-btn" data-limit="50" onclick="setLatestVideosLimit(50)">50</button>
+                <div class="section-header-controls">
+                    <div class="inline-date-filter">
+                        <label>Du</label>
+                        <input type="date" id="latestDateFrom" onchange="onLatestDateFilter()">
+                        <label>Au</label>
+                        <input type="date" id="latestDateTo" onchange="onLatestDateFilter()">
+                        <button class="btn btn-secondary btn-sm" onclick="clearLatestDateFilter()" title="Reinitialiser">&#10005;</button>
+                    </div>
+                    <div class="limit-selector" id="latestVideosLimit">
+                        <button class="limit-btn" data-limit="5" onclick="setLatestVideosLimit(5)">5</button>
+                        <button class="limit-btn active" data-limit="10" onclick="setLatestVideosLimit(10)">10</button>
+                        <button class="limit-btn" data-limit="20" onclick="setLatestVideosLimit(20)">20</button>
+                        <button class="limit-btn" data-limit="50" onclick="setLatestVideosLimit(50)">50</button>
+                    </div>
                 </div>
             </div>
             <div class="video-cards-grid" id="latestVideosGrid">

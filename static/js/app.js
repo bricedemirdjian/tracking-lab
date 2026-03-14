@@ -39,6 +39,9 @@ let state = {
     tablePage: 1,
     tablePerPage: 25,
     tableVideos: [],
+    // Latest videos date filter
+    latestDateFrom: null,
+    latestDateTo: null,
 };
 
 // Utility functions
@@ -99,9 +102,15 @@ async function loadDashboard() {
             fetchAPI("/api/videos", { ...params, sort_by: state.sortBy, sort_order: state.sortOrder }),
             // Evolution chart: only filter by account, NOT by date (always show full history)
             fetchAPI("/api/evolution", { account: state.selectedAccount }),
-            // Best & Latest videos: only filter by account, NOT by date (always show global best/latest)
+            // Best videos: only filter by account, NOT by date (always show global best)
             fetchAPI("/api/best-videos", { account: state.selectedAccount, limit: state.bestVideosLimit }),
-            fetchAPI("/api/latest-videos", { account: state.selectedAccount, limit: state.latestVideosLimit }),
+            // Latest videos: filter by account + optional dedicated date filter
+            fetchAPI("/api/latest-videos", {
+                account: state.selectedAccount,
+                limit: state.latestVideosLimit,
+                date_from: state.latestDateFrom,
+                date_to: state.latestDateTo,
+            }),
         ]);
 
         if (!accounts) return; // Redirected to login
@@ -289,6 +298,20 @@ function setBestVideosLimit(n) {
 function setLatestVideosLimit(n) {
     state.latestVideosLimit = n;
     document.querySelectorAll("#latestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadDashboard();
+}
+
+function onLatestDateFilter() {
+    state.latestDateFrom = document.getElementById("latestDateFrom").value || null;
+    state.latestDateTo = document.getElementById("latestDateTo").value || null;
+    loadDashboard();
+}
+
+function clearLatestDateFilter() {
+    state.latestDateFrom = null;
+    state.latestDateTo = null;
+    document.getElementById("latestDateFrom").value = "";
+    document.getElementById("latestDateTo").value = "";
     loadDashboard();
 }
 

@@ -479,6 +479,58 @@ body {
 .limit-btn:hover { color: var(--text-primary); background: var(--bg-secondary); }
 .limit-btn.active { background: var(--accent); color: white; }
 
+/* Section header controls (date filter + limit selector side by side) */
+.section-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.inline-date-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px 8px;
+}
+
+.inline-date-filter label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.inline-date-filter input[type="date"] {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.inline-date-filter input[type="date"]:focus {
+    border-color: var(--tiktok-blue);
+}
+
+.inline-date-filter input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.inline-date-filter .btn {
+    padding: 3px 8px;
+    font-size: 11px;
+    min-height: auto;
+}
+
 /* Video Cards Grid */
 .video-cards-grid {
     display: grid;
