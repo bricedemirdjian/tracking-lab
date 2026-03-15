@@ -327,6 +327,13 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
     if not snapshots:
         return {}
 
+    # Check if we have at least 2 different snapshot dates
+    # With only 1 date, deltas can't provide meaningful filtering
+    # (delta = full cumulative - 0 = same as no filter)
+    unique_dates = set(s['snapshot_date'] for s in snapshots)
+    if len(unique_dates) < 2:
+        return {}
+
     # Group by account
     account_snaps = {}
     for s in snapshots:
