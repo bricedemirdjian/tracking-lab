@@ -19,7 +19,22 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiktok_track
 
 def get_connection():
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL)
+        from urllib.parse import urlparse, unquote
+        parsed = urlparse(DATABASE_URL)
+        username = unquote(parsed.username or '')
+        password = unquote(parsed.password or '')
+        host = parsed.hostname or ''
+        port = parsed.port or 5432
+        dbname = (parsed.path or '/postgres').lstrip('/')
+        print(f"[DB] Connecting as user={username} to {host}:{port}/{dbname}")
+        conn = psycopg2.connect(
+            user=username,
+            password=password,
+            host=host,
+            port=port,
+            dbname=dbname,
+            sslmode='require'
+        )
         return conn
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
