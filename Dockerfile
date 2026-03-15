@@ -22,4 +22,4 @@ RUN mkdir -p /app/data
 EXPOSE 10000
 
 # Start with gunicorn
-CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:10000", "--workers", "2", "--timeout", "120", "--access-logfile", "-"]
+CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:10000", "--workers", "1", "--threads", "4", "--timeout", "300", "--access-logfile", "-"]
