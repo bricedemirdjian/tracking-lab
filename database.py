@@ -286,7 +286,7 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
         params.append(date_from)
     if date_to:
         query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
+        params.append(date_to + "T23:59:59")
 
     allowed_sorts = {"create_time", "views", "likes", "comments", "shares", "saves"}
     if sort_by not in allowed_sorts:
@@ -428,7 +428,7 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
         params.append(date_from)
     if date_to:
         query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
+        params.append(date_to + "T23:59:59")
     query += " GROUP BY account_username"
 
     results = conn.execute(query, params).fetchall()
@@ -474,7 +474,7 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
         params.append(date_from)
     if date_to:
         query += " AND create_time <= ?"
-        params.append(date_to + " 23:59:59")
+        params.append(date_to + "T23:59:59")
 
     result = conn.execute(query, params).fetchone()
     conn.close()
