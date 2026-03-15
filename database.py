@@ -448,6 +448,11 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
         if end_snap is None:
             continue
 
+        # If date_from is set but no snapshot exists before that date,
+        # we can't compute a meaningful delta → skip and let fallback handle it
+        if date_from and start_snap is None:
+            continue
+
         delta = {'account_username': acc}
         for m in metrics:
             end_val = end_snap.get(m, 0) or 0
