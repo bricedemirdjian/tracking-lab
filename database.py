@@ -76,6 +76,13 @@ def _execute(conn, query, params=None):
     return cur
 
 
+def _date_cast(column):
+    """Cast column to text for date comparison (PostgreSQL returns timestamp, not text)."""
+    if DATABASE_URL:
+        return f"CAST({column} AS TEXT)"
+    return column
+
+
 # ==================== Schema ====================
 
 def init_db():
@@ -350,10 +357,10 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
         query += " AND account_username = %s"
         params.append(account_username)
     if date_from:
-        query += " AND create_time >= %s"
+        query += f" AND {_date_cast('create_time')} >= %s"
         params.append(date_from)
     if date_to:
-        query += " AND create_time <= %s"
+        query += f" AND {_date_cast('create_time')} <= %s"
         params.append(date_to + "T23:59:59")
 
     allowed_sorts = {"create_time", "views", "likes", "comments", "shares", "saves"}
@@ -495,10 +502,10 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
         query += " AND account_username = %s"
         params.append(account_username)
     if date_from:
-        query += " AND create_time >= %s"
+        query += f" AND {_date_cast('create_time')} >= %s"
         params.append(date_from)
     if date_to:
-        query += " AND create_time <= %s"
+        query += f" AND {_date_cast('create_time')} <= %s"
         params.append(date_to + "T23:59:59")
     query += " GROUP BY account_username"
 
@@ -541,10 +548,10 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
         query += " AND user_id = %s"
         params.append(user_id)
     if date_from:
-        query += " AND create_time >= %s"
+        query += f" AND {_date_cast('create_time')} >= %s"
         params.append(date_from)
     if date_to:
-        query += " AND create_time <= %s"
+        query += f" AND {_date_cast('create_time')} <= %s"
         params.append(date_to + "T23:59:59")
 
     result = _fetchone(conn, query, params)
