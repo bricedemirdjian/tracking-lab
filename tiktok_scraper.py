@@ -13,6 +13,13 @@ def fetch_account_data_ytdlp(username):
     url = f"https://www.tiktok.com/@{username}"
     print(f"  [yt-dlp] Fetching data for @{username}...")
 
+    # Realistic browser user-agent to avoid TikTok datacenter IP blocking
+    user_agent = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    )
+
     try:
         result = subprocess.run(
             [
@@ -23,8 +30,13 @@ def fetch_account_data_ytdlp(username):
                 "--no-warnings",
                 "--quiet",
                 "--socket-timeout", "30",
-                "--retries", "1",
+                "--retries", "2",
                 "--no-check-certificates",
+                "--geo-bypass",
+                "--user-agent", user_agent,
+                "--add-header", "Accept-Language:fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+                "--add-header", "Referer:https://www.tiktok.com/",
+                "--extractor-args", "tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com",
                 url,
             ],
             capture_output=True,
@@ -33,7 +45,7 @@ def fetch_account_data_ytdlp(username):
         )
 
         if result.returncode != 0:
-            print(f"  [yt-dlp] Error for @{username}: {result.stderr[:200]}")
+            print(f"  [yt-dlp] Error for @{username}: {result.stderr[:300]}")
             return None
 
         videos = []
