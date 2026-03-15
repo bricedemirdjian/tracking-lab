@@ -95,8 +95,18 @@ def api_stats():
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)
 
-    per_account = get_aggregated_stats(account, date_from, date_to, user_id=current_user.id)
-    global_stats = get_global_stats(date_from, date_to, user_id=current_user.id)
+    try:
+        per_account = get_aggregated_stats(account, date_from, date_to, user_id=current_user.id)
+        global_stats = get_global_stats(date_from, date_to, user_id=current_user.id)
+    except Exception as e:
+        print(f"[API] Error in /api/stats: {e}")
+        global_stats = {"total_videos": 0, "total_views": 0, "total_likes": 0,
+                        "total_comments": 0, "total_shares": 0, "total_saves": 0}
+        per_account = []
+
+    # Ensure all values are numeric (PostgreSQL may return None)
+    for key in ["total_videos", "total_views", "total_likes", "total_comments", "total_shares", "total_saves"]:
+        global_stats[key] = global_stats.get(key) or 0
 
     total_engagement = (global_stats["total_likes"] + global_stats["total_comments"]
                         + global_stats["total_shares"] + global_stats["total_saves"])

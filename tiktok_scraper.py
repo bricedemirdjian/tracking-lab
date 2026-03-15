@@ -21,9 +21,10 @@ def fetch_account_data_ytdlp(username):
     )
 
     try:
+        import sys
         result = subprocess.run(
             [
-                "yt-dlp",
+                sys.executable, "-m", "yt_dlp",
                 "--dump-json",
                 "--flat-playlist",
                 "--no-download",
