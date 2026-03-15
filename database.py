@@ -76,11 +76,11 @@ def _execute(conn, query, params=None):
     return cur
 
 
-def _date_cast(column):
-    """Cast column to text for date comparison (PostgreSQL returns timestamp, not text)."""
+def _ts_cast():
+    """Return SQL suffix to cast date parameter to timestamp for PostgreSQL."""
     if DATABASE_URL:
-        return f"CAST({column} AS TEXT)"
-    return column
+        return "::timestamp"
+    return ""
 
 
 # ==================== Schema ====================
@@ -357,11 +357,11 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
         query += " AND account_username = %s"
         params.append(account_username)
     if date_from:
-        query += f" AND {_date_cast('create_time')} >= %s"
+        query += f" AND create_time >= %s{_ts_cast()}"
         params.append(date_from)
     if date_to:
-        query += f" AND {_date_cast('create_time')} <= %s"
-        params.append(date_to + "T23:59:59")
+        query += f" AND create_time <= %s{_ts_cast()}"
+        params.append(date_to + " 23:59:59")
 
     allowed_sorts = {"create_time", "views", "likes", "comments", "shares", "saves"}
     if sort_by not in allowed_sorts:
@@ -507,11 +507,11 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
         query += " AND account_username = %s"
         params.append(account_username)
     if date_from:
-        query += f" AND {_date_cast('create_time')} >= %s"
+        query += f" AND create_time >= %s{_ts_cast()}"
         params.append(date_from)
     if date_to:
-        query += f" AND {_date_cast('create_time')} <= %s"
-        params.append(date_to + "T23:59:59")
+        query += f" AND create_time <= %s{_ts_cast()}"
+        params.append(date_to + " 23:59:59")
     query += " GROUP BY account_username"
 
     results = _fetchall(conn, query, params)
@@ -553,11 +553,11 @@ def get_global_stats(date_from=None, date_to=None, user_id=None):
         query += " AND user_id = %s"
         params.append(user_id)
     if date_from:
-        query += f" AND {_date_cast('create_time')} >= %s"
+        query += f" AND create_time >= %s{_ts_cast()}"
         params.append(date_from)
     if date_to:
-        query += f" AND {_date_cast('create_time')} <= %s"
-        params.append(date_to + "T23:59:59")
+        query += f" AND create_time <= %s{_ts_cast()}"
+        params.append(date_to + " 23:59:59")
 
     result = _fetchone(conn, query, params)
     conn.close()
