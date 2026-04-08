@@ -2,7 +2,7 @@ import os
 from flask import Blueprint, redirect, url_for, session, request, render_template
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from database import create_or_update_user, get_user_by_id, seed_user_data
+from database import create_or_update_user, get_user_by_id, seed_user_data, set_user_role
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -22,6 +22,23 @@ class User(UserMixin):
         self.email = user_dict['email']
         self.name = user_dict['name']
         self.avatar_url = user_dict['avatar_url']
+        self.role = user_dict.get('role', 'user')
+        self.blocked = user_dict.get('blocked', False)
+
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
+
+    @property
+    def is_manager(self):
+        return self.role == 'manager'
+
+    @property
+    def data_user_id(self):
+        """Managers see admin's data (user_id=1), others see their own."""
+        if self.role == 'manager':
+            return 1  # Admin's user_id
+        return self.id
 
 
 @login_manager.user_loader
@@ -51,6 +68,20 @@ def init_auth(app):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+
+    # Dev mode: auto-login when Google OAuth is not configured
+    if not os.environ.get('GOOGLE_CLIENT_ID'):
+        user_dict = create_or_update_user(
+            google_id='dev-local',
+            email='dev@local.test',
+            name='Dev Local',
+            avatar_url=None
+        )
+        user = User(user_dict)
+        login_user(user, remember=True)
+        seed_user_data(user.id)
+        return redirect(url_for('dashboard'))
+
     return render_template('login.html')
 
 
@@ -74,6 +105,22 @@ def auth_callback():
             name=userinfo.get('name', ''),
             avatar_url=userinfo.get('picture', '')
         )
+
+        # Check if user is blocked
+        if user_dict.get('blocked'):
+            return render_template('blocked.html'), 403
+
+        # Auto-assign admin role if email matches ADMIN_EMAIL
+        admin_email = os.environ.get('ADMIN_EMAIL', '')
+        if admin_email and userinfo['email'].lower() == admin_email.lower() and user_dict.get('role') != 'admin':
+            set_user_role(user_dict['id'], 'admin')
+            user_dict['role'] = 'admin'
+
+        # Auto-assign manager role if email matches MANAGER_EMAILS
+        manager_emails = [e.strip().lower() for e in os.environ.get('MANAGER_EMAILS', '').split(',') if e.strip()]
+        if userinfo['email'].lower() in manager_emails and user_dict.get('role') not in ('admin', 'manager'):
+            set_user_role(user_dict['id'], 'manager')
+            user_dict['role'] = 'manager'
 
         user = User(user_dict)
         login_user(user, remember=True)

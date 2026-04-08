@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --white: #fff;
+            --bg-alt: #f5f5f7;
+            --dark: #0d0d0d;
+            --dark-surface: #161618;
+            --dark-card: #1c1c1e;
+            --text: #1d1d1f;
+            --text-2: #6e6e73;
+            --text-3: #86868b;
+            --border: #e0e0e5;
+            --accent: #FF69B4;
+            --accent-hover: #f05aa0;
+            --pink: #FF69B4;
+            --section-gap: clamp(100px, 12vw, 160px);
+            --r: 20px;
+            --r-lg: 28px;
+            --r-pill: 980px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--white);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* ─── NAV ─── */
+        nav {
+            position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 100;
+            width: calc(100% - 32px); max-width: 1100px;
+            height: 56px;
+            background: #fff;
+            border-radius: 100px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.04);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .nav-inner {
+            width: 100%; padding: 0 8px 0 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text); }
+        .logo-mark {
+            width: 28px; height: 28px; border-radius: 8px;
+            background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 11px; font-weight: 900;
+        }
+        .logo span { font-weight: 700; font-size: 15px; letter-spacing: -0.4px; }
+        .nav-links { display: flex !important; gap: 32px; }
+        .nav-links a { font-size: 15px; font-weight: 500; color: var(--text-2); text-decoration: none; transition: color .2s; }
+        .nav-links a:hover { color: var(--text); }
+        .nav-cta { display: flex; align-items: center; gap: 16px; }
+        .nav-cta .btn-ghost { font-size: 14px; font-weight: 600; color: var(--text); }
+        .nav-cta .btn-primary { border-radius: 100px; padding: 10px 22px; font-size: 14px; }
+
+        /* ─── BTN ─── */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 9px 20px; border-radius: var(--r-pill);
+            font-size: 13px; font-weight: 600; text-decoration: none;
+            border: none; cursor: pointer; transition: all .3s cubic-bezier(.25,.1,0,1);
+            letter-spacing: -0.1px;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn-primary { background: var(--dark); color: #fff; }
+        .btn-primary:hover { background: #222; transform: translateY(-1px); }
+        .btn-dark { background: var(--dark); color: #fff; }
+        .btn-dark:hover { background: #222; }
+        .btn-ghost { background: none; color: var(--text-2); }
+        .btn-ghost:hover { color: var(--text); }
+        .btn-outline { border: 1.5px solid var(--border); background: none; color: var(--text); }
+        .btn-outline:hover { background: var(--bg-alt); }
+        .btn-white { background: #fff; color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .btn-white:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); transform: translateY(-1px); }
+        .btn-lg { padding: 14px 30px; font-size: 16px; }
+
+        /* ─── HERO ─── */
+        .hero {
+            min-height: 100lvh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center;
+            padding: 80px 24px 48px;
+            position: relative; overflow: hidden;
+            background: var(--white); color: var(--dark);
+        }
+        .hero::after { display: none; }
+        .hero > * { position: relative; z-index: 1; }
+        .hero-eyebrow {
+            font-size: 14px; font-weight: 600; letter-spacing: .02em;
+            color: var(--accent); margin-bottom: 20px;
+            animation: rise .7s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero h1 {
+            font-size: clamp(44px, 7vw, 80px);
+            font-weight: 900; letter-spacing: -0.045em;
+            line-height: .95; max-width: 780px;
+            margin-bottom: 24px;
+            animation: rise .7s .08s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero h1 em {
+            font-style: normal;
+            color: var(--accent);
+        }
+        .hero-p {
+            font-size: clamp(16px, 1.8vw, 19px);
+            font-weight: 500; color: var(--text-3); line-height: 1.55;
+            max-width: 460px; margin-bottom: 40px;
+            animation: rise .7s .16s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero-btns {
+            display: flex; gap: 10px; margin-bottom: 64px;
+            animation: rise .7s .24s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero-img-wrap {
+            width: 100%; max-width: 1060px;
+            border-radius: var(--r-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: 0 40px 80px rgba(0,0,0,.1);
+            animation: rise .9s .32s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero-mock {
+            width: 100%; aspect-ratio: 16/9;
+            background: var(--dark-surface);
+            display: grid; grid-template-rows: auto 1fr; gap: 12px;
+            padding: 20px;
+        }
+        .mock-topbar { display: flex; gap: 6px; align-items: center; }
+        .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .mock-body { display: flex; flex-direction: column; gap: 8px; }
+        .mock-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; background: var(--dark-card); border-radius: 10px;
+        }
+        .mock-logo { width: 22px; height: 22px; border-radius: 6px; background: #FF69B4; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; color: #fff; }
+        .mock-header-title { font-size: 9px; font-weight: 800; margin-right: 8px; }
+        .mock-header-btn { background: rgba(255,255,255,.06); border-radius: 5px; padding: 3px 8px; font-size: 5.5px; font-weight: 600; color: rgba(255,255,255,.4); white-space: nowrap; }
+        .mock-header-btn.active { background: #FF69B4; color: #fff; }
+        .mock-header-user { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+        .mock-header-avatar { width: 16px; height: 16px; border-radius: 50%; background: #7b61ff; display: flex; align-items: center; justify-content: center; font-size: 6px; font-weight: 800; color: #fff; }
+        .mock-main { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .mock-kpis { display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; }
+        .mock-kpi {
+            background: var(--dark-card); border-radius: 10px;
+            padding: 10px;
+        }
+        .mock-kpi-icon { font-size: 10px; float: right; opacity: .4; }
+        .mock-kpi-label {
+            font-size: 6px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; color: rgba(255,255,255,.35); margin-bottom: 4px;
+        }
+        .mock-kpi-val { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
+        .mock-accounts {
+            display: grid; grid-template-columns: repeat(3,1fr); gap: 6px;
+        }
+        .mock-account {
+            background: var(--dark-card); border-radius: 10px; padding: 10px;
+        }
+        .mock-acc-top {
+            display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+        }
+        .mock-avatar {
+            width: 20px; height: 20px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 8px; font-weight: 800; color: #fff;
+        }
+        .mock-acc-name { font-size: 8px; font-weight: 700; }
+        .mock-acc-handle { font-size: 6px; color: rgba(255,255,255,.3); }
+        .mock-acc-stats {
+            display: grid; grid-template-columns: repeat(3,1fr); gap: 4px;
+        }
+        .mock-acc-stat { text-align: center; }
+        .mock-acc-stat-val { font-size: 9px; font-weight: 800; }
+        .mock-acc-stat-lbl { font-size: 5px; text-transform: uppercase; color: rgba(255,255,255,.3); letter-spacing: .5px; }
+
+        /* ─── SECTION ─── */
+        .section { padding: var(--section-gap) 24px; }
+        .section-inner { max-width: 1080px; margin: 0 auto; }
+        .section-dark { background: var(--white); color: var(--dark); }
+        .section-alt { background: var(--white); }
+        .section-hd { text-align: center; margin-bottom: 64px; }
+        .eyebrow {
+            font-size: 14px; font-weight: 700; letter-spacing: .02em;
+            margin-bottom: 12px;
+        }
+        .eyebrow-accent { color: var(--accent); }
+        .section-hd h2 {
+            font-size: clamp(36px, 5vw, 56px);
+            font-weight: 800; letter-spacing: -0.035em; line-height: 1.05;
+        }
+        .section-hd p {
+            font-size: 17px; font-weight: 500;
+            color: var(--text-2); max-width: 440px; margin: 14px auto 0;
+        }
+        .section-dark .section-hd p { color: var(--text-2); }
+
+        /* ─── PLATFORMS ─── */
+        .platforms {
+            display: flex; justify-content: center; gap: 40px;
+            padding: 44px 24px; border-bottom: 1px solid var(--border);
+        }
+        .plat { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .plat-icon {
+            width: 52px; height: 52px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; background: var(--bg-alt);
+        }
+        .plat-name { font-size: 12px; font-weight: 700; color: var(--text-2); }
+
+        /* ─── BENTO ─── */
+        .bento { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+        .bento-item {
+            background: var(--bg-alt); border-radius: var(--r-lg);
+            padding: 40px 32px; min-height: 260px;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            position: relative; overflow: hidden;
+            transition: transform .4s cubic-bezier(.2,0,0,1);
+        }
+        .bento-item:hover { transform: scale(1.015); }
+        .bento-item.span-2 { grid-column: span 2; }
+        .bento-item.dark { background: var(--dark); color: #fff; }
+        .bento-item.accent { background: var(--accent); color: #fff; }
+        .bento-item h3 { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 6px; }
+        .bento-item p { font-size: 14px; font-weight: 500; opacity: .6; line-height: 1.5; }
+
+        /* mini chart inside bento */
+        .bento-bars {
+            position: absolute; top: 28px; right: 28px;
+            display: flex; gap: 4px; align-items: flex-end; height: 80px;
+        }
+        .bento-bars div {
+            width: 14px; border-radius: 4px 4px 0 0;
+        }
+
+        /* ─── STEPS ─── */
+        .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; }
+        .step {
+            background: var(--bg-alt); border-radius: var(--r-lg);
+            padding: 52px 32px; text-align: center;
+        }
+        .step-n {
+            font-size: 72px; font-weight: 900;
+            letter-spacing: -0.04em; line-height: 1; margin-bottom: 16px;
+        }
+        .step h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+        .step p { font-size: 14px; font-weight: 500; color: var(--text-2); line-height: 1.6; }
+
+        /* ─── STATS ─── */
+        .stats {
+            padding: 36px 0; overflow: hidden;
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+        }
+        .stats-track {
+            display: flex; gap: 52px; align-items: center;
+            animation: slide 18s linear infinite; width: max-content;
+        }
+        @keyframes slide { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        .stats::before, .stats::after {
+            content:''; position:absolute; top:0; bottom:0; width:100px; z-index:2; pointer-events:none;
+        }
+        .stats { position: relative; }
+        .stats::before { left:0; background:linear-gradient(to right,var(--white),transparent); }
+        .stats::after { right:0; background:linear-gradient(to left,var(--white),transparent); }
+        .st { display:flex; align-items:baseline; gap:8px; white-space:nowrap; }
+        .st-val { font-size:28px; font-weight:900; letter-spacing:-0.03em; }
+        .st-lbl { font-size:13px; font-weight:600; color:var(--text-3); }
+        .st-dot { width:4px; height:4px; border-radius:50%; background:var(--accent); opacity:.3; }
+
+        /* ─── COMPARISON ─── */
+        .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .compare-card {
+            border-radius: var(--r-lg); padding: 44px 36px;
+        }
+        .compare-card.without {
+            background: var(--bg-alt); border: 1px solid var(--border);
+        }
+        .compare-card.with {
+            background: var(--dark); color: #fff;
+            border: 1px solid var(--dark);
+        }
+        .compare-card h3 {
+            font-size: 20px; font-weight: 800; letter-spacing: -0.02em;
+            margin-bottom: 20px;
+        }
+        .compare-card.with h3 span { color: var(--accent); }
+        .compare-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+        .compare-list li {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 14px; font-weight: 600;
+        }
+        .compare-list .x { color: var(--text-3); font-size: 16px; }
+        .compare-list .v { color: var(--accent); font-size: 16px; }
+        .compare-card.without .compare-list li { color: var(--text-2); }
+
+        /* ─── PRICING ─── */
+        .pricing { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; max-width: 960px; margin: 0 auto; }
+        .price-card {
+            background: var(--white); border-radius: var(--r-lg);
+            padding: 40px 28px; position: relative;
+            border: 1.5px solid var(--border);
+            transition: all .3s cubic-bezier(.2,0,0,1);
+        }
+        .price-card:hover { transform: translateY(-4px); border-color: #ccc; }
+        .price-card.pop {
+            border-color: var(--accent);
+            box-shadow: 0 12px 40px rgba(254,44,85,.1);
+        }
+        .price-tag {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: var(--accent); color: #fff;
+            font-size: 11px; font-weight: 800;
+            padding: 5px 16px; border-radius: var(--r-pill);
+        }
+        .price-name {
+            font-size: 12px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--text-3); margin-bottom: 16px;
+        }
+        .price-val {
+            font-size: 52px; font-weight: 900;
+            letter-spacing: -0.04em; line-height: 1; margin-bottom: 4px;
+            color: var(--dark);
+        }
+        .price-val span { font-size: 15px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+        .price-sub { font-size: 14px; color: var(--text-3); margin-bottom: 28px; font-weight: 500; }
+        .price-sep { height: 1px; background: var(--border); margin-bottom: 24px; }
+        .price-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+        .price-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+        .price-list .ok { color: var(--accent); }
+        .price-list .no { color: var(--border); }
+        .price-list li.dim { color: var(--text-3); font-weight: 500; }
+
+        /* ─── CTA ─── */
+        .cta {
+            padding: var(--section-gap) 24px;
+            text-align: center;
+            background: var(--white);
+        }
+        .cta h2 {
+            font-size: clamp(36px, 5vw, 64px);
+            font-weight: 900; letter-spacing: -0.04em;
+            line-height: .95; margin-bottom: 18px;
+        }
+        .cta h2 em {
+            font-style: normal;
+            color: var(--accent);
+        }
+        .cta p {
+            font-size: 17px; font-weight: 500; color: var(--text-2);
+            max-width: 420px; margin: 0 auto 36px;
+        }
+        .cta-btns { display: flex; justify-content: center; gap: 10px; }
+
+        /* ─── FOOTER ─── */
+        footer {
+            background: var(--white); color: var(--dark);
+            padding: 52px 24px 24px;
+            border-top: 1px solid var(--border);
+        }
+        .foot-inner {
+            max-width: 1080px; margin: 0 auto;
+            display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr;
+            gap: 32px; margin-bottom: 40px;
+        }
+        .foot-brand p { font-size: 13px; color: var(--text-3); line-height: 1.6; margin-top: 12px; }
+        .foot-col h4 {
+            font-size: 10px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--text-3); margin-bottom: 14px;
+        }
+        .foot-col a {
+            display: block; color: var(--text-2);
+            text-decoration: none; font-size: 13px; font-weight: 500;
+            margin-bottom: 10px; transition: color .2s;
+        }
+        .foot-col a:hover { color: var(--dark); }
+        .foot-bottom {
+            max-width: 1080px; margin: 0 auto;
+            padding-top: 20px; border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between;
+            font-size: 11px; color: var(--text-3);
+        }
+
+        /* ─── ANIM ─── */
+        @keyframes rise {
+            from { opacity:0; transform:translateY(28px); }
+            to { opacity:1; transform:translateY(0); }
+        }
+        .reveal {
+            opacity:0; transform:translateY(32px);
+            transition: opacity .7s cubic-bezier(.2,0,0,1), transform .7s cubic-bezier(.2,0,0,1);
+        }
+        .reveal.vis { opacity:1; transform:translateY(0); }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width:768px) {
+            .nav-links { display:flex !important; }
+            .bento { grid-template-columns:1fr; }
+            .bento-item.span-2 { grid-column:1; }
+            .steps { grid-template-columns:1fr; }
+            .pricing { grid-template-columns:1fr; max-width:380px; }
+            .compare { grid-template-columns:1fr; }
+            .hero-btns { flex-direction:column; }
+            .cta-btns { flex-direction:column; align-items:center; }
+            .platforms { gap:20px; }
+            .foot-inner { grid-template-columns:1fr 1fr; }
+            .mock-sidebar { display:none; }
+            .mock-kpis { grid-template-columns:repeat(2,1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+    <div class="nav-inner">
+        <a href="#" class="logo">
+            <div class="logo-mark"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+  <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
+  <circle cx="16" cy="16" r="1.8" fill="#fff"/>
+  <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+</svg></div>
+            <span>Tracking Lab</span>
+        </a>
+        <div class="nav-links">
+            <a href="#features">Fonctionnalités</a>
+            <a href="#pricing">Tarifs</a>
+        </div>
+        <div class="nav-cta">
+            <a href="/login" class="btn btn-ghost">Se connecter</a>
+            <a href="/login" class="btn btn-primary">Essai gratuit</a>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <p class="hero-eyebrow">Analytics pour créateurs de contenus et entreprises</p>
+    <h1>Trackez vos<br><em>performances</em></h1>
+    <p class="hero-p">TikTok, YouTube Shorts, Instagram Reels — toutes vos metriques reunies dans un seul dashboard.</p>
+    <div class="hero-btns">
+        <a href="/login" class="btn btn-primary btn-lg">Démarrer gratuitement</a>
+        <a href="#pricing" class="btn btn-white btn-lg">Voir les tarifs</a>
+    </div>
+    <div class="hero-img-wrap">
+        <div class="hero-mock">
+            <div class="mock-topbar">
+                <div class="mock-dot" style="background:#fe2c55;"></div>
+                <div class="mock-dot" style="background:rgba(255,255,255,.2);"></div>
+                <div class="mock-dot" style="background:rgba(255,255,255,.2);"></div>
+            </div>
+            <div class="mock-body">
+                <!-- Header -->
+                <div class="mock-header">
+                    <div class="mock-logo">TL</div>
+                    <div class="mock-header-title">Tracking Lab</div>
+                    <div class="mock-header-btn active">Admin</div>
+                    <div class="mock-header-btn">Gerer les projets</div>
+                    <div class="mock-header-btn">Gerer les comptes</div>
+                    <div class="mock-header-btn">Mon abonnement</div>
+                    <div class="mock-header-btn">Exporter CSV</div>
+                    <div class="mock-header-btn" style="background:#FF69B4;color:#fff;">Scraping...</div>
+                    <div class="mock-header-user">
+                        <div class="mock-header-avatar">B</div>
+                        <span style="font-size:6px;font-weight:600;color:rgba(255,255,255,.4);">Brice</span>
+                    </div>
+                </div>
+                <div class="mock-main">
+                    <!-- Filtre date -->
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:600;color:rgba(255,255,255,.35);">Projet ▼</div>
+                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:600;color:rgba(255,255,255,.35);">Compte ▼</div>
+                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:700;color:#25f4ee;">📅 Date debut</div>
+                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:700;color:#25f4ee;">📅 Date fin</div>
+                        <div style="margin-left:auto;font-size:6px;color:rgba(255,255,255,.25);cursor:pointer;">Reinitialiser</div>
+                    </div>
+                    <!-- KPIs -->
+                    <div class="mock-kpis">
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">🎬</div>
+                            <div class="mock-kpi-label">Contenus</div>
+                            <div class="mock-kpi-val" style="color:#FF69B4;">1 284</div>
+                        </div>
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">👁</div>
+                            <div class="mock-kpi-label">Vues totales</div>
+                            <div class="mock-kpi-val" style="color:#fff;">12.4M</div>
+                        </div>
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">❤</div>
+                            <div class="mock-kpi-label">Likes</div>
+                            <div class="mock-kpi-val" style="color:#25f4ee;">843K</div>
+                        </div>
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">💬</div>
+                            <div class="mock-kpi-label">Commentaires</div>
+                            <div class="mock-kpi-val" style="color:#7b61ff;">18.7K</div>
+                        </div>
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">🔁</div>
+                            <div class="mock-kpi-label">Partages</div>
+                            <div class="mock-kpi-val" style="color:#34c759;">97.2K</div>
+                        </div>
+                        <div class="mock-kpi">
+                            <div class="mock-kpi-icon">📊</div>
+                            <div class="mock-kpi-label">Engagement</div>
+                            <div class="mock-kpi-val" style="color:#FF69B4;">7.62%</div>
+                        </div>
+                    </div>
+                    <!-- Tabs -->
+                    <div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                        <span style="font-size:7px;font-weight:700;color:#fff;padding-bottom:3px;border-bottom:1.5px solid #FF69B4;">Vue d'ensemble</span>
+                        <span style="font-size:7px;font-weight:500;color:rgba(255,255,255,.3);">Graphiques</span>
+                        <span style="font-size:7px;font-weight:500;color:rgba(255,255,255,.3);">Tableau detaille</span>
+                    </div>
+                    <!-- Comptes suivis -->
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                        <span style="font-size:9px;font-weight:800;">Comptes suivis</span>
+                        <span style="font-size:5px;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px;color:rgba(255,255,255,.35);font-weight:600;">24 comptes</span>
+                    </div>
+                    <div class="mock-accounts">
+                        <div class="mock-account">
+                            <div class="mock-acc-top">
+                                <div class="mock-avatar" style="background:#FF69B4;">L</div>
+                                <div><div class="mock-acc-name">♪ lea.music</div><div class="mock-acc-handle">@lea.music</div></div>
+                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">142 contenus</div>
+                            </div>
+                            <div class="mock-acc-stats">
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">1.2M</div><div class="mock-acc-stat-lbl">Vues</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">89.4K</div><div class="mock-acc-stat-lbl">Likes</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">8.12%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
+                            </div>
+                        </div>
+                        <div class="mock-account">
+                            <div class="mock-acc-top">
+                                <div class="mock-avatar" style="background:#7b61ff;">M</div>
+                                <div><div class="mock-acc-name">♪ maxfitparis</div><div class="mock-acc-handle">@maxfitparis</div></div>
+                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">87 contenus</div>
+                            </div>
+                            <div class="mock-acc-stats">
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">478K</div><div class="mock-acc-stat-lbl">Vues</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">52.1K</div><div class="mock-acc-stat-lbl">Likes</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">12.3%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
+                            </div>
+                        </div>
+                        <div class="mock-account">
+                            <div class="mock-acc-top">
+                                <div class="mock-avatar" style="background:#25f4ee;color:#000;">S</div>
+                                <div><div class="mock-acc-name">♪ sophie.vlogs</div><div class="mock-acc-handle">@sophie.vlogs</div></div>
+                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">203 contenus</div>
+                            </div>
+                            <div class="mock-acc-stats">
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">2.1M</div><div class="mock-acc-stat-lbl">Vues</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">156K</div><div class="mock-acc-stat-lbl">Likes</div></div>
+                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">6.94%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PLATFORMS -->
+<div class="platforms">
+    <div class="plat">
+        <div class="plat-icon">&#x1F3B5;</div>
+        <span class="plat-name">TikTok</span>
+    </div>
+    <div class="plat">
+        <div class="plat-icon">&#x25B6;&#xFE0F;</div>
+        <span class="plat-name">YouTube Shorts</span>
+    </div>
+    <div class="plat">
+        <div class="plat-icon">&#x1F4F7;</div>
+        <span class="plat-name">Instagram Reels</span>
+    </div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+    <div class="stats-track">
+        <div class="st"><span class="st-val">3</span><span class="st-lbl">Plateformes</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Videos trackees</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">500+</span><span class="st-lbl">Comptes suivis</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">3</span><span class="st-lbl">Plateformes</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Videos trackees</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">500+</span><span class="st-lbl">Comptes suivis</span></div><div class="st-dot"></div>
+        <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div><div class="st-dot"></div>
+    </div>
+</div>
+
+<!-- COMPARE (viral.app style) -->
+<section class="section" id="compare">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Pourquoi Tracking Lab</p>
+            <h2>Avant / Apres</h2>
+        </div>
+        <div class="compare">
+            <div class="compare-card without reveal">
+                <h3>Sans Tracking Lab</h3>
+                <ul class="compare-list">
+                    <li><span class="x">&times;</span> Copier-coller les stats manuellement</li>
+                    <li><span class="x">&times;</span> Un onglet par plateforme</li>
+                    <li><span class="x">&times;</span> Pas de vue d'ensemble</li>
+                    <li><span class="x">&times;</span> Reporting manuel en fin de mois</li>
+                    <li><span class="x">&times;</span> Donnees eparpillees</li>
+                </ul>
+            </div>
+            <div class="compare-card with reveal">
+                <h3>Avec <span>Tracking Lab</span></h3>
+                <ul class="compare-list">
+                    <li><span class="v">&#x2713;</span> Scraping automatique</li>
+                    <li><span class="v">&#x2713;</span> 3 plateformes, 1 dashboard</li>
+                    <li><span class="v">&#x2713;</span> KPIs en temps reel</li>
+                    <li><span class="v">&#x2713;</span> Export CSV en 1 clic</li>
+                    <li><span class="v">&#x2713;</span> Tout centralise, toujours</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section section-alt" id="features">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Fonctionnalites</p>
+            <h2>Tout ce qu'il vous faut.</h2>
+        </div>
+        <div class="bento">
+            <div class="bento-item span-2 accent reveal">
+                <div class="bento-bars">
+                    <div style="height:40%;background:rgba(255,255,255,.25);"></div>
+                    <div style="height:65%;background:rgba(255,255,255,.35);"></div>
+                    <div style="height:50%;background:rgba(255,255,255,.3);"></div>
+                    <div style="height:85%;background:rgba(255,255,255,.4);"></div>
+                    <div style="height:55%;background:rgba(255,255,255,.25);"></div>
+                    <div style="height:75%;background:rgba(255,255,255,.35);"></div>
+                </div>
+                <h3>Dashboard unifie</h3>
+                <p>Vues, likes, partages — tout centralise.</p>
+            </div>
+            <div class="bento-item dark reveal">
+                <h3>Multi-plateforme</h3>
+                <p>TikTok, YouTube, Instagram. Fini de jongler.</p>
+            </div>
+            <div class="bento-item reveal">
+                <h3>Suivi quotidien</h3>
+                <p>Graphiques jour par jour. Tendances claires.</p>
+            </div>
+            <div class="bento-item dark reveal">
+                <h3>Projets</h3>
+                <p>Organisez par campagne.</p>
+            </div>
+            <div class="bento-item span-2 reveal">
+                <h3>Collaboration & export</h3>
+                <p>Partagez l'acces, exportez en CSV.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- HOW -->
+<section class="section section-dark" id="how">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Simple.</p>
+            <h2>Pret en 3 minutes.</h2>
+        </div>
+        <div class="steps">
+            <div class="step reveal">
+                <div class="step-n" style="color:var(--accent);">01</div>
+                <h3>Connectez-vous</h3>
+                <p>Un clic avec Google. Gratuit, sans CB.</p>
+            </div>
+            <div class="step reveal">
+                <div class="step-n" style="color:var(--accent);">02</div>
+                <h3>Ajoutez vos comptes</h3>
+                <p>Usernames TikTok, YouTube, Instagram.</p>
+            </div>
+            <div class="step reveal">
+                <div class="step-n" style="color:var(--accent);">03</div>
+                <h3>Analysez</h3>
+                <p>Scraping + stats en temps reel.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PRICING -->
+<section class="section section-dark" id="pricing">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Tarifs</p>
+            <h2>Simple et transparent.</h2>
+            <p>Commencez gratuitement.</p>
+        </div>
+        <div class="pricing">
+            <div class="price-card reveal">
+                <div class="price-name">Starter</div>
+                <div class="price-val">0&#8364; <span>HT/mois</span></div>
+                <div class="price-sub">Decouvrir l'outil</div>
+                <div class="price-sep"></div>
+                <ul class="price-list">
+                    <li><span class="ok">&#x2713;</span> 5 comptes</li>
+                    <li><span class="ok">&#x2713;</span> TikTok + YouTube</li>
+                    <li><span class="ok">&#x2713;</span> Dashboard</li>
+                    <li><span class="ok">&#x2713;</span> 1 projet</li>
+                    <li class="dim"><span class="no">&times;</span> Instagram</li>
+                    <li class="dim"><span class="no">&times;</span> Acces partages</li>
+                </ul>
+                <a href="/login" class="btn btn-outline" style="width:100%;justify-content:center;">Commencer</a>
+            </div>
+            <div class="price-card pop reveal">
+                <div class="price-tag">Populaire</div>
+                <div class="price-name">Pro</div>
+                <div class="price-val">29&#8364; <span>HT/mois</span></div>
+                <div class="price-sub">Createurs serieux</div>
+                <div class="price-sep"></div>
+                <ul class="price-list">
+                    <li><span class="ok">&#x2713;</span> 20 comptes</li>
+                    <li><span class="ok">&#x2713;</span> Toutes les plateformes</li>
+                    <li><span class="ok">&#x2713;</span> Dashboard complet</li>
+                    <li><span class="ok">&#x2713;</span> 5 projets</li>
+                    <li><span class="ok">&#x2713;</span> 2 acces partages</li>
+                    <li><span class="ok">&#x2713;</span> Export CSV</li>
+                </ul>
+                <a href="/login" class="btn btn-primary" style="width:100%;justify-content:center;">Démarrer</a>
+            </div>
+            <div class="price-card reveal">
+                <div class="price-name">Agency</div>
+                <div class="price-val">99&#8364; <span>HT/mois</span></div>
+                <div class="price-sub">Agences et labs</div>
+                <div class="price-sep"></div>
+                <ul class="price-list">
+                    <li><span class="ok">&#x2713;</span> Comptes illimites</li>
+                    <li><span class="ok">&#x2713;</span> Toutes les plateformes</li>
+                    <li><span class="ok">&#x2713;</span> Projets illimites</li>
+                    <li><span class="ok">&#x2713;</span> Acces illimites</li>
+                    <li><span class="ok">&#x2713;</span> Export CSV</li>
+                    <li><span class="ok">&#x2713;</span> Support prioritaire</li>
+                </ul>
+                <a href="/login" class="btn btn-outline" style="width:100%;justify-content:center;">Choisir Agency</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+    <h2>Pret a <em>scaler</em> ?</h2>
+    <p>Rejoignez les createurs et agences qui font confiance a Tracking Lab.</p>
+    <div class="cta-btns">
+        <a href="/login" class="btn btn-primary btn-lg">Essai gratuit</a>
+        <a href="#pricing" class="btn btn-dark btn-lg">Voir les tarifs</a>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <div class="foot-inner">
+        <div class="foot-brand">
+            <a href="#" class="logo" style="color:var(--dark);">
+                <div class="logo-mark"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+  <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
+  <circle cx="16" cy="16" r="1.8" fill="#fff"/>
+  <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+</svg></div>
+                <span>Tracking Lab</span>
+            </a>
+            <p>Analytics pour createurs de contenu et agences social media.</p>
+        </div>
+        <div class="foot-col">
+            <h4>Produit</h4>
+            <a href="#">Fonctionnalites</a>
+            <a href="#">Tarifs</a>
+            <a href="#">Changelog</a>
+        </div>
+        <div class="foot-col">
+            <h4>Ressources</h4>
+            <a href="#">Guide</a>
+            <a href="#">FAQ</a>
+            <a href="#">Contact</a>
+        </div>
+        <div class="foot-col">
+            <h4>Legal</h4>
+            <a href="#">CGV</a>
+            <a href="#">Confidentialite</a>
+            <a href="#">Mentions legales</a>
+        </div>
+    </div>
+    <div class="foot-bottom">
+        <span>&copy; 2026 Tracking Lab</span>
+        <span>France</span>
+    </div>
+</footer>
+
+<script>
+const io = new IntersectionObserver(es => {
+    es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('vis'); io.unobserve(e.target); }});
+}, { threshold: .12 });
+document.querySelectorAll('.reveal').forEach((el,i) => {
+    el.style.transitionDelay = Math.min(i*40,250)+'ms';
+    io.observe(el);
+});
+</script>
+
+</body>
+</html>

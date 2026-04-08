@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260321b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -20,15 +20,20 @@
             </div>
         </div>
         <div class="header-actions">
-            <div class="refresh-indicator" onclick="refreshNow()" title="Cliquez pour rafraichir maintenant">
-                <div class="refresh-bar-bg">
-                    <div class="refresh-bar" id="refreshBar"></div>
-                </div>
-                <span class="refresh-label">MAJ dans <strong id="refreshCountdown">30s</strong></span>
-            </div>
+            {% if user.role == 'admin' %}
+            <a href="/admin" class="btn btn-secondary btn-sm" style="background:var(--warning);color:#000;border-color:var(--warning)">
+                Admin
+            </a>
+            {% endif %}
+            <button class="btn btn-secondary btn-sm" onclick="openProjectsModal()">
+                Gerer les projets
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="openAccountsModal()">
                 Gerer les comptes
             </button>
+            <a href="/billing" class="btn btn-secondary btn-sm">
+                Mon abonnement
+            </a>
             <button class="btn btn-secondary btn-sm" onclick="openImportModal()">
                 Importer CSV
             </button>
@@ -53,6 +58,12 @@
         <!-- Filters -->
         <div class="filters-bar">
             <div class="filter-group">
+                <label>Projet</label>
+                <select id="filterProject" onchange="onProjectFilter(this.value)">
+                    <option value="all">Tous les projets</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Compte</label>
                 <select id="filterAccount">
                     <option value="all">Tous les comptes</option>
@@ -68,7 +79,7 @@
             </div>
             <div class="filter-group" style="margin-left:auto">
                 <label>&nbsp;</label>
-                <button class="btn btn-secondary btn-sm" onclick="state.dateFrom=null;state.dateTo=null;document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';state.selectedAccount='all';document.getElementById('filterAccount').value='all';loadDashboard();">
+                <button class="btn btn-secondary btn-sm" onclick="state.dateFrom=null;state.dateTo=null;document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';state.selectedAccount='all';document.getElementById('filterAccount').value='all';state.selectedProject='all';document.getElementById('filterProject').value='all';loadDashboard();">
                     Reinitialiser les filtres
                 </button>
             </div>
@@ -126,7 +137,7 @@
             <!-- Best Videos -->
             <div class="section-header" style="margin-top:32px">
                 <div class="section-title" style="margin-bottom:0">
-                    Meilleures videos <span class="badge" id="bestVideosBadge">Top 10</span>
+                    Meilleures videos <span class="badge" id="bestVideosBadge">Top 5</span>
                 </div>
                 <div class="section-header-controls">
                     <div class="inline-date-filter">
@@ -176,10 +187,30 @@
             <!-- Main Charts -->
             <div class="charts-grid">
                 <div class="chart-card full-width">
-                    <h3>Vues gagnees par jour et par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="viewsChart"></canvas>
+                    <div class="chart-header">
+                        <h3>Vues gagnees par jour et par compte</h3>
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="viewsChartDateFrom" onchange="onViewsChartDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="viewsChartDateTo" onchange="onViewsChartDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearViewsChartDateFilter()" title="Reinitialiser">&#10005;</button>
+                        </div>
                     </div>
+                    <div id="viewsPerDayTable" class="posts-per-day-grid single-row"></div>
+                </div>
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3>Publications par jour</h3>
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="postsChartDateFrom" onchange="onPostsChartDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="postsChartDateTo" onchange="onPostsChartDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearPostsChartDateFilter()" title="Reinitialiser">&#10005;</button>
+                        </div>
+                    </div>
+                    <div id="postsPerDayTable" class="posts-per-day-grid single-row"></div>
                 </div>
                 <div class="chart-card">
                     <h3>Taux d'engagement par compte</h3>
@@ -246,52 +277,49 @@
 
         <!-- Tab: Table -->
         <div class="tab-content" id="tab-table">
-            <div class="table-container">
-                <div class="table-header">
-                    <h3>Toutes les videos</h3>
-                    <span id="videoCount" class="badge" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:12px;color:var(--text-secondary)">0 videos</span>
+            <!-- Best Videos (grid) -->
+            <div class="section-header">
+                <div class="section-title" style="margin-bottom:0">
+                    Meilleures videos <span class="badge" id="tableBestBadge">Top 5</span>
                 </div>
-                <div class="table-toolbar">
-                    <div class="table-search">
-                        <span class="table-search-icon">&#128269;</span>
-                        <input type="text" placeholder="Rechercher par compte, description..." oninput="onTableSearch(this.value)" id="tableSearchInput">
+                <div class="section-header-controls">
+                    <div class="limit-selector" id="tableBestLimit">
+                        <button class="limit-btn active" data-limit="5" onclick="setTableBestLimit(5)">5</button>
+                        <button class="limit-btn" data-limit="10" onclick="setTableBestLimit(10)">10</button>
+                        <button class="limit-btn" data-limit="20" onclick="setTableBestLimit(20)">20</button>
+                        <button class="limit-btn" data-limit="50" onclick="setTableBestLimit(50)">50</button>
+                        <button class="limit-btn" data-limit="all" onclick="setTableBestLimit('all')">ALL</button>
                     </div>
-                    <div class="table-per-page">
-                        <label>Afficher</label>
-                        <select onchange="onTablePerPageChange(this.value)">
-                            <option value="10">10</option>
-                            <option value="25" selected>25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
+                </div>
+            </div>
+            <div class="video-cards-wrap" id="tableBestGrid">
+                <div style="text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
+            </div>
+
+            <!-- Latest Videos (grid) -->
+            <div class="section-header" style="margin-top:32px">
+                <div class="section-title" style="margin-bottom:0">
+                    Dernieres videos <span class="badge" id="tableLatestBadge">5</span>
+                </div>
+                <div class="section-header-controls">
+                    <div class="inline-date-filter">
+                        <label>Du</label>
+                        <input type="date" id="tableLatestDateFrom" onchange="onTableLatestDateFilter()">
+                        <label>Au</label>
+                        <input type="date" id="tableLatestDateTo" onchange="onTableLatestDateFilter()">
+                        <button class="btn btn-secondary btn-sm" onclick="clearTableLatestDateFilter()" title="Reinitialiser">&#10005;</button>
                     </div>
-                    <div class="table-pagination" id="tablePagination"></div>
+                    <div class="limit-selector" id="tableLatestLimit">
+                        <button class="limit-btn active" data-limit="5" onclick="setTableLatestLimit(5)">5</button>
+                        <button class="limit-btn" data-limit="10" onclick="setTableLatestLimit(10)">10</button>
+                        <button class="limit-btn" data-limit="20" onclick="setTableLatestLimit(20)">20</button>
+                        <button class="limit-btn" data-limit="50" onclick="setTableLatestLimit(50)">50</button>
+                        <button class="limit-btn" data-limit="all" onclick="setTableLatestLimit('all')">ALL</button>
+                    </div>
                 </div>
-                <div class="table-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width:40px">#</th>
-                                <th data-sort="account_username">Video <span class="sort-arrow"></span></th>
-                                <th data-sort="create_time">Date <span class="sort-arrow"></span></th>
-                                <th data-sort="views" class="text-right">Vues <span class="sort-arrow"></span></th>
-                                <th data-sort="likes" class="text-right">Likes <span class="sort-arrow"></span></th>
-                                <th class="text-right" style="min-width:90px">Engage.</th>
-                                <th data-sort="comments" class="text-right">Comm. <span class="sort-arrow"></span></th>
-                                <th data-sort="shares" class="text-right">Partages <span class="sort-arrow"></span></th>
-                                <th data-sort="saves" class="text-right">Saves <span class="sort-arrow"></span></th>
-                                <th style="width:40px"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="videosTableBody">
-                            <tr>
-                                <td colspan="10" style="text-align:center; padding:40px; color:var(--text-muted)">
-                                    Chargement...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="video-cards-wrap" id="tableLatestGrid">
+                <div style="text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
             </div>
         </div>
 
@@ -317,10 +345,15 @@
     <!-- Accounts Management Modal -->
     <div class="modal-overlay hidden" id="accountsModal">
         <div class="modal">
-            <h2>Gerer les comptes TikTok</h2>
-            <p>Ajoutez ou supprimez les comptes TikTok a suivre.</p>
+            <h2>Gerer les comptes</h2>
+            <p>Ajoutez ou supprimez les comptes a suivre.</p>
             <div id="accountsList" class="accounts-list"></div>
             <div class="add-account-form">
+                <select id="newAccountPlatform" style="width:auto;min-width:120px">
+                    <option value="tiktok">TikTok</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="youtube">YouTube Shorts</option>
+                </select>
                 <input type="text" id="newAccountInput" placeholder="@nom_utilisateur" onkeydown="if(event.key==='Enter')addAccount()">
                 <button class="btn btn-primary btn-sm" onclick="addAccount()">Ajouter</button>
             </div>
@@ -330,9 +363,37 @@
         </div>
     </div>
 
+    <!-- Projects Management Modal -->
+    <div class="modal-overlay hidden" id="projectsModal">
+        <div class="modal" style="max-width:600px">
+            <h2>Gerer les projets</h2>
+            <p>Organisez vos comptes en projets.</p>
+            <div id="projectsList" class="accounts-list" style="max-height:400px;overflow-y:auto"></div>
+            <div class="add-account-form">
+                <input type="text" id="newProjectInput" placeholder="Nom du projet" onkeydown="if(event.key==='Enter')createNewProject()">
+                <button class="btn btn-primary btn-sm" onclick="createNewProject()">Creer</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeProjectsModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Accounts Modal -->
+    <div class="modal-overlay hidden" id="projectAccountsModal">
+        <div class="modal" style="max-width:500px">
+            <h2 id="projectAccountsTitle">Comptes du projet</h2>
+            <div id="projectAccountsList" class="accounts-list" style="max-height:400px;overflow-y:auto"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeProjectAccountsModal()">Retour</button>
+                <button class="btn btn-primary" onclick="saveCurrentProjectAccounts()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Bar -->
     <div class="status-bar" id="statusBar"></div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=20260321b"></script>
 </body>
 </html>

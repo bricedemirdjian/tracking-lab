@@ -1,0 +1,13 @@
+venv/
+*.db
+*.db-shm
+*.db-wal
+Dockerfile
+render.yaml
+setup.sh
+start.sh
+scrape.log
+.DS_Store
+__pycache__/
+preview-*.html
+version3.html
