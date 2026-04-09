@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab — Mon abonnement</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260409">
     <script src="https://js.stripe.com/v3/"></script>
     <style>
         .billing-container {
@@ -19,19 +20,21 @@
             font-size: 32px;
             font-weight: 800;
             margin-bottom: 8px;
+            letter-spacing: -0.5px;
         }
         .billing-header p { color: var(--text-muted); }
 
         .current-plan-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 20px;
             padding: 32px;
             margin-bottom: 40px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 24px;
+            box-shadow: var(--shadow);
         }
         .plan-badge {
             display: inline-flex;
@@ -44,11 +47,11 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        .plan-badge.starter { background: rgba(107,114,128,0.2); color: #9ca3af; }
-        .plan-badge.pro { background: rgba(254,44,85,0.15); color: #fe2c55; }
-        .plan-badge.agency { background: rgba(123,97,255,0.15); color: #7b61ff; }
+        .plan-badge.starter { background: rgba(134,134,139,0.1); color: var(--text-muted); }
+        .plan-badge.pro { background: rgba(255,105,180,0.1); color: #FF69B4; }
+        .plan-badge.agency { background: rgba(88,86,214,0.1); color: #5856d6; }
 
-        .plan-info h2 { font-size: 24px; font-weight: 700; margin: 12px 0 6px; }
+        .plan-info h2 { font-size: 24px; font-weight: 700; margin: 12px 0 6px; letter-spacing: -0.3px; }
         .plan-info p { color: var(--text-muted); font-size: 14px; }
 
         .plan-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -62,23 +65,24 @@
         .pricing-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 20px;
             padding: 28px 24px;
             position: relative;
             transition: all 0.2s;
+            box-shadow: var(--shadow);
         }
-        .pricing-card:hover { border-color: rgba(255,255,255,0.15); }
+        .pricing-card:hover { border-color: #ccc; transform: translateY(-2px); box-shadow: var(--shadow-md); }
         .pricing-card.current { border-color: var(--accent); }
         .pricing-card.featured {
-            border-color: #fe2c55;
-            box-shadow: 0 0 30px rgba(254,44,85,0.1);
+            border-color: var(--accent);
+            box-shadow: 0 4px 24px rgba(255,105,180,0.12);
         }
         .featured-badge {
             position: absolute;
             top: -12px;
             left: 50%;
             transform: translateX(-50%);
-            background: linear-gradient(135deg, #fe2c55, #7b61ff);
+            background: var(--text-primary);
             color: white;
             font-size: 11px;
             font-weight: 700;
@@ -112,12 +116,13 @@
             font-weight: 900;
             letter-spacing: -2px;
             margin-bottom: 4px;
+            color: var(--text-primary);
         }
         .plan-price span { font-size: 16px; font-weight: 600; color: var(--text-muted); }
         .plan-period { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
         .plan-divider { height: 1px; background: var(--border); margin-bottom: 16px; }
         .plan-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-        .plan-features li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .plan-features li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); }
         .plan-features li .ok { color: var(--success); }
         .plan-features li .no { color: var(--text-muted); }
         .plan-features li.dim { color: var(--text-muted); }
@@ -125,7 +130,8 @@
         .btn-plan {
             width: 100%;
             padding: 12px;
-            border-radius: 10px;
+            border-radius: 100px;
+            font-family: 'Inter', sans-serif;
             font-size: 14px;
             font-weight: 700;
             text-align: center;
@@ -135,22 +141,22 @@
         }
         .btn-plan-outline {
             border: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
+            background: var(--bg-secondary);
             color: var(--text-muted);
             cursor: default;
         }
         .btn-plan-primary {
-            background: linear-gradient(135deg, #fe2c55, #7b61ff);
+            background: var(--text-primary);
             color: white;
-            box-shadow: 0 6px 20px rgba(254,44,85,0.25);
+            box-shadow: var(--shadow-md);
         }
-        .btn-plan-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(254,44,85,0.35); }
+        .btn-plan-primary:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
         .btn-plan-secondary {
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-            color: var(--text);
+            border: 1.5px solid var(--border);
+            background: var(--white);
+            color: var(--text-primary);
         }
-        .btn-plan-secondary:hover { background: rgba(255,255,255,0.07); }
+        .btn-plan-secondary:hover { background: var(--bg-secondary); }
 
         .back-link {
             display: inline-flex;
@@ -162,17 +168,17 @@
             margin-bottom: 32px;
             transition: color 0.2s;
         }
-        .back-link:hover { color: var(--text); }
+        .back-link:hover { color: var(--text-primary); }
 
         .alert {
             padding: 14px 20px;
-            border-radius: 10px;
+            border-radius: 100px;
             margin-bottom: 24px;
             font-size: 14px;
             font-weight: 600;
         }
-        .alert-success { background: rgba(0,214,143,0.1); border: 1px solid rgba(0,214,143,0.3); color: var(--success); }
-        .alert-info { background: rgba(37,244,238,0.1); border: 1px solid rgba(37,244,238,0.3); color: var(--tiktok-blue); }
+        .alert-success { background: rgba(52,199,89,0.08); border: 1px solid rgba(52,199,89,0.2); color: var(--success); }
+        .alert-info { background: rgba(255,105,180,0.08); border: 1px solid rgba(255,105,180,0.2); color: var(--accent); }
 
         @media (max-width: 700px) {
             .pricing-grid { grid-template-columns: 1fr; }
@@ -228,7 +234,7 @@
     </div>
 
     <!-- Plans -->
-    <h2 style="font-size:22px;font-weight:700;margin-bottom:24px;" id="plans-section">Changer de plan</h2>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:24px;letter-spacing:-0.3px" id="plans-section">Changer de plan</h2>
     <div class="pricing-grid">
 
         <!-- Starter -->

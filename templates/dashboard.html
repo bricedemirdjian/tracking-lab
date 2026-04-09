@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260321b">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260409">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -13,7 +14,16 @@
     <!-- Header -->
     <header class="app-header">
         <div class="logo">
-            <div class="logo-icon">TL</div>
+            <div class="logo-icon"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+                <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
+                <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
+                <circle cx="16" cy="16" r="1.8" fill="#fff"/>
+                <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+            </svg></div>
             <div>
                 <h1>Tracking Lab</h1>
                 <span class="subtitle">Suivi des performances de votre lab interne</span>
@@ -21,7 +31,7 @@
         </div>
         <div class="header-actions">
             {% if user.role == 'admin' %}
-            <a href="/admin" class="btn btn-secondary btn-sm" style="background:var(--warning);color:#000;border-color:var(--warning)">
+            <a href="/admin" class="btn btn-secondary btn-sm" style="background:var(--warning);color:#000;border:none">
                 Admin
             </a>
             {% endif %}
@@ -394,6 +404,6 @@
     <!-- Status Bar -->
     <div class="status-bar" id="statusBar"></div>
 
-    <script src="/static/js/app.js?v=20260321b"></script>
+    <script src="/static/js/app.js?v=20260409"></script>
 </body>
 </html>
