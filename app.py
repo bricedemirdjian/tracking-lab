@@ -7,6 +7,9 @@ import stripe
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, Response, redirect, url_for
 from flask_login import login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 from database import (
     init_db, get_all_accounts, get_videos, get_aggregated_stats,
     get_global_stats, get_daily_evolution, upsert_video, upsert_account,
@@ -52,6 +55,67 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 print(f"[Config] GOOGLE_CLIENT_ID present: {app.config['GOOGLE_CLIENT_ID'] is not None}")
 print(f"[Config] GOOGLE_CLIENT_SECRET present: {app.config['GOOGLE_CLIENT_SECRET'] is not None}")
 print(f"[Config] SECRET_KEY length: {len(app.config['SECRET_KEY'])}")
+
+# Trust Render's load balancer (1 proxy hop) so request.remote_addr is the
+# real client IP — required for Flask-Limiter keying on IP.
+if IS_PRODUCTION:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Rate limiting — in-memory storage (fine for single-instance Render).
+# If we scale horizontally, swap storage_uri to Redis.
+def _rate_limit_key():
+    """Prefer authenticated user id over IP when available."""
+    try:
+        if current_user and current_user.is_authenticated:
+            return f"user:{current_user.id}"
+    except Exception:
+        pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    app=app,
+    key_func=_rate_limit_key,
+    default_limits=["200 per minute", "2000 per hour"],
+    storage_uri="memory://",
+    strategy="fixed-window",
+)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Return JSON for rate-limit errors so the frontend can handle them."""
+    return jsonify({
+        "error": "Trop de requêtes",
+        "detail": str(e.description),
+        "retry_after": getattr(e, "retry_after", None),
+    }), 429
+
+
+@app.after_request
+def _security_headers(response):
+    """
+    Add baseline security headers to every response.
+
+    Notes:
+      - HSTS: set preload=False until the domain is verified on hstspreload.org
+      - CSP: allow inline scripts because dashboard/landing currently use them;
+        relax to strict-dynamic later after moving inline scripts to files.
+      - frame-ancestors 'none' replaces X-Frame-Options for modern browsers.
+    """
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=()",
+    )
+    if IS_PRODUCTION:
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+    return response
 
 # Initialize database and auth
 init_db()
@@ -228,6 +292,7 @@ def api_billing_subscription():
 
 
 @app.route("/webhook/stripe", methods=["POST"])
+@limiter.limit("120 per minute", key_func=get_remote_address)
 def stripe_webhook():
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
@@ -612,6 +677,7 @@ def api_posts_per_day():
 
 @app.route("/api/scrape", methods=["POST"])
 @login_required
+@limiter.limit("10 per minute; 60 per hour")
 def api_scrape():
     username = request.json.get("username") if request.json else None
     user_id = current_user.data_user_id
@@ -707,6 +773,10 @@ def api_scrape_status():
 def _cron_auth_check():
     """Verify CRON_SECRET header. Returns error response or None if OK."""
     cron_secret = os.environ.get("CRON_SECRET")
+    # Enforce presence in production — no "open cron" fallback.
+    if IS_PRODUCTION and not cron_secret:
+        print("[Cron] CRON_SECRET not set in production — rejecting request")
+        return jsonify({"error": "Cron not configured"}), 503
     auth_header = request.headers.get("Authorization", "")
     if cron_secret and auth_header != f"Bearer {cron_secret}":
         return jsonify({"error": "Unauthorized"}), 401
@@ -778,6 +848,7 @@ def _cron_scrape(platform_filter=None):
 
 
 @app.route("/api/cron/daily-scrape", methods=["GET"])
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def api_cron_daily_scrape():
     """Legacy endpoint — scrapes all platforms."""
     err = _cron_auth_check()
@@ -787,6 +858,7 @@ def api_cron_daily_scrape():
 
 
 @app.route("/api/cron/scrape-tiktok-youtube", methods=["GET"])
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def api_cron_scrape_tiktok_youtube():
     """Hourly cron — TikTok + YouTube only."""
     err = _cron_auth_check()
@@ -796,6 +868,7 @@ def api_cron_scrape_tiktok_youtube():
 
 
 @app.route("/api/cron/scrape-instagram", methods=["GET"])
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def api_cron_scrape_instagram():
     """Twice daily cron (9h & 18h) — Instagram only."""
     err = _cron_auth_check()
