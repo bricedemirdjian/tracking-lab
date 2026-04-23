@@ -21,7 +21,7 @@
             --accent: #FF69B4;
             --accent-hover: #f05aa0;
             --pink: #FF69B4;
-            --section-gap: clamp(100px, 12vw, 160px);
+            --section-gap: 40px;
             --r: 20px;
             --r-lg: 28px;
             --r-pill: 980px;
@@ -48,21 +48,89 @@
         .nav-inner {
             width: 100%; padding: 0 8px 0 24px;
             display: flex; align-items: center; justify-content: space-between;
+            position: relative;
         }
         .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text); }
         .logo-mark {
             width: 28px; height: 28px; border-radius: 8px;
-            background: var(--accent);
+            background: transparent;
             display: flex; align-items: center; justify-content: center;
-            color: #fff; font-size: 11px; font-weight: 900;
+            flex-shrink: 0;
         }
         .logo span { font-weight: 700; font-size: 15px; letter-spacing: -0.4px; }
-        .nav-links { display: flex !important; gap: 32px; }
+        .nav-links {
+            display: flex; gap: 32px;
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+        }
         .nav-links a { font-size: 15px; font-weight: 500; color: var(--text-2); text-decoration: none; transition: color .2s; }
         .nav-links a:hover { color: var(--text); }
         .nav-cta { display: flex; align-items: center; gap: 16px; }
         .nav-cta .btn-ghost { font-size: 14px; font-weight: 600; color: var(--text); }
-        .nav-cta .btn-primary { border-radius: 100px; padding: 10px 22px; font-size: 14px; }
+        .nav-cta .btn-primary { border-radius: 100px; padding: 10px 22px; font-size: 14px; box-shadow: 0 2px 12px rgba(255,105,180,.25); }
+
+        /* Hamburger button (mobile only) */
+        .nav-burger {
+            display: none;
+            width: 40px; height: 40px;
+            background: none; border: none; cursor: pointer;
+            padding: 0; margin-right: 8px;
+            align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: background .2s;
+        }
+        .nav-burger:hover { background: rgba(0,0,0,.04); }
+        .nav-burger span {
+            display: block; position: relative;
+            width: 20px; height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+            transition: transform .3s cubic-bezier(.2,0,0,1), opacity .2s;
+        }
+        .nav-burger span::before, .nav-burger span::after {
+            content: ''; position: absolute; left: 0;
+            width: 20px; height: 2px;
+            background: var(--text); border-radius: 2px;
+            transition: transform .3s cubic-bezier(.2,0,0,1);
+        }
+        .nav-burger span::before { top: -6px; }
+        .nav-burger span::after { top: 6px; }
+        .nav-burger.open span { background: transparent; }
+        .nav-burger.open span::before { transform: translateY(6px) rotate(45deg); }
+        .nav-burger.open span::after { transform: translateY(-6px) rotate(-45deg); }
+
+        /* Mobile menu overlay */
+        .mobile-menu {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,.98);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 99;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 24px;
+            opacity: 0; pointer-events: none;
+            transform: translateY(-12px);
+            transition: opacity .3s cubic-bezier(.2,0,0,1), transform .3s cubic-bezier(.2,0,0,1);
+        }
+        .mobile-menu.open {
+            opacity: 1; pointer-events: auto;
+            transform: translateY(0);
+        }
+        .mobile-menu a.mm-link {
+            font-size: 24px; font-weight: 700; color: var(--text);
+            text-decoration: none; letter-spacing: -0.5px;
+        }
+        .mobile-menu .mm-cta {
+            display: flex; flex-direction: column; gap: 12px;
+            margin-top: 16px; width: 80%; max-width: 280px;
+        }
+        .mobile-menu .mm-cta .btn {
+            width: 100%; padding: 14px 24px; font-size: 15px;
+        }
+        body.menu-open { overflow: hidden; }
 
         /* ─── BTN ─── */
         .btn {
@@ -73,17 +141,18 @@
             letter-spacing: -0.1px;
         }
         .btn:active { transform: scale(.97); }
-        .btn-primary { background: var(--dark); color: #fff; }
-        .btn-primary:hover { background: #222; transform: translateY(-1px); }
+        .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 20px rgba(255,105,180,.3); }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,105,180,.4); }
         .btn-dark { background: var(--dark); color: #fff; }
         .btn-dark:hover { background: #222; }
         .btn-ghost { background: none; color: var(--text-2); }
         .btn-ghost:hover { color: var(--text); }
-        .btn-outline { border: 1.5px solid var(--border); background: none; color: var(--text); }
-        .btn-outline:hover { background: var(--bg-alt); }
-        .btn-white { background: #fff; color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-        .btn-white:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); transform: translateY(-1px); }
-        .btn-lg { padding: 14px 30px; font-size: 16px; }
+        .btn-outline { border: 1.5px solid var(--border); background: #fff; color: var(--text); }
+        .btn-outline:hover { background: var(--bg-alt); border-color: #ccc; }
+        .btn-white { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
+        .btn-white:hover { background: var(--bg-alt); border-color: #ccc; transform: translateY(-1px); }
+        .btn-lg { padding: 18px 36px; font-size: 17px; font-weight: 700; gap: 10px; }
+        .btn-lg svg { flex-shrink: 0; }
 
         /* ─── HERO ─── */
         .hero {
@@ -91,36 +160,103 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             text-align: center;
-            padding: 80px 24px 48px;
+            padding: 120px 24px 80px;
             position: relative; overflow: hidden;
             background: var(--white); color: var(--dark);
         }
         .hero::after { display: none; }
         .hero > * { position: relative; z-index: 1; }
+
+        /* Floating bg logos */
+        .hero-logos-bg {
+            position: absolute; inset: 0; z-index: 0 !important;
+            pointer-events: none; overflow: hidden;
+        }
+        .hero-logos-bg svg {
+            position: absolute;
+            opacity: .12;
+        }
+        @keyframes bgDrift1 { 0%,100%{transform:var(--r) translateY(0)} 50%{transform:var(--r) translateY(-14px)} }
+        @keyframes bgDrift2 { 0%,100%{transform:var(--r) translateY(0)} 50%{transform:var(--r) translateY(10px)} }
+        .hero-logos-bg .fl1 { animation: bgDrift1 8s ease-in-out infinite; }
+        .hero-logos-bg .fl2 { animation: bgDrift2 9s ease-in-out infinite 1s; }
+        .hero-logos-bg .fl3 { animation: bgDrift1 10s ease-in-out infinite 2s; }
+        .hero-logos-bg .fl4 { animation: bgDrift2 7.5s ease-in-out infinite .5s; }
+
+        /* Hero platforms showcase */
+        .hero-platforms {
+            display: flex; align-items: flex-start; justify-content: center;
+            gap: 52px; margin-bottom: 52px;
+            animation: rise .7s .2s cubic-bezier(.2,0,0,1) backwards;
+        }
+        .hero-plat-card {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 14px; cursor: default;
+            transition: transform .4s cubic-bezier(.2,0,0,1);
+        }
+        .hero-plat-card:hover { transform: translateY(-6px) scale(1.08); }
+        .hero-plat-icon {
+            width: 72px; height: 72px; border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            transition: box-shadow .4s cubic-bezier(.2,0,0,1);
+        }
+        /* Brand glow shadows */
+        .hero-plat-card.tiktok .hero-plat-icon { box-shadow: 0 8px 28px rgba(0,0,0,.15); }
+        .hero-plat-card.tiktok:hover .hero-plat-icon { box-shadow: 0 16px 44px rgba(37,244,238,.35), 0 0 0 4px rgba(37,244,238,.1); }
+        .hero-plat-card.instagram .hero-plat-icon { box-shadow: 0 8px 28px rgba(214,41,118,.2); }
+        .hero-plat-card.instagram:hover .hero-plat-icon { box-shadow: 0 16px 44px rgba(214,41,118,.4), 0 0 0 4px rgba(214,41,118,.1); }
+        .hero-plat-card.youtube .hero-plat-icon { box-shadow: 0 8px 28px rgba(255,0,0,.15); }
+        .hero-plat-card.youtube:hover .hero-plat-icon { box-shadow: 0 16px 44px rgba(255,0,0,.35), 0 0 0 4px rgba(255,0,0,.08); }
+        .hero-plat-card.linkedin .hero-plat-icon { box-shadow: 0 8px 28px rgba(10,102,194,.2); }
+        .hero-plat-card.linkedin:hover .hero-plat-icon { box-shadow: 0 16px 44px rgba(10,102,194,.4), 0 0 0 4px rgba(10,102,194,.1); }
+        /* Float animation */
+        @keyframes heroFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        .hero-plat-card:nth-child(1) { animation: heroFloat 5s ease-in-out infinite; }
+        .hero-plat-card:nth-child(2) { animation: heroFloat 5.5s ease-in-out infinite .4s; }
+        .hero-plat-card:nth-child(3) { animation: heroFloat 4.8s ease-in-out infinite .8s; }
+        .hero-plat-card:nth-child(4) { animation: heroFloat 5.2s ease-in-out infinite 1.2s; }
+        .hero-plat-name { font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: -0.01em; }
         .hero-eyebrow {
             font-size: 14px; font-weight: 600; letter-spacing: .02em;
-            color: var(--accent); margin-bottom: 20px;
+            color: var(--accent); margin-bottom: 28px;
             animation: rise .7s cubic-bezier(.2,0,0,1) backwards;
         }
         .hero h1 {
             font-size: clamp(44px, 7vw, 80px);
             font-weight: 900; letter-spacing: -0.045em;
-            line-height: .95; max-width: 780px;
-            margin-bottom: 24px;
+            line-height: 1; max-width: 780px;
+            margin-bottom: 32px;
             animation: rise .7s .08s cubic-bezier(.2,0,0,1) backwards;
         }
         .hero h1 em {
             font-style: normal;
             color: var(--accent);
         }
+        .hero-swipe-wrap {
+            display: inline-block;
+            overflow: hidden;
+            vertical-align: baseline;
+            line-height: inherit;
+            clip-path: inset(0 0 0 0);
+        }
+        .hero-swipe {
+            display: flex;
+            flex-direction: column;
+        }
+        .hero-swipe em {
+            display: block;
+            white-space: nowrap;
+            line-height: inherit;
+            padding-right: 0.05em;
+        }
         .hero-p {
             font-size: clamp(16px, 1.8vw, 19px);
             font-weight: 500; color: var(--text-3); line-height: 1.55;
-            max-width: 460px; margin-bottom: 40px;
+            max-width: 480px; margin-bottom: 48px;
             animation: rise .7s .16s cubic-bezier(.2,0,0,1) backwards;
         }
         .hero-btns {
-            display: flex; gap: 10px; margin-bottom: 64px;
+            display: flex; gap: 14px; margin-bottom: 18px;
             animation: rise .7s .24s cubic-bezier(.2,0,0,1) backwards;
         }
         .hero-img-wrap {
@@ -133,213 +269,1203 @@
         }
         .hero-mock {
             width: 100%; aspect-ratio: 16/9;
-            background: var(--dark-surface);
-            display: grid; grid-template-rows: auto 1fr; gap: 12px;
-            padding: 20px;
+            background: #0a0a0c;
+            display: grid; grid-template-rows: auto 1fr; gap: 8px;
+            padding: 12px;
         }
-        .mock-topbar { display: flex; gap: 6px; align-items: center; }
-        .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .mock-body { display: flex; flex-direction: column; gap: 8px; }
-        .mock-header {
-            display: flex; align-items: center; gap: 8px;
-            padding: 8px 12px; background: var(--dark-card); border-radius: 10px;
+        .mock-topbar { display: flex; gap: 5px; align-items: center; padding: 0 3px; }
+        .mock-dot { width: 7px; height: 7px; border-radius: 50%; }
+        .mock-app {
+            display: grid; grid-template-columns: 142px 1fr; gap: 8px;
+            min-height: 0;
         }
-        .mock-logo { width: 22px; height: 22px; border-radius: 6px; background: #FF69B4; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; color: #fff; }
-        .mock-header-title { font-size: 9px; font-weight: 800; margin-right: 8px; }
-        .mock-header-btn { background: rgba(255,255,255,.06); border-radius: 5px; padding: 3px 8px; font-size: 5.5px; font-weight: 600; color: rgba(255,255,255,.4); white-space: nowrap; }
-        .mock-header-btn.active { background: #FF69B4; color: #fff; }
-        .mock-header-user { margin-left: auto; display: flex; align-items: center; gap: 4px; }
-        .mock-header-avatar { width: 16px; height: 16px; border-radius: 50%; background: #7b61ff; display: flex; align-items: center; justify-content: center; font-size: 6px; font-weight: 800; color: #fff; }
-        .mock-main { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-        .mock-kpis { display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; }
-        .mock-kpi {
-            background: var(--dark-card); border-radius: 10px;
-            padding: 10px;
+        /* ── Sidebar ── */
+        .mock-sidebar {
+            background: #161618; border-radius: 9px;
+            padding: 10px 8px; display: flex; flex-direction: column;
+            gap: 8px; min-height: 0;
         }
-        .mock-kpi-icon { font-size: 10px; float: right; opacity: .4; }
-        .mock-kpi-label {
-            font-size: 6px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 1px; color: rgba(255,255,255,.35); margin-bottom: 4px;
-        }
-        .mock-kpi-val { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
-        .mock-accounts {
-            display: grid; grid-template-columns: repeat(3,1fr); gap: 6px;
-        }
-        .mock-account {
-            background: var(--dark-card); border-radius: 10px; padding: 10px;
-        }
-        .mock-acc-top {
-            display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
-        }
-        .mock-avatar {
-            width: 20px; height: 20px; border-radius: 50%;
+        .mock-sb-brand { display: flex; align-items: center; gap: 6px; }
+        .mock-sb-logo {
+            width: 18px; height: 18px; border-radius: 5px;
+            background: radial-gradient(circle, rgba(255,105,180,.5) 30%, rgba(255,105,180,.05));
             display: flex; align-items: center; justify-content: center;
-            font-size: 8px; font-weight: 800; color: #fff;
         }
-        .mock-acc-name { font-size: 8px; font-weight: 700; }
-        .mock-acc-handle { font-size: 6px; color: rgba(255,255,255,.3); }
-        .mock-acc-stats {
+        .mock-sb-logo::after { content:''; width: 6px; height: 6px; border-radius: 50%; background: #FF69B4; }
+        .mock-sb-title { font-size: 8px; font-weight: 800; color: #fff; line-height: 1.1; }
+        .mock-sb-sub { font-size: 5px; font-weight: 500; color: rgba(255,255,255,.35); }
+        .mock-sb-nav { display: flex; flex-direction: column; gap: 5px; }
+        .mock-sb-section { display: flex; flex-direction: column; gap: 1px; }
+        .mock-sb-label {
+            font-size: 4.5px; font-weight: 800; letter-spacing: .6px;
+            text-transform: uppercase; color: rgba(255,255,255,.3);
+            padding: 0 4px; margin-bottom: 1px;
+        }
+        .mock-sb-item {
+            display: flex; align-items: center; gap: 4px;
+            padding: 3px 5px; border-radius: 4px;
+            font-size: 6px; font-weight: 600; color: rgba(255,255,255,.5);
+        }
+        .mock-sb-item .mock-sb-ico {
+            width: 7px; height: 7px; border-radius: 2px;
+            background: rgba(255,255,255,.15);
+        }
+        .mock-sb-item.active { background: rgba(255,105,180,.12); color: #FF69B4; }
+        .mock-sb-item.active .mock-sb-ico { background: #FF69B4; }
+        .mock-sb-badge {
+            margin-left: auto; font-size: 4.5px; font-weight: 700;
+            background: rgba(255,255,255,.08); padding: 1px 4px; border-radius: 5px;
+            color: rgba(255,255,255,.5);
+        }
+        .mock-sb-actions {
+            display: flex; flex-direction: column; gap: 3px;
+            padding-top: 6px; border-top: 1px solid rgba(255,255,255,.06);
+        }
+        .mock-sb-action {
+            display: flex; align-items: center; gap: 5px;
+            padding: 4px 5px; border-radius: 4px;
+            background: #1c1c1e;
+            font-size: 5.5px; font-weight: 700; color: rgba(255,255,255,.55);
+        }
+        .mock-sb-action::before {
+            content:''; width: 6px; height: 6px; border-radius: 1px;
+            background: rgba(255,105,180,.45);
+        }
+        .mock-sb-action.scrape { background: linear-gradient(90deg, rgba(255,105,180,.18), rgba(123,97,255,.12)); color: #FF69B4; }
+        .mock-sb-action.scrape::before { background: #FF69B4; }
+        .mock-sb-account {
+            margin-top: auto;
+            display: flex; align-items: center; gap: 5px;
+            padding-top: 6px; border-top: 1px solid rgba(255,255,255,.06);
+        }
+        .mock-sb-avatar {
+            width: 16px; height: 16px; border-radius: 50%; background: #FF69B4;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 6.5px; font-weight: 800; color: #fff;
+        }
+        .mock-sb-acc-name { font-size: 5.5px; font-weight: 700; color: #fff; line-height: 1.2; }
+        .mock-sb-acc-mail { font-size: 4.5px; color: rgba(255,255,255,.35); }
+        /* ── Main area ── */
+        .mock-main {
+            display: grid; grid-template-rows: 1fr auto; gap: 8px;
+            min-height: 0;
+        }
+        .mock-a-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            min-height: 0;
+        }
+        .mock-a-card {
+            background: #161618; border-radius: 9px;
+            padding: 10px; position: relative; overflow: hidden;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .mock-a-card::before {
+            content:''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, #FF69B4, #7b61ff);
+        }
+        .mock-a-card.comp::before { background: linear-gradient(90deg, #25f4ee, #7b61ff); }
+        .mock-a-head {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .mock-a-title {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 7.5px; font-weight: 800; color: #fff;
+        }
+        .mock-a-title .mock-a-ico {
+            width: 9px; height: 9px; border-radius: 2px;
+            background: rgba(255,105,180,.2); border: 1px solid #FF69B4;
+        }
+        .mock-a-card.comp .mock-a-title .mock-a-ico {
+            background: rgba(37,244,238,.15); border-color: #25f4ee;
+        }
+        .mock-a-badge {
+            font-size: 4.5px; font-weight: 700;
+            background: rgba(255,255,255,.08); padding: 2px 5px; border-radius: 5px;
+            color: rgba(255,255,255,.5);
+        }
+        .mock-a-filters { display: flex; gap: 3px; }
+        .mock-a-pill {
+            background: #1c1c1e; border: 1px solid rgba(255,255,255,.06);
+            border-radius: 4px; padding: 2px 5px;
+            font-size: 4.5px; font-weight: 600; color: rgba(255,255,255,.45);
+        }
+        .mock-a-hero {
+            text-align: center; padding: 2px 0;
+        }
+        .mock-a-hero-val {
+            font-size: 20px; font-weight: 900; letter-spacing: -.8px;
+            color: #fff; line-height: 1;
+        }
+        .mock-a-card.comp .mock-a-hero-val { color: #25f4ee; }
+        .mock-a-hero-lbl {
+            font-size: 5px; font-weight: 600; color: rgba(255,255,255,.4);
+            text-transform: uppercase; letter-spacing: .8px; margin-top: 2px;
+        }
+        .mock-a-metrics {
             display: grid; grid-template-columns: repeat(3,1fr); gap: 4px;
         }
-        .mock-acc-stat { text-align: center; }
-        .mock-acc-stat-val { font-size: 9px; font-weight: 800; }
-        .mock-acc-stat-lbl { font-size: 5px; text-transform: uppercase; color: rgba(255,255,255,.3); letter-spacing: .5px; }
+        .mock-a-metric {
+            background: #1c1c1e; border-radius: 5px;
+            padding: 5px 3px; text-align: center;
+        }
+        .mock-a-metric-val {
+            font-size: 10px; font-weight: 800; color: #fff;
+            letter-spacing: -.3px;
+        }
+        .mock-a-metric.accent .mock-a-metric-val { color: #FF69B4; }
+        .mock-a-card.comp .mock-a-metric.accent .mock-a-metric-val { color: #25f4ee; }
+        .mock-a-metric-lbl {
+            font-size: 4.5px; font-weight: 600; color: rgba(255,255,255,.4);
+            text-transform: uppercase; letter-spacing: .5px; margin-top: 1px;
+        }
+        .mock-a-secondary {
+            display: flex; flex-wrap: wrap; gap: 3px 7px;
+            font-size: 5px; font-weight: 600; color: rgba(255,255,255,.45);
+        }
+        .mock-a-secondary span { color: #fff; font-weight: 800; }
+        .mock-a-table {
+            width: 100%; border-collapse: collapse; margin-top: auto;
+        }
+        .mock-a-table th, .mock-a-table td {
+            font-size: 5px; padding: 2px 3px; text-align: left;
+        }
+        .mock-a-table th {
+            color: rgba(255,255,255,.35); font-weight: 700; text-transform: uppercase;
+            letter-spacing: .3px; border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        .mock-a-table td { color: rgba(255,255,255,.7); font-weight: 600; }
+        .mock-a-table td:not(:first-child) { color: #fff; font-weight: 800; text-align: right; }
+        /* ── Bottom row : Charts + Top videos ── */
+        .mock-b-grid {
+            display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px;
+            min-height: 0;
+        }
+        .mock-b-card {
+            background: #161618; border-radius: 9px;
+            padding: 9px 10px; display: flex; flex-direction: column; gap: 6px;
+            overflow: hidden;
+        }
+        .mock-b-head {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .mock-b-title { font-size: 6.5px; font-weight: 800; color: #fff; }
+        .mock-b-tag {
+            font-size: 4.5px; font-weight: 700; color: rgba(255,255,255,.5);
+            background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 4px;
+        }
+        .mock-bars {
+            display: flex; align-items: flex-end; gap: 3px; height: 50px;
+        }
+        .mock-bar {
+            flex: 1; border-radius: 2px 2px 0 0;
+            background: linear-gradient(180deg, #FF69B4, rgba(255,105,180,.25));
+            position: relative;
+        }
+        .mock-bar.alt { background: linear-gradient(180deg, #25f4ee, rgba(37,244,238,.2)); }
+        .mock-bar-axis {
+            display: flex; justify-content: space-between;
+            font-size: 4px; color: rgba(255,255,255,.3); font-weight: 600;
+            padding: 0 1px;
+        }
+        .mock-vids { display: flex; gap: 4px; }
+        .mock-vid {
+            flex: 1; aspect-ratio: 9/12;
+            background: linear-gradient(160deg, #2a1a2a, #1c1c1e);
+            border-radius: 5px; position: relative; overflow: hidden;
+            border: 1px solid rgba(255,255,255,.06);
+        }
+        .mock-vid::before {
+            content:''; position: absolute; left: 4px; top: 4px;
+            width: 9px; height: 9px; border-radius: 50%;
+            background: linear-gradient(135deg, #FF69B4, #7b61ff);
+        }
+        .mock-vid::after {
+            content:'▶'; position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            color: rgba(255,255,255,.4); font-size: 8px;
+        }
+        .mock-vid-stats {
+            position: absolute; left: 3px; right: 3px; bottom: 3px;
+            display: flex; justify-content: space-between;
+            font-size: 4px; font-weight: 800; color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,.6);
+        }
+        .mock-vid-stats span:last-child { color: #FF69B4; }
+        .mock-vid:nth-child(2)::before { background: linear-gradient(135deg, #25f4ee, #7b61ff); }
+        .mock-vid:nth-child(2) .mock-vid-stats span:last-child { color: #25f4ee; }
+        .mock-vid:nth-child(3)::before { background: linear-gradient(135deg, #7b61ff, #FF69B4); }
+        .mock-vid:nth-child(3) .mock-vid-stats span:last-child { color: #7b61ff; }
+        .mock-vid:nth-child(4)::before { background: linear-gradient(135deg, #34c759, #25f4ee); }
+        .mock-vid:nth-child(4) .mock-vid-stats span:last-child { color: #34c759; }
 
         /* ─── SECTION ─── */
         .section { padding: var(--section-gap) 24px; }
         .section-inner { max-width: 1080px; margin: 0 auto; }
         .section-dark { background: var(--white); color: var(--dark); }
         .section-alt { background: var(--white); }
-        .section-hd { text-align: center; margin-bottom: 64px; }
-        .eyebrow {
+        .section-hd { text-align: center; margin-bottom: 72px; }
+        .section-hd .eyebrow {
             font-size: 14px; font-weight: 700; letter-spacing: .02em;
-            margin-bottom: 12px;
+            margin: 0 0 16px; color: var(--text-2);
         }
-        .eyebrow-accent { color: var(--accent); }
+        .section-hd .eyebrow-accent { color: var(--accent); }
         .section-hd h2 {
             font-size: clamp(36px, 5vw, 56px);
             font-weight: 800; letter-spacing: -0.035em; line-height: 1.05;
         }
-        .section-hd p {
+        .section-hd > h2 + p {
             font-size: 17px; font-weight: 500;
             color: var(--text-2); max-width: 440px; margin: 14px auto 0;
         }
-        .section-dark .section-hd p { color: var(--text-2); }
+        .section-dark .section-hd > h2 + p { color: var(--text-2); }
 
-        /* ─── PLATFORMS ─── */
-        .platforms {
-            display: flex; justify-content: center; gap: 40px;
-            padding: 44px 24px; border-bottom: 1px solid var(--border);
+        /* (platforms now in hero) */
+
+        /* ─── FEATURES ─── */
+        .features-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr);
+            gap: 18px; max-width: 1100px; margin: 0 auto;
         }
-        .plat { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .plat-icon {
-            width: 52px; height: 52px; border-radius: 14px;
+        .feat-card {
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: var(--r-lg); overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: transform .5s cubic-bezier(.2,0,0,1), box-shadow .5s cubic-bezier(.2,0,0,1), border-color .4s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+            position: relative;
+        }
+        .feat-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 24px 60px rgba(0,0,0,.08);
+            border-color: rgba(255,105,180,.25);
+        }
+        .feat-card.span-4 { grid-column: span 4; }
+        .feat-card.span-3 { grid-column: span 3; }
+        .feat-card.span-2 { grid-column: span 2; }
+        .feat-card.dark { background: #0d0d0d; border-color: rgba(255,255,255,.08); color: #fff; }
+        .feat-card.dark:hover {
+            box-shadow: 0 24px 60px rgba(0,0,0,.5);
+            border-color: rgba(255,105,180,.4);
+        }
+        .feat-visual {
+            height: 220px; position: relative; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
-            font-size: 24px; background: var(--bg-alt);
+            background: var(--bg-alt);
+            border-bottom: 1px solid var(--border);
         }
-        .plat-name { font-size: 12px; font-weight: 700; color: var(--text-2); }
+        .feat-card.dark .feat-visual {
+            background: linear-gradient(180deg, #0a0a0c 0%, #18181b 100%);
+            border-bottom-color: rgba(255,255,255,.06);
+        }
+        .feat-visual::before {
+            content:''; position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(255,105,180,.06) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .feat-card.dark .feat-visual::before {
+            background: radial-gradient(circle at 50% 50%, rgba(255,105,180,.10) 0%, transparent 65%);
+        }
+        .feat-content {
+            padding: 26px 28px 28px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .feat-content h3 {
+            font-size: 22px; font-weight: 800;
+            letter-spacing: -0.02em; color: inherit;
+        }
+        .feat-content p {
+            font-size: 14px; font-weight: 500;
+            color: var(--text-2); line-height: 1.55;
+        }
+        .feat-card.dark .feat-content p { color: rgba(255,255,255,.6); }
 
-        /* ─── BENTO ─── */
-        .bento { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-        .bento-item {
-            background: var(--bg-alt); border-radius: var(--r-lg);
-            padding: 40px 32px; min-height: 260px;
+        /* Visual 1: Dashboard mock */
+        .feat-mock-dash {
+            width: 86%; max-width: 380px;
+            background: #fff; border-radius: 12px;
+            padding: 11px;
+            box-shadow: 0 18px 44px rgba(255,105,180,.18), 0 4px 14px rgba(0,0,0,.06);
+            border: 1px solid #f0f0f5;
+            display: flex; flex-direction: column; gap: 9px;
+        }
+        .feat-mock-dash-bar {
+            display: flex; align-items: center; gap: 5px;
+            padding-bottom: 8px; border-bottom: 1px solid #f5f5f7;
+        }
+        .feat-mock-dash-dots { display: flex; gap: 3px; }
+        .feat-mock-dash-dots div { width: 5px; height: 5px; border-radius: 50%; background: #e0e0e5; }
+        .feat-mock-dash-bar-line {
+            flex: 1; height: 4px; background: #f5f5f7; border-radius: 2px;
+            margin-left: 6px;
+        }
+        .feat-mock-dash-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+        }
+        .feat-mock-dash-kpi {
+            background: #fafafc; border: 1px solid #f0f0f5;
+            border-radius: 7px; padding: 7px 8px;
+        }
+        .feat-mock-dash-kpi-lbl {
+            font-size: 5.5px; color: #86868b;
+            text-transform: uppercase; font-weight: 700; letter-spacing: 0.4px;
+        }
+        .feat-mock-dash-kpi-val {
+            font-size: 11px; font-weight: 800; color: #18181b;
+            letter-spacing: -0.3px; margin-top: 2px;
+        }
+        .feat-mock-dash-kpi-val .delta {
+            font-size: 6px; color: #34c759; margin-left: 3px; font-weight: 700;
+        }
+        .feat-mock-dash-chart {
+            height: 36px; background: linear-gradient(180deg, rgba(255,105,180,.06), rgba(255,105,180,0));
+            border-radius: 6px; padding: 4px; position: relative;
+        }
+        .feat-mock-dash-chart svg { width: 100%; height: 100%; display: block; }
+
+        /* Visual 2: Platforms grid */
+        .feat-platforms {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 16px; padding: 8px;
+        }
+        .feat-plat {
+            width: 60px; height: 60px; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform .5s cubic-bezier(.2,0,0,1);
+            box-shadow: 0 8px 22px rgba(0,0,0,.25);
+        }
+        .feat-plat svg { width: 100%; height: 100%; border-radius: 16px; }
+        .feat-card:hover .feat-plat { transform: translateY(-4px) scale(1.05); }
+        .feat-card:hover .feat-plat:nth-child(2) { transition-delay: .04s; }
+        .feat-card:hover .feat-plat:nth-child(3) { transition-delay: .08s; }
+        .feat-card:hover .feat-plat:nth-child(4) { transition-delay: .12s; }
+
+        /* Visual 3: Live chart */
+        .feat-chart {
+            width: 82%; height: 78%;
+            position: relative;
             display: flex; flex-direction: column; justify-content: flex-end;
-            position: relative; overflow: hidden;
-            transition: transform .4s cubic-bezier(.2,0,0,1);
         }
-        .bento-item:hover { transform: scale(1.015); }
-        .bento-item.span-2 { grid-column: span 2; }
-        .bento-item.dark { background: var(--dark); color: #fff; }
-        .bento-item.accent { background: var(--accent); color: #fff; }
-        .bento-item h3 { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 6px; }
-        .bento-item p { font-size: 14px; font-weight: 500; opacity: .6; line-height: 1.5; }
+        .feat-chart-svg { width: 100%; height: 100%; display: block; }
+        .feat-chart-live {
+            position: absolute; top: 4px; right: 4px;
+            display: flex; align-items: center; gap: 5px;
+            font-size: 9px; font-weight: 800;
+            color: #34c759; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .feat-chart-live::before {
+            content:''; width: 6px; height: 6px;
+            background: #34c759; border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(52,199,89,.18);
+            animation: featPulse 1.6s ease-in-out infinite;
+        }
+        @keyframes featPulse {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(52,199,89,.18); }
+            50% { box-shadow: 0 0 0 7px rgba(52,199,89,.10); }
+        }
 
-        /* mini chart inside bento */
-        .bento-bars {
-            position: absolute; top: 28px; right: 28px;
-            display: flex; gap: 4px; align-items: flex-end; height: 80px;
+        /* Visual 4: Comparison bars */
+        .feat-compare {
+            width: 80%; display: flex; flex-direction: column; gap: 13px;
         }
-        .bento-bars div {
-            width: 14px; border-radius: 4px 4px 0 0;
+        .feat-compare-row { display: flex; flex-direction: column; gap: 5px; }
+        .feat-compare-lbl {
+            display: flex; justify-content: space-between;
+            font-size: 10px; font-weight: 700; color: rgba(255,255,255,.7);
+        }
+        .feat-compare-bar {
+            height: 7px; background: rgba(255,255,255,.08);
+            border-radius: 4px; overflow: hidden;
+        }
+        .feat-compare-bar-fill {
+            height: 100%; border-radius: 4px;
+            background: linear-gradient(90deg, #FF69B4, #ff8ec9);
+        }
+        .feat-compare-bar-fill.alt {
+            background: linear-gradient(90deg, #7b61ff, #25f4ee);
         }
 
-        /* ─── STEPS ─── */
-        .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; }
-        .step {
-            background: var(--bg-alt); border-radius: var(--r-lg);
-            padding: 52px 32px; text-align: center;
+        /* Visual 5: Export CSV */
+        .feat-export {
+            display: flex; align-items: center; gap: 18px;
         }
-        .step-n {
-            font-size: 72px; font-weight: 900;
-            letter-spacing: -0.04em; line-height: 1; margin-bottom: 16px;
+        .feat-export-file {
+            width: 80px; height: 100px;
+            background: #fff; border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 12px 32px rgba(0,0,0,.08);
+            padding: 18px 12px 12px;
+            position: relative;
+            display: flex; flex-direction: column; gap: 6px;
         }
-        .step h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
-        .step p { font-size: 14px; font-weight: 500; color: var(--text-2); line-height: 1.6; }
+        .feat-export-file::before {
+            content: 'CSV'; position: absolute;
+            top: -8px; left: 50%; transform: translateX(-50%);
+            background: #34c759; color: #fff;
+            font-size: 8px; font-weight: 800;
+            padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px;
+        }
+        .feat-export-row { height: 5px; background: #f0f0f5; border-radius: 2px; }
+        .feat-export-row.short { width: 60%; }
+        .feat-export-arrow {
+            color: var(--accent);
+            transition: transform .5s cubic-bezier(.2,0,0,1);
+        }
+        .feat-card:hover .feat-export-arrow { transform: translateX(4px); }
+
+        /* ─── HOW (viral.app inspired) ─── */
+        .how-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 24px; max-width: 1100px; margin: 0 auto;
+        }
+        .how-card {
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: 28px; overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: transform .5s cubic-bezier(.2,0,0,1), box-shadow .5s cubic-bezier(.2,0,0,1);
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        }
+        .how-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 24px 60px rgba(0,0,0,.08);
+        }
+        .how-visual {
+            height: 280px; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .how-card.c1 .how-visual { background: linear-gradient(180deg, #ffe4f1 0%, #fff5fa 60%, #fff 100%); }
+        .how-card.c2 .how-visual { background: linear-gradient(180deg, #ffc8e0 0%, #ffe9f3 60%, #fff 100%); }
+        .how-card.c3 .how-visual { background: linear-gradient(180deg, #ffaccf 0%, #ffd8e9 60%, #fff 100%); }
+        .how-content {
+            padding: 28px 32px 36px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .how-num {
+            font-size: 18px; font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .how-card.c1 .how-num { color: var(--accent); }
+        .how-card.c2 .how-num { color: var(--accent); }
+        .how-card.c3 .how-num { color: var(--accent); }
+        .how-content h3 {
+            font-size: 24px; font-weight: 800;
+            letter-spacing: -0.02em; line-height: 1.2;
+            color: var(--text);
+        }
+        .how-content p {
+            font-size: 15px; font-weight: 500;
+            color: var(--text-2); line-height: 1.55;
+        }
+
+        /* Step 1 mock: Google login */
+        .how-mock-login {
+            background: #fff; border-radius: 14px;
+            padding: 22px 24px;
+            box-shadow: 0 18px 44px rgba(255,105,180,.22), 0 4px 14px rgba(0,0,0,.05);
+            border: 1px solid #f0f0f5;
+            width: 78%; max-width: 260px;
+        }
+        .how-mock-login-title {
+            font-size: 10px; font-weight: 800;
+            color: #86868b; margin-bottom: 14px;
+            text-transform: uppercase; letter-spacing: 0.6px;
+        }
+        .how-mock-login-btn {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 14px;
+            background: #fff; border: 1.5px solid #e0e0e5;
+            border-radius: 10px;
+            font-size: 12px; font-weight: 700; color: #18181b;
+            box-shadow: 0 2px 8px rgba(0,0,0,.04);
+        }
+        .how-mock-login-google {
+            width: 16px; height: 16px; flex-shrink: 0;
+        }
+        .how-mock-login-divider {
+            margin: 12px 0; height: 1px; background: #f0f0f5;
+        }
+        .how-mock-login-cta {
+            background: #FF69B4; color: #fff;
+            font-size: 11px; font-weight: 800;
+            padding: 10px; border-radius: 8px; text-align: center;
+            letter-spacing: 0.2px;
+        }
+
+        /* Step 2 mock: Add accounts */
+        .how-mock-add {
+            background: #fff; border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 18px 44px rgba(255,105,180,.28), 0 4px 14px rgba(0,0,0,.05);
+            border: 1px solid #f0f0f5;
+            width: 78%; max-width: 260px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .how-mock-add-input {
+            background: #fafafc; border: 1px solid #f0f0f5;
+            border-radius: 8px; padding: 9px 11px;
+            font-size: 11px; font-weight: 700; color: #18181b;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .how-mock-add-input::before {
+            content: '@'; color: var(--accent); font-weight: 900;
+        }
+        .how-mock-add-platforms {
+            display: flex; gap: 6px; padding: 4px 0;
+        }
+        .how-mock-add-plat {
+            width: 26px; height: 26px; border-radius: 7px; overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+        }
+        .how-mock-add-plat svg { width: 100%; height: 100%; display: block; }
+        .how-mock-add-btn {
+            background: #FF69B4; color: #fff;
+            font-size: 11px; font-weight: 800;
+            padding: 9px 12px; border-radius: 8px; text-align: center;
+            margin-top: 2px;
+        }
+
+        /* Step 3 mock: Dashboard */
+        .how-mock-dash3 {
+            background: #fff; border-radius: 14px;
+            padding: 14px;
+            box-shadow: 0 18px 44px rgba(255,105,180,.32), 0 4px 14px rgba(0,0,0,.05);
+            border: 1px solid #f0f0f5;
+            width: 80%; max-width: 260px;
+            display: flex; flex-direction: column; gap: 9px;
+        }
+        .how-mock-dash3-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+        }
+        .how-mock-dash3-kpi {
+            background: #fafafc; border: 1px solid #f0f0f5;
+            border-radius: 8px; padding: 10px;
+        }
+        .how-mock-dash3-lbl {
+            font-size: 7px; color: #86868b;
+            text-transform: uppercase; font-weight: 800; letter-spacing: 0.4px;
+            margin-bottom: 3px;
+        }
+        .how-mock-dash3-val {
+            font-size: 14px; font-weight: 800; color: #18181b;
+            letter-spacing: -0.4px;
+        }
+        .how-mock-dash3-val .delta {
+            font-size: 8px; color: #34c759; margin-left: 4px; font-weight: 800;
+        }
+        .how-mock-dash3-chart {
+            height: 44px;
+            background: linear-gradient(180deg, rgba(255,105,180,.06), rgba(255,105,180,0));
+            border-radius: 8px; padding: 4px;
+        }
+        .how-mock-dash3-chart svg { width: 100%; height: 100%; display: block; }
 
         /* ─── STATS ─── */
         .stats {
             padding: 36px 0; overflow: hidden;
             border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            position: relative;
         }
         .stats-track {
-            display: flex; gap: 52px; align-items: center;
-            animation: slide 18s linear infinite; width: max-content;
+            display: flex;
+            width: max-content;
+            animation: slide 25s linear infinite;
+            will-change: transform;
         }
-        @keyframes slide { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        .stats-row {
+            display: flex;
+            gap: 52px;
+            padding-right: 52px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        /* 3 rows total → translate by -33.333% = exactly 1 row width = seamless loop */
+        @keyframes slide {
+            from { transform: translateX(0); }
+            to { transform: translateX(-33.3333%); }
+        }
         .stats::before, .stats::after {
             content:''; position:absolute; top:0; bottom:0; width:100px; z-index:2; pointer-events:none;
         }
-        .stats { position: relative; }
         .stats::before { left:0; background:linear-gradient(to right,var(--white),transparent); }
         .stats::after { right:0; background:linear-gradient(to left,var(--white),transparent); }
         .st { display:flex; align-items:baseline; gap:8px; white-space:nowrap; }
         .st-val { font-size:28px; font-weight:900; letter-spacing:-0.03em; }
         .st-lbl { font-size:13px; font-weight:600; color:var(--text-3); }
-        .st-dot { width:4px; height:4px; border-radius:50%; background:var(--accent); opacity:.3; }
 
-        /* ─── COMPARISON ─── */
-        .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        /* ─── COMPARISON (viral.app inspired) ─── */
+        #compare.section { padding-top: 80px; }
+        .compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
         .compare-card {
-            border-radius: var(--r-lg); padding: 44px 36px;
+            background: var(--white);
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: transform .5s cubic-bezier(.2,0,0,1), box-shadow .5s cubic-bezier(.2,0,0,1);
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
         }
-        .compare-card.without {
-            background: var(--bg-alt); border: 1px solid var(--border);
+        .compare-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 24px 60px rgba(0,0,0,.08);
         }
-        .compare-card.with {
-            background: var(--dark); color: #fff;
-            border: 1px solid var(--dark);
+        .compare-card-header {
+            padding: 30px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
         }
-        .compare-card h3 {
-            font-size: 20px; font-weight: 800; letter-spacing: -0.02em;
-            margin-bottom: 20px;
+        .compare-card.without .compare-card-header {
+            background: #18181b;
+            color: #fff;
         }
-        .compare-card.with h3 span { color: var(--accent); }
-        .compare-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+        .compare-card.with .compare-card-header {
+            background: var(--accent);
+            color: #fff;
+        }
+        .compare-card-header h3 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin: 0;
+        }
+        .compare-card-header-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            background: rgba(255,255,255,.15);
+        }
+        .compare-mockup {
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .compare-card.without .compare-mockup {
+            background: #fafafa;
+        }
+        .compare-card.with .compare-mockup {
+            background: #fff5fa;
+        }
+        .compare-mockup::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 520px; height: 520px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,.04);
+            pointer-events: none;
+        }
+        .compare-mockup::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 380px; height: 380px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,.04);
+            pointer-events: none;
+        }
+
+        /* WITHOUT mockup - messy spreadsheet */
+        .mock-sheet {
+            position: relative;
+            width: 240px; height: 170px;
+            background: #fff;
+            border: 1px solid #e5e5e7;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.06);
+            z-index: 1;
+        }
+        .mock-sheet-header {
+            height: 22px;
+            background: #f4f4f5;
+            border-bottom: 1px solid #e5e5e7;
+            display: flex;
+            border-radius: 6px 6px 0 0;
+        }
+        .mock-sheet-header div {
+            flex: 1;
+            border-right: 1px solid #e5e5e7;
+            font-size: 8px;
+            color: #a1a1aa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .mock-sheet-header div:last-child { border-right: none; }
+        .mock-sheet-row {
+            display: flex;
+            border-bottom: 1px solid #f4f4f5;
+            height: 18px;
+        }
+        .mock-sheet-row > div {
+            flex: 1;
+            border-right: 1px solid #f4f4f5;
+        }
+        .mock-sheet-row > div:last-child { border-right: none; }
+        .mock-bubble {
+            position: absolute;
+            background: #27272a;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 8px;
+            white-space: nowrap;
+            z-index: 2;
+            line-height: 1.3;
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        }
+        .mock-bubble::after {
+            content: '';
+            position: absolute;
+            width: 0; height: 0;
+            border-style: solid;
+        }
+        .mock-bubble.b1 { top: 8%; right: 8%; }
+        .mock-bubble.b1::after {
+            bottom: -5px; left: 16px;
+            border-width: 6px 6px 0 0;
+            border-color: #27272a transparent transparent transparent;
+        }
+        .mock-bubble.b2 { top: 38%; left: 4%; }
+        .mock-bubble.b2::after {
+            bottom: -5px; right: 16px;
+            border-width: 6px 0 0 6px;
+            border-color: #27272a transparent transparent transparent;
+        }
+        .mock-bubble.b3 { bottom: 8%; right: 6%; }
+        .mock-bubble.b3::after {
+            top: -5px; left: 16px;
+            border-width: 0 6px 6px 0;
+            border-color: transparent #27272a transparent transparent;
+        }
+
+        /* WITH mockup - clean dashboard */
+        .mock-dash {
+            position: relative;
+            width: 320px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 10px 30px rgba(255,105,180,.12), 0 0 0 1px rgba(0,0,0,.04);
+            z-index: 1;
+        }
+        .mock-dash-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #f4f4f5;
+        }
+        .mock-dash-dots { display: flex; gap: 4px; }
+        .mock-dash-dots div { width: 7px; height: 7px; border-radius: 50%; }
+        .mock-dash-dots div:nth-child(1) { background: #ff5f57; }
+        .mock-dash-dots div:nth-child(2) { background: #febc2e; }
+        .mock-dash-dots div:nth-child(3) { background: #28c840; }
+        .mock-dash-platforms { display: flex; gap: 4px; }
+        .mock-dash-platforms svg { width: 14px; height: 14px; border-radius: 3px; }
+        .mock-dash-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin-bottom: 6px;
+        }
+        .mock-dash-card {
+            background: #fafafa;
+            border: 1px solid #f0f0f0;
+            border-radius: 7px;
+            padding: 7px 9px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .mock-dash-card-icon {
+            width: 22px; height: 22px;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .mock-dash-card-icon svg { width: 11px; height: 11px; color: #fff; }
+        .mock-dash-card-icon.green { background: #10b981; }
+        .mock-dash-card-icon.blue { background: #3b82f6; }
+        .mock-dash-card-icon.pink { background: #FF69B4; }
+        .mock-dash-card-icon.purple { background: #8b5cf6; }
+        .mock-dash-card-text { flex: 1; min-width: 0; line-height: 1; }
+        .mock-dash-card .lbl {
+            display: block;
+            font-size: 6.5px;
+            color: #71717a;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 2px;
+        }
+        .mock-dash-card .val {
+            display: block;
+            font-size: 11px;
+            font-weight: 800;
+            color: #18181b;
+            letter-spacing: -0.02em;
+        }
+        .mock-dash-card .delta {
+            font-size: 6.5px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-left: 3px;
+        }
+        .mock-dash-chart {
+            background: #fafafa;
+            border: 1px solid #f0f0f0;
+            border-radius: 7px;
+            padding: 7px 9px;
+            height: 50px;
+            position: relative;
+            overflow: hidden;
+        }
+        .mock-dash-chart-lbl {
+            font-size: 6.5px;
+            color: #71717a;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .mock-dash-chart svg {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            width: 100%; height: 32px;
+        }
+
+        .compare-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
         .compare-list li {
-            display: flex; align-items: center; gap: 10px;
-            font-size: 14px; font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 32px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            border-top: 1px solid var(--border);
         }
-        .compare-list .x { color: var(--text-3); font-size: 16px; }
-        .compare-list .v { color: var(--accent); font-size: 16px; }
-        .compare-card.without .compare-list li { color: var(--text-2); }
+        .compare-icon {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .compare-icon.x {
+            background: #d4d4d8;
+        }
+        .compare-icon.v {
+            background: var(--accent);
+        }
+        .compare-icon svg { width: 14px; height: 14px; }
+
+        /* ─── ADVANTAGES ─── */
+        .advantages {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+        .adv-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            padding: 32px;
+            display: flex;
+            gap: 22px;
+            align-items: flex-start;
+            transition: all .5s cubic-bezier(.2,0,0,1);
+            box-shadow: 0 1px 3px rgba(0,0,0,.03);
+        }
+        .adv-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--accent);
+            box-shadow: 0 24px 60px rgba(255,105,180,.12);
+        }
+        .adv-icon {
+            width: 56px; height: 56px;
+            border-radius: 16px;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            color: var(--accent);
+            transition: all .5s cubic-bezier(.2,0,0,1);
+        }
+        .adv-card:hover .adv-icon {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            transform: scale(1.05) rotate(-3deg);
+        }
+        .adv-content { flex: 1; min-width: 0; }
+        .adv-content h3 {
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin: 0 0 8px;
+            color: var(--text);
+            line-height: 1.2;
+        }
+        .adv-content p {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-2);
+            line-height: 1.6;
+            margin: 0;
+        }
 
         /* ─── PRICING ─── */
-        .pricing { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; max-width: 960px; margin: 0 auto; }
+        .pricing {
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 20px; max-width: 1080px; margin: 0 auto;
+            align-items: stretch;
+        }
         .price-card {
             background: var(--white); border-radius: var(--r-lg);
             padding: 40px 28px; position: relative;
             border: 1.5px solid var(--border);
             transition: all .3s cubic-bezier(.2,0,0,1);
+            display: flex; flex-direction: column;
         }
         .price-card:hover { transform: translateY(-4px); border-color: #ccc; }
         .price-card.pop {
+            background: linear-gradient(180deg, var(--accent) 0%, #f05aa0 100%);
             border-color: var(--accent);
-            box-shadow: 0 12px 40px rgba(254,44,85,.1);
+            box-shadow: 0 24px 60px rgba(255,105,180,.35), 0 8px 22px rgba(255,105,180,.18);
+            z-index: 2;
+        }
+        .price-card.pop:hover {
+            transform: translateY(-6px);
+            border-color: var(--accent);
+            box-shadow: 0 32px 70px rgba(255,105,180,.42), 0 10px 26px rgba(255,105,180,.22);
+        }
+        .price-card.pop::after {
+            content: ''; position: absolute;
+            top: 12px; right: 18px;
+            width: 60px; height: 60px;
+            background: radial-gradient(circle, rgba(255,255,255,.25), transparent 65%);
+            border-radius: 50%; pointer-events: none;
         }
         .price-tag {
-            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-            background: var(--accent); color: #fff;
+            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+            background: #fff; color: var(--accent);
             font-size: 11px; font-weight: 800;
-            padding: 5px 16px; border-radius: var(--r-pill);
+            padding: 6px 18px; border-radius: var(--r-pill);
+            box-shadow: 0 6px 18px rgba(0,0,0,.12);
+            letter-spacing: 0.4px;
         }
         .price-name {
             font-size: 12px; font-weight: 800; text-transform: uppercase;
             letter-spacing: 2px; color: var(--text-3); margin-bottom: 16px;
         }
+        .price-card.pop .price-name { color: rgba(255,255,255,.85); }
         .price-val {
             font-size: 52px; font-weight: 900;
             letter-spacing: -0.04em; line-height: 1; margin-bottom: 4px;
             color: var(--dark);
         }
+        .price-card.pop .price-val { color: #fff; }
         .price-val span { font-size: 15px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+        .price-card.pop .price-val span { color: rgba(255,255,255,.8); }
         .price-sub { font-size: 14px; color: var(--text-3); margin-bottom: 28px; font-weight: 500; }
+        .price-card.pop .price-sub { color: rgba(255,255,255,.92); font-weight: 600; }
         .price-sep { height: 1px; background: var(--border); margin-bottom: 24px; }
-        .price-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+        .price-card.pop .price-sep { background: rgba(255,255,255,.25); }
+        .price-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; flex: 1; }
         .price-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
         .price-list .ok { color: var(--accent); }
         .price-list .no { color: var(--border); }
         .price-list li.dim { color: var(--text-3); font-weight: 500; }
+        .price-card.pop .price-list li { color: #fff; }
+        .price-card.pop .price-list .ok { color: #fff; }
+        .price-card.pop .btn-primary {
+            background: #fff; color: var(--accent);
+            box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        }
+        .price-card.pop .btn-primary:hover {
+            background: #fff; color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(0,0,0,.18);
+        }
+        .price-trial {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            margin-top: 14px;
+            font-size: 12px; font-weight: 600; color: var(--text-3);
+            letter-spacing: 0.1px;
+        }
+        .price-trial svg { color: var(--accent); }
+        .price-card.pop .price-trial { color: rgba(255,255,255,.92); }
+        .price-card.pop .price-trial svg { color: #fff; }
+
+        /* ─── PRICING TOGGLE ─── */
+        .pricing-toggle {
+            display: flex; align-items: center; justify-content: center;
+            gap: 16px; margin-bottom: 48px;
+        }
+        .pricing-toggle-label {
+            font-size: 15px; font-weight: 600; color: var(--text-3);
+            cursor: pointer; transition: color .3s;
+        }
+        .pricing-toggle-label.active { color: var(--dark); }
+        .pricing-toggle-switch {
+            position: relative; width: 52px; height: 28px;
+            background: var(--border); border-radius: 14px;
+            cursor: pointer; transition: background .3s;
+            flex-shrink: 0;
+        }
+        .pricing-toggle-switch.on { background: var(--accent); }
+        .pricing-toggle-switch::after {
+            content: ''; position: absolute;
+            top: 3px; left: 3px;
+            width: 22px; height: 22px;
+            background: #fff; border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
+            transition: transform .3s cubic-bezier(.2,0,0,1);
+        }
+        .pricing-toggle-switch.on::after { transform: translateX(24px); }
+        .pricing-badge {
+            background: linear-gradient(135deg, var(--accent), #f05aa0);
+            color: #fff; font-size: 11px; font-weight: 800;
+            padding: 5px 12px; border-radius: var(--r-pill);
+            letter-spacing: 0.3px; white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(255,105,180,.3);
+        }
+        .price-old {
+            font-size: 18px; font-weight: 600; color: var(--text-3);
+            text-decoration: line-through; margin-right: 6px;
+            display: none;
+        }
+        .price-card.pop .price-old { color: rgba(255,255,255,.6); }
+        .pricing-toggle-switch.on ~ .pricing-badge { animation: badgePop .4s cubic-bezier(.2,0,0,1); }
+        @keyframes badgePop { 0% { transform: scale(.8); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* ─── CTA ─── */
+        /* ─── SECURITY ─── */
+        .trust-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 24px; max-width: 900px; margin: 0 auto;
+        }
+        .trust-card {
+            display: grid; grid-template-columns: auto 1fr;
+            gap: 28px; align-items: center;
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: var(--r-lg); padding: 40px 36px;
+            transition: transform .5s cubic-bezier(.2,0,0,1), box-shadow .5s cubic-bezier(.2,0,0,1);
+        }
+        .trust-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 50px rgba(0,0,0,.06);
+        }
+        .trust-icon {
+            width: 100px; height: 100px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .trust-icon.shield { background: linear-gradient(135deg, #dbeafe, #eff6ff); }
+        .trust-icon.uptime { background: linear-gradient(135deg, #d1fae5, #ecfdf5); }
+        .trust-icon.shield svg { color: #3b82f6; }
+        .trust-text h3 {
+            font-size: 22px; font-weight: 800;
+            letter-spacing: -0.02em; line-height: 1.2;
+            color: var(--text); margin-bottom: 10px;
+        }
+        .trust-text p {
+            font-size: 14px; font-weight: 500;
+            color: var(--text-2); line-height: 1.55;
+        }
+        .uptime-ring {
+            width: 80px; height: 80px; position: relative;
+        }
+        .uptime-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .uptime-ring-bg { fill: none; stroke: #e0e0e5; stroke-width: 6; }
+        .uptime-ring-fill { fill: none; stroke: #34c759; stroke-width: 6; stroke-linecap: round;
+            stroke-dasharray: 226; stroke-dashoffset: 0.2; }
+        .uptime-ring-label {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .uptime-ring-val { font-size: 15px; font-weight: 900; color: #34c759; letter-spacing: -0.03em; }
+        .uptime-ring-lbl { font-size: 7px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ─── TESTIMONIALS ─── */
+        .testi-section .section-inner { max-width: 100%; padding: 0; }
+        .testi-section .section-hd { padding: 0 24px; }
+        .testi-marquee-wrap {
+            position: relative; overflow: hidden;
+            mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+        }
+        .testi-marquee-wrap + .testi-marquee-wrap { margin-top: 16px; }
+        .testi-marquee {
+            display: flex; gap: 16px; width: max-content;
+            animation: marqueeScroll 40s linear infinite;
+        }
+        .testi-marquee-wrap:nth-child(2) .testi-marquee { animation: marqueeScrollR 45s linear infinite; }
+        .testi-marquee-wrap:hover .testi-marquee { animation-play-state: paused; }
+        @keyframes marqueeScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes marqueeScrollR { 0% { transform: translateX(-50%); } 100% { transform: translateX(0); } }
+        .testi-card {
+            flex-shrink: 0; width: 380px;
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: var(--r-lg); padding: 28px 28px 24px;
+            transition: border-color .3s, box-shadow .3s;
+            cursor: default;
+        }
+        .testi-card:hover {
+            border-color: rgba(255,105,180,.3);
+            box-shadow: 0 8px 30px rgba(255,105,180,.08);
+        }
+        .testi-text {
+            font-size: 14.5px; font-weight: 500;
+            color: var(--text-2); line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .testi-text strong { color: var(--text); font-weight: 700; }
+        .testi-bottom {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .testi-author {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .testi-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #f05aa0);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 800; color: #fff;
+            flex-shrink: 0;
+        }
+        .testi-name {
+            font-size: 13px; font-weight: 700; color: var(--text);
+        }
+        .testi-role {
+            font-size: 11px; font-weight: 500; color: var(--text-3);
+        }
+        .testi-stars { display: flex; gap: 2px; flex-shrink: 0; }
+        .testi-stars svg { width: 13px; height: 13px; color: #fbbf24; }
 
         /* ─── CTA ─── */
         .cta {
@@ -404,18 +1530,53 @@
 
         /* ─── RESPONSIVE ─── */
         @media (max-width:768px) {
-            .nav-links { display:flex !important; }
-            .bento { grid-template-columns:1fr; }
-            .bento-item.span-2 { grid-column:1; }
-            .steps { grid-template-columns:1fr; }
+            nav { height: 52px; width: calc(100% - 20px); top: 10px; }
+            .nav-inner { padding: 0 6px 0 18px; }
+            .logo span { font-size: 14px; }
+            .logo-mark { width: 26px; height: 26px; }
+            .nav-links { display: none; }
+            .nav-cta { display: none; }
+            .nav-burger { display: flex; }
+            .features-grid { grid-template-columns: 1fr; gap: 14px; }
+            .feat-card.span-2, .feat-card.span-3, .feat-card.span-4 { grid-column: 1; }
+            .feat-visual { height: 180px; }
+            .feat-content { padding: 22px 22px 24px; }
+            .feat-content h3 { font-size: 20px; }
+            .how-grid { grid-template-columns:1fr; gap:16px; }
+            .how-visual { height: 220px; }
+            .how-content { padding: 22px 24px 28px; }
+            .how-content h3 { font-size: 20px; }
             .pricing { grid-template-columns:1fr; max-width:380px; }
+            .trust-grid { grid-template-columns:1fr; }
+            .trust-card { grid-template-columns:1fr; justify-items:center; text-align:center; padding:28px 24px; }
+            .testimonials-grid { columns:1; }
             .compare { grid-template-columns:1fr; }
             .hero-btns { flex-direction:column; }
             .cta-btns { flex-direction:column; align-items:center; }
-            .platforms { gap:20px; }
+            .hero-platforms { gap:28px; }
+            .hero-plat-icon { width:56px; height:56px; }
+            .hero-plat-icon svg { width:56px; height:56px; }
             .foot-inner { grid-template-columns:1fr 1fr; }
             .mock-sidebar { display:none; }
             .mock-kpis { grid-template-columns:repeat(2,1fr); }
+
+            /* Mobile readability: hide background logos that interfere with text */
+            .hero-logos-bg { display: none; }
+            /* Stronger eyebrow on mobile (was --accent which was too pale over bg) */
+            .hero-eyebrow {
+                color: var(--accent);
+                font-weight: 700;
+                font-size: 13px;
+            }
+            /* Darker, bolder paragraph on mobile (was --text-3 #86868b too light) */
+            .hero-p {
+                color: var(--text);
+                font-weight: 500;
+                font-size: 17px;
+                line-height: 1.5;
+            }
+            /* Hero h1: ensure pink em stays vivid */
+            .hero h1 em { color: var(--accent); }
         }
     </style>
 </head>
@@ -425,16 +1586,7 @@
 <nav>
     <div class="nav-inner">
         <a href="#" class="logo">
-            <div class="logo-mark"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-  <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
-  <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
-  <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
-  <circle cx="16" cy="16" r="1.8" fill="#fff"/>
-  <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-</svg></div>
+            <div class="logo-mark"><svg width="22" height="22" viewBox="0 0 40 40" fill="none"><defs><radialGradient id="navLogoDot" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FF69B4" stop-opacity="1"/><stop offset="55%" stop-color="#FF69B4" stop-opacity="0.6"/><stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/></radialGradient></defs><circle cx="20" cy="20" r="20" fill="url(#navLogoDot)"/><circle cx="20" cy="20" r="7" fill="#FF69B4"/></svg></div>
             <span>Tracking Lab</span>
         </a>
         <div class="nav-links">
@@ -445,18 +1597,52 @@
             <a href="/login" class="btn btn-ghost">Se connecter</a>
             <a href="/login" class="btn btn-primary">Essai gratuit</a>
         </div>
+        <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false"><span></span></button>
     </div>
 </nav>
 
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+    <a href="#features" class="mm-link">Fonctionnalités</a>
+    <a href="#pricing" class="mm-link">Tarifs</a>
+    <div class="mm-cta">
+        <a href="/login" class="btn btn-ghost" style="border:1px solid var(--border)">Se connecter</a>
+        <a href="/login" class="btn btn-primary">Essai gratuit</a>
+    </div>
+</div>
+
 <!-- HERO -->
 <section class="hero">
-    <p class="hero-eyebrow">Analytics pour créateurs de contenus et entreprises</p>
-    <h1>Trackez vos<br><em>performances</em></h1>
-    <p class="hero-p">TikTok, YouTube Shorts, Instagram Reels — toutes vos metriques reunies dans un seul dashboard.</p>
-    <div class="hero-btns">
-        <a href="/login" class="btn btn-primary btn-lg">Démarrer gratuitement</a>
-        <a href="#pricing" class="btn btn-white btn-lg">Voir les tarifs</a>
+    <div class="hero-logos-bg" aria-hidden="true">
+        <!-- Left scattered -->
+        <svg class="fl1" viewBox="0 0 48 48" width="72" height="72" style="--r:rotate(-15deg);top:8%;left:10%"><rect width="48" height="48" rx="12" fill="#010101"/><path fill="#fff" d="M33.6 17.3a7.3 7.3 0 0 1-5.7-6.4V10h-5.2v20.6a4.4 4.4 0 0 1-4.3 3.8 4.4 4.4 0 0 1-4.4-4.4 4.4 4.4 0 0 1 4.4-4.4c.4 0 .8.1 1.2.2v-5.4a9.6 9.6 0 0 0-1.2-.1A9.6 9.6 0 0 0 8.8 30a9.6 9.6 0 0 0 9.6 9.6 9.6 9.6 0 0 0 9.6-9.6v-8.9a12.4 12.4 0 0 0 7.2 2.3v-5.3a7.3 7.3 0 0 1-1.6-.8z"/></svg>
+        <svg class="fl3" viewBox="0 0 48 48" width="80" height="80" style="--r:rotate(10deg);top:30%;left:7%"><defs><linearGradient id="bgIg1" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#feda75"/><stop offset="50%" stop-color="#d62976"/><stop offset="100%" stop-color="#4f5bd5"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#bgIg1)"/><circle cx="24" cy="24" r="8.5" fill="none" stroke="#fff" stroke-width="2.5"/><circle cx="34" cy="14" r="2" fill="#fff"/><rect x="6" y="6" width="36" height="36" rx="10" fill="none" stroke="#fff" stroke-width="2.5"/></svg>
+        <svg class="fl2" viewBox="0 0 48 48" width="64" height="64" style="--r:rotate(-8deg);top:54%;left:12%"><rect width="48" height="48" rx="12" fill="#FF0000"/><polygon points="20,14 20,34 34,24" fill="#fff"/></svg>
+        <svg class="fl4" viewBox="0 0 48 48" width="76" height="76" style="--r:rotate(18deg);top:76%;left:8%"><rect width="48" height="48" rx="12" fill="#0A66C2"/><path fill="#fff" d="M16 20h4v13h-4V20zm2-6.5a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zM22 20h3.8v1.8h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.7 4.8 6.1V33h-4v-6.3c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V33h-4V20z"/></svg>
+        <svg class="fl1" viewBox="0 0 48 48" width="48" height="48" style="--r:rotate(5deg);top:44%;left:19%"><rect width="48" height="48" rx="12" fill="#FF0000"/><polygon points="20,14 20,34 34,24" fill="#fff"/></svg>
+        <svg class="fl3" viewBox="0 0 48 48" width="56" height="56" style="--r:rotate(-22deg);top:16%;left:22%"><rect width="48" height="48" rx="12" fill="#0A66C2"/><path fill="#fff" d="M16 20h4v13h-4V20zm2-6.5a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zM22 20h3.8v1.8h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.7 4.8 6.1V33h-4v-6.3c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V33h-4V20z"/></svg>
+        <!-- Right scattered -->
+        <svg class="fl2" viewBox="0 0 48 48" width="76" height="76" style="--r:rotate(12deg);top:6%;right:9%"><defs><linearGradient id="bgIg3" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#feda75"/><stop offset="50%" stop-color="#d62976"/><stop offset="100%" stop-color="#4f5bd5"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#bgIg3)"/><circle cx="24" cy="24" r="8.5" fill="none" stroke="#fff" stroke-width="2.5"/><circle cx="34" cy="14" r="2" fill="#fff"/><rect x="6" y="6" width="36" height="36" rx="10" fill="none" stroke="#fff" stroke-width="2.5"/></svg>
+        <svg class="fl4" viewBox="0 0 48 48" width="68" height="68" style="--r:rotate(-14deg);top:32%;right:7%"><rect width="48" height="48" rx="12" fill="#0A66C2"/><path fill="#fff" d="M16 20h4v13h-4V20zm2-6.5a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zM22 20h3.8v1.8h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.7 4.8 6.1V33h-4v-6.3c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V33h-4V20z"/></svg>
+        <svg class="fl1" viewBox="0 0 48 48" width="60" height="60" style="--r:rotate(8deg);top:58%;right:11%"><rect width="48" height="48" rx="12" fill="#010101"/><path fill="#fff" d="M33.6 17.3a7.3 7.3 0 0 1-5.7-6.4V10h-5.2v20.6a4.4 4.4 0 0 1-4.3 3.8 4.4 4.4 0 0 1-4.4-4.4 4.4 4.4 0 0 1 4.4-4.4c.4 0 .8.1 1.2.2v-5.4a9.6 9.6 0 0 0-1.2-.1A9.6 9.6 0 0 0 8.8 30a9.6 9.6 0 0 0 9.6 9.6 9.6 9.6 0 0 0 9.6-9.6v-8.9a12.4 12.4 0 0 0 7.2 2.3v-5.3a7.3 7.3 0 0 1-1.6-.8z"/></svg>
+        <svg class="fl3" viewBox="0 0 48 48" width="82" height="82" style="--r:rotate(-10deg);top:78%;right:14%"><rect width="48" height="48" rx="12" fill="#FF0000"/><polygon points="20,14 20,34 34,24" fill="#fff"/></svg>
+        <svg class="fl2" viewBox="0 0 48 48" width="52" height="52" style="--r:rotate(20deg);top:46%;right:19%"><rect width="48" height="48" rx="12" fill="#0A66C2"/><path fill="#fff" d="M16 20h4v13h-4V20zm2-6.5a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zM22 20h3.8v1.8h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.7 4.8 6.1V33h-4v-6.3c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V33h-4V20z"/></svg>
+        <svg class="fl3" viewBox="0 0 48 48" width="64" height="64" style="--r:rotate(-12deg);top:18%;right:18%"><rect width="48" height="48" rx="12" fill="#010101"/><path fill="#fff" d="M33.6 17.3a7.3 7.3 0 0 1-5.7-6.4V10h-5.2v20.6a4.4 4.4 0 0 1-4.3 3.8 4.4 4.4 0 0 1-4.4-4.4 4.4 4.4 0 0 1 4.4-4.4c.4 0 .8.1 1.2.2v-5.4a9.6 9.6 0 0 0-1.2-.1A9.6 9.6 0 0 0 8.8 30a9.6 9.6 0 0 0 9.6 9.6 9.6 9.6 0 0 0 9.6-9.6v-8.9a12.4 12.4 0 0 0 7.2 2.3v-5.3a7.3 7.3 0 0 1-1.6-.8z"/></svg>
+        <svg class="fl4" viewBox="0 0 48 48" width="56" height="56" style="--r:rotate(-18deg);top:66%;right:21%"><rect width="48" height="48" rx="12" fill="#FF0000"/><polygon points="20,14 20,34 34,24" fill="#fff"/></svg>
+        <svg class="fl2" viewBox="0 0 48 48" width="70" height="70" style="--r:rotate(14deg);top:90%;right:10%"><defs><linearGradient id="bgIg4" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#feda75"/><stop offset="50%" stop-color="#d62976"/><stop offset="100%" stop-color="#4f5bd5"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#bgIg4)"/><circle cx="24" cy="24" r="8.5" fill="none" stroke="#fff" stroke-width="2.5"/><circle cx="34" cy="14" r="2" fill="#fff"/><rect x="6" y="6" width="36" height="36" rx="10" fill="none" stroke="#fff" stroke-width="2.5"/></svg>
     </div>
+    <p class="hero-eyebrow">Analytics pour créateurs de contenus et entreprises</p>
+    <h1>Trackez vos<br><span class="hero-swipe-wrap"><span class="hero-swipe" id="heroSwipe"><em>performances</em><em>concurrents</em></span></span></h1>
+    <p class="hero-p">Pilotez toute votre stratégie de contenus et ses métriques clés dans un dashboard unique</p>
+    <div class="hero-btns">
+        <a href="/login" class="btn btn-primary btn-lg">Essai gratuit <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+        <a href="#pricing" class="btn btn-white btn-lg">Voir les tarifs <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10"/></svg></a>
+    </div>
+    <p style="font-size:13px;color:var(--text-3);font-weight:500;margin:0 0 6px;animation:rise .7s .3s cubic-bezier(.2,0,0,1) backwards">0 &euro; aujourd'hui &middot; Annulable à tout moment</p>
+    <p style="font-size:13px;color:var(--text-2);font-weight:600;margin:0 0 56px;display:flex;align-items:center;justify-content:center;gap:8px;animation:rise .7s .36s cubic-bezier(.2,0,0,1) backwards">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <strong style="color:var(--text);font-weight:800">+500 entreprises</strong> nous font déjà confiance
+    </p>
     <div class="hero-img-wrap">
         <div class="hero-mock">
             <div class="mock-topbar">
@@ -464,176 +1650,429 @@
                 <div class="mock-dot" style="background:rgba(255,255,255,.2);"></div>
                 <div class="mock-dot" style="background:rgba(255,255,255,.2);"></div>
             </div>
-            <div class="mock-body">
-                <!-- Header -->
-                <div class="mock-header">
-                    <div class="mock-logo">TL</div>
-                    <div class="mock-header-title">Tracking Lab</div>
-                    <div class="mock-header-btn active">Admin</div>
-                    <div class="mock-header-btn">Gerer les projets</div>
-                    <div class="mock-header-btn">Gerer les comptes</div>
-                    <div class="mock-header-btn">Mon abonnement</div>
-                    <div class="mock-header-btn">Exporter CSV</div>
-                    <div class="mock-header-btn" style="background:#FF69B4;color:#fff;">Scraping...</div>
-                    <div class="mock-header-user">
-                        <div class="mock-header-avatar">B</div>
-                        <span style="font-size:6px;font-weight:600;color:rgba(255,255,255,.4);">Brice</span>
-                    </div>
-                </div>
-                <div class="mock-main">
-                    <!-- Filtre date -->
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:600;color:rgba(255,255,255,.35);">Projet ▼</div>
-                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:600;color:rgba(255,255,255,.35);">Compte ▼</div>
-                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:700;color:#25f4ee;">📅 Date debut</div>
-                        <div style="background:var(--dark-card);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 10px;font-size:7px;font-weight:700;color:#25f4ee;">📅 Date fin</div>
-                        <div style="margin-left:auto;font-size:6px;color:rgba(255,255,255,.25);cursor:pointer;">Reinitialiser</div>
-                    </div>
-                    <!-- KPIs -->
-                    <div class="mock-kpis">
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">🎬</div>
-                            <div class="mock-kpi-label">Contenus</div>
-                            <div class="mock-kpi-val" style="color:#FF69B4;">1 284</div>
-                        </div>
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">👁</div>
-                            <div class="mock-kpi-label">Vues totales</div>
-                            <div class="mock-kpi-val" style="color:#fff;">12.4M</div>
-                        </div>
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">❤</div>
-                            <div class="mock-kpi-label">Likes</div>
-                            <div class="mock-kpi-val" style="color:#25f4ee;">843K</div>
-                        </div>
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">💬</div>
-                            <div class="mock-kpi-label">Commentaires</div>
-                            <div class="mock-kpi-val" style="color:#7b61ff;">18.7K</div>
-                        </div>
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">🔁</div>
-                            <div class="mock-kpi-label">Partages</div>
-                            <div class="mock-kpi-val" style="color:#34c759;">97.2K</div>
-                        </div>
-                        <div class="mock-kpi">
-                            <div class="mock-kpi-icon">📊</div>
-                            <div class="mock-kpi-label">Engagement</div>
-                            <div class="mock-kpi-val" style="color:#FF69B4;">7.62%</div>
+            <div class="mock-app">
+                <!-- ── Sidebar ── -->
+                <aside class="mock-sidebar">
+                    <div class="mock-sb-brand">
+                        <div class="mock-sb-logo"></div>
+                        <div>
+                            <div class="mock-sb-title">Tracking Lab</div>
+                            <div class="mock-sb-sub">Votre espace</div>
                         </div>
                     </div>
-                    <!-- Tabs -->
-                    <div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-                        <span style="font-size:7px;font-weight:700;color:#fff;padding-bottom:3px;border-bottom:1.5px solid #FF69B4;">Vue d'ensemble</span>
-                        <span style="font-size:7px;font-weight:500;color:rgba(255,255,255,.3);">Graphiques</span>
-                        <span style="font-size:7px;font-weight:500;color:rgba(255,255,255,.3);">Tableau detaille</span>
-                    </div>
-                    <!-- Comptes suivis -->
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                        <span style="font-size:9px;font-weight:800;">Comptes suivis</span>
-                        <span style="font-size:5px;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px;color:rgba(255,255,255,.35);font-weight:600;">24 comptes</span>
-                    </div>
-                    <div class="mock-accounts">
-                        <div class="mock-account">
-                            <div class="mock-acc-top">
-                                <div class="mock-avatar" style="background:#FF69B4;">L</div>
-                                <div><div class="mock-acc-name">♪ lea.music</div><div class="mock-acc-handle">@lea.music</div></div>
-                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">142 contenus</div>
-                            </div>
-                            <div class="mock-acc-stats">
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">1.2M</div><div class="mock-acc-stat-lbl">Vues</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">89.4K</div><div class="mock-acc-stat-lbl">Likes</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">8.12%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
-                            </div>
+                    <nav class="mock-sb-nav">
+                        <div class="mock-sb-section">
+                            <div class="mock-sb-label">Analytics</div>
+                            <div class="mock-sb-item active"><div class="mock-sb-ico"></div>Vue d'ensemble</div>
                         </div>
-                        <div class="mock-account">
-                            <div class="mock-acc-top">
-                                <div class="mock-avatar" style="background:#7b61ff;">M</div>
-                                <div><div class="mock-acc-name">♪ maxfitparis</div><div class="mock-acc-handle">@maxfitparis</div></div>
-                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">87 contenus</div>
-                            </div>
-                            <div class="mock-acc-stats">
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">478K</div><div class="mock-acc-stat-lbl">Vues</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">52.1K</div><div class="mock-acc-stat-lbl">Likes</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">12.3%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
-                            </div>
+                        <div class="mock-sb-section">
+                            <div class="mock-sb-label">Lab interne</div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Vue d'ensemble</div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Comptes<span class="mock-sb-badge">12</span></div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Vidéos</div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Tableau</div>
                         </div>
-                        <div class="mock-account">
-                            <div class="mock-acc-top">
-                                <div class="mock-avatar" style="background:#25f4ee;color:#000;">S</div>
-                                <div><div class="mock-acc-name">♪ sophie.vlogs</div><div class="mock-acc-handle">@sophie.vlogs</div></div>
-                                <div style="margin-left:auto;font-size:5px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;">203 contenus</div>
-                            </div>
-                            <div class="mock-acc-stats">
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#FF69B4;">2.1M</div><div class="mock-acc-stat-lbl">Vues</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#25f4ee;">156K</div><div class="mock-acc-stat-lbl">Likes</div></div>
-                                <div class="mock-acc-stat"><div class="mock-acc-stat-val" style="color:#34c759;">6.94%</div><div class="mock-acc-stat-lbl">Engage.</div></div>
-                            </div>
+                        <div class="mock-sb-section">
+                            <div class="mock-sb-label">Concurrents</div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Vue d'ensemble</div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Comptes<span class="mock-sb-badge">24</span></div>
+                            <div class="mock-sb-item"><div class="mock-sb-ico"></div>Vidéos</div>
+                        </div>
+                    </nav>
+                    <div class="mock-sb-actions">
+                        <div class="mock-sb-action scrape">Scraper auto</div>
+                        <div class="mock-sb-action">Gérer projets</div>
+                        <div class="mock-sb-action">Gérer comptes</div>
+                        <div class="mock-sb-action">Import CSV</div>
+                        <div class="mock-sb-action">Export CSV</div>
+                    </div>
+                    <div class="mock-sb-account">
+                        <div class="mock-sb-avatar">B</div>
+                        <div>
+                            <div class="mock-sb-acc-name">Brice</div>
+                            <div class="mock-sb-acc-mail">brice@tracking.lab</div>
                         </div>
                     </div>
-                </div>
+                </aside>
+                <!-- ── Main ── -->
+                <main class="mock-main">
+                    <!-- Top row : Analytics cards -->
+                    <div class="mock-a-grid">
+                        <!-- Lab interne -->
+                        <div class="mock-a-card">
+                            <div class="mock-a-head">
+                                <div class="mock-a-title"><div class="mock-a-ico"></div>Lab interne</div>
+                                <div class="mock-a-badge">12 comptes</div>
+                            </div>
+                            <div class="mock-a-filters">
+                                <div class="mock-a-pill">Tous les projets ▾</div>
+                                <div class="mock-a-pill">📅 Période</div>
+                            </div>
+                            <div class="mock-a-hero">
+                                <div class="mock-a-hero-val">12.4M</div>
+                                <div class="mock-a-hero-lbl">vues totales</div>
+                            </div>
+                            <div class="mock-a-metrics">
+                                <div class="mock-a-metric">
+                                    <div class="mock-a-metric-val">1 284</div>
+                                    <div class="mock-a-metric-lbl">Contenus</div>
+                                </div>
+                                <div class="mock-a-metric">
+                                    <div class="mock-a-metric-val">843K</div>
+                                    <div class="mock-a-metric-lbl">Likes</div>
+                                </div>
+                                <div class="mock-a-metric accent">
+                                    <div class="mock-a-metric-val">7.62%</div>
+                                    <div class="mock-a-metric-lbl">Engagement</div>
+                                </div>
+                            </div>
+                            <div class="mock-a-secondary">
+                                <div><span>18.7K</span> comm.</div>
+                                <div><span>97.2K</span> partages</div>
+                                <div><span>9.6K</span> moy/vid</div>
+                            </div>
+                            <table class="mock-a-table">
+                                <thead><tr><th>Compte</th><th>Vues</th><th>Likes</th><th>Eng.</th></tr></thead>
+                                <tbody>
+                                    <tr><td>@lea.music</td><td>1.2M</td><td>89.4K</td><td>8.12%</td></tr>
+                                    <tr><td>@maxfitparis</td><td>478K</td><td>52.1K</td><td>12.3%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Concurrents -->
+                        <div class="mock-a-card comp">
+                            <div class="mock-a-head">
+                                <div class="mock-a-title"><div class="mock-a-ico"></div>Concurrents</div>
+                                <div class="mock-a-badge">24 comptes</div>
+                            </div>
+                            <div class="mock-a-filters">
+                                <div class="mock-a-pill">Tous les comptes ▾</div>
+                                <div class="mock-a-pill">📅 Période</div>
+                            </div>
+                            <div class="mock-a-hero">
+                                <div class="mock-a-hero-val">38.7M</div>
+                                <div class="mock-a-hero-lbl">vues totales</div>
+                            </div>
+                            <div class="mock-a-metrics">
+                                <div class="mock-a-metric">
+                                    <div class="mock-a-metric-val">3 412</div>
+                                    <div class="mock-a-metric-lbl">Contenus</div>
+                                </div>
+                                <div class="mock-a-metric">
+                                    <div class="mock-a-metric-val">2.1M</div>
+                                    <div class="mock-a-metric-lbl">Likes</div>
+                                </div>
+                                <div class="mock-a-metric accent">
+                                    <div class="mock-a-metric-val">5.84%</div>
+                                    <div class="mock-a-metric-lbl">Engagement</div>
+                                </div>
+                            </div>
+                            <div class="mock-a-secondary">
+                                <div><span>54.2K</span> comm.</div>
+                                <div><span>231K</span> partages</div>
+                                <div><span>11.3K</span> moy/vid</div>
+                            </div>
+                            <table class="mock-a-table">
+                                <thead><tr><th>Compte</th><th>Vues</th><th>Likes</th><th>Eng.</th></tr></thead>
+                                <tbody>
+                                    <tr><td>@viral.fr</td><td>5.8M</td><td>312K</td><td>5.41%</td></tr>
+                                    <tr><td>@trendwave</td><td>3.2M</td><td>198K</td><td>6.18%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Bottom row : Chart + Top vidéos -->
+                    <div class="mock-b-grid">
+                        <!-- Chart card -->
+                        <div class="mock-b-card">
+                            <div class="mock-b-head">
+                                <div class="mock-b-title">Vues gagnées par jour</div>
+                                <div class="mock-b-tag">14 jours</div>
+                            </div>
+                            <div class="mock-bars">
+                                <div class="mock-bar" style="height:38%"></div>
+                                <div class="mock-bar" style="height:55%"></div>
+                                <div class="mock-bar" style="height:72%"></div>
+                                <div class="mock-bar" style="height:48%"></div>
+                                <div class="mock-bar" style="height:88%"></div>
+                                <div class="mock-bar" style="height:62%"></div>
+                                <div class="mock-bar" style="height:78%"></div>
+                                <div class="mock-bar alt" style="height:95%"></div>
+                                <div class="mock-bar" style="height:68%"></div>
+                                <div class="mock-bar" style="height:82%"></div>
+                                <div class="mock-bar" style="height:58%"></div>
+                                <div class="mock-bar" style="height:74%"></div>
+                                <div class="mock-bar alt" style="height:92%"></div>
+                                <div class="mock-bar" style="height:85%"></div>
+                            </div>
+                            <div class="mock-bar-axis">
+                                <span>27 mars</span><span>2 avr.</span><span>9 avr.</span>
+                            </div>
+                        </div>
+                        <!-- Top vidéos card -->
+                        <div class="mock-b-card">
+                            <div class="mock-b-head">
+                                <div class="mock-b-title">Top vidéos</div>
+                                <div class="mock-b-tag">Top 4</div>
+                            </div>
+                            <div class="mock-vids">
+                                <div class="mock-vid"><div class="mock-vid-stats"><span>2.4M</span><span>★</span></div></div>
+                                <div class="mock-vid"><div class="mock-vid-stats"><span>1.8M</span><span>★</span></div></div>
+                                <div class="mock-vid"><div class="mock-vid-stats"><span>1.2M</span><span>★</span></div></div>
+                                <div class="mock-vid"><div class="mock-vid-stats"><span>987K</span><span>★</span></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
             </div>
         </div>
     </div>
 </section>
 
-<!-- PLATFORMS -->
-<div class="platforms">
-    <div class="plat">
-        <div class="plat-icon">&#x1F3B5;</div>
-        <span class="plat-name">TikTok</span>
-    </div>
-    <div class="plat">
-        <div class="plat-icon">&#x25B6;&#xFE0F;</div>
-        <span class="plat-name">YouTube Shorts</span>
-    </div>
-    <div class="plat">
-        <div class="plat-icon">&#x1F4F7;</div>
-        <span class="plat-name">Instagram Reels</span>
-    </div>
-</div>
 
 <!-- STATS -->
 <div class="stats">
     <div class="stats-track">
-        <div class="st"><span class="st-val">3</span><span class="st-lbl">Plateformes</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Videos trackees</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">500+</span><span class="st-lbl">Comptes suivis</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">3</span><span class="st-lbl">Plateformes</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Videos trackees</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">500+</span><span class="st-lbl">Comptes suivis</span></div><div class="st-dot"></div>
-        <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div><div class="st-dot"></div>
+        <div class="stats-row">
+            <div class="st"><span class="st-val">4</span><span class="st-lbl">Plateformes</span></div>
+            <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Vidéos trackées</span></div>
+            <div class="st"><span class="st-val">+1000</span><span class="st-lbl">Comptes suivis</span></div>
+            <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div>
+        </div>
+        <div class="stats-row" aria-hidden="true">
+            <div class="st"><span class="st-val">4</span><span class="st-lbl">Plateformes</span></div>
+            <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Vidéos trackées</span></div>
+            <div class="st"><span class="st-val">+1000</span><span class="st-lbl">Comptes suivis</span></div>
+            <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div>
+        </div>
+        <div class="stats-row" aria-hidden="true">
+            <div class="st"><span class="st-val">4</span><span class="st-lbl">Plateformes</span></div>
+            <div class="st"><span class="st-val">10K+</span><span class="st-lbl">Vidéos trackées</span></div>
+            <div class="st"><span class="st-val">+1000</span><span class="st-lbl">Comptes suivis</span></div>
+            <div class="st"><span class="st-val">99.9%</span><span class="st-lbl">Uptime</span></div>
+        </div>
     </div>
 </div>
 
-<!-- COMPARE (viral.app style) -->
+<!-- COMPARE (viral.app inspired) -->
 <section class="section" id="compare">
     <div class="section-inner">
         <div class="section-hd reveal">
             <p class="eyebrow eyebrow-accent">Pourquoi Tracking Lab</p>
-            <h2>Avant / Apres</h2>
+            <h2>Avant / Après</h2>
         </div>
         <div class="compare">
+            <!-- WITHOUT -->
             <div class="compare-card without reveal">
-                <h3>Sans Tracking Lab</h3>
+                <div class="compare-card-header">
+                    <h3>Sans Tracking Lab</h3>
+                    <div class="compare-card-header-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </div>
+                </div>
+                <div class="compare-mockup">
+                    <div class="mock-sheet">
+                        <div class="mock-sheet-header">
+                            <div>A</div><div>B</div><div>C</div><div>D</div>
+                        </div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                        <div class="mock-sheet-row"><div></div><div></div><div></div><div></div></div>
+                    </div>
+                    <div class="mock-bubble b1">Calculer<br>manuellement</div>
+                    <div class="mock-bubble b2">Données<br>obsolètes</div>
+                    <div class="mock-bubble b3">Travail de<br>3 personnes</div>
+                </div>
                 <ul class="compare-list">
-                    <li><span class="x">&times;</span> Copier-coller les stats manuellement</li>
-                    <li><span class="x">&times;</span> Un onglet par plateforme</li>
-                    <li><span class="x">&times;</span> Pas de vue d'ensemble</li>
-                    <li><span class="x">&times;</span> Reporting manuel en fin de mois</li>
-                    <li><span class="x">&times;</span> Donnees eparpillees</li>
+                    <li>
+                        <span class="compare-icon x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                        Tracking dans des spreadsheets
+                    </li>
+                    <li>
+                        <span class="compare-icon x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                        Calculs manuels chaque jour
+                    </li>
+                    <li>
+                        <span class="compare-icon x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                        Données éparpillées partout
+                    </li>
                 </ul>
             </div>
+
+            <!-- WITH -->
             <div class="compare-card with reveal">
-                <h3>Avec <span>Tracking Lab</span></h3>
+                <div class="compare-card-header">
+                    <h3>Avec Tracking Lab</h3>
+                    <div class="compare-card-header-icon">
+                        <svg width="22" height="22" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="rgba(255,255,255,.2)"/><circle cx="20" cy="20" r="6" fill="#fff"/></svg>
+                    </div>
+                </div>
+                <div class="compare-mockup">
+                    <div class="mock-dash">
+                        <div class="mock-dash-topbar">
+                            <div class="mock-dash-dots">
+                                <div></div><div></div><div></div>
+                            </div>
+                            <div class="mock-dash-platforms">
+                                <svg viewBox="0 0 24 24" fill="#000"><rect width="24" height="24" rx="4"/><path fill="#fff" d="M16.8 8.65a3.65 3.65 0 0 1-2.85-3.2V5h-2.6v10.3a2.2 2.2 0 0 1-2.15 1.9 2.2 2.2 0 0 1-2.2-2.2 2.2 2.2 0 0 1 2.2-2.2c.2 0 .4.05.6.1V10.2a4.8 4.8 0 0 0-.6-.05A4.8 4.8 0 0 0 4.4 15a4.8 4.8 0 0 0 4.8 4.8 4.8 4.8 0 0 0 4.8-4.8v-4.45a6.2 6.2 0 0 0 3.6 1.15v-2.65a3.65 3.65 0 0 1-.8-.4z"/></svg>
+                                <svg viewBox="0 0 24 24"><defs><linearGradient id="mig1" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#feda75"/><stop offset="50%" stop-color="#d62976"/><stop offset="100%" stop-color="#4f5bd5"/></linearGradient></defs><rect width="24" height="24" rx="4" fill="url(#mig1)"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="17" cy="7" r="1" fill="#fff"/><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="#fff" stroke-width="1.5"/></svg>
+                                <svg viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#FF0000"/><polygon points="10,7 10,17 17,12" fill="#fff"/></svg>
+                                <svg viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M8 10h2v6.5H8V10zm1-3.25a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4zM11 10h1.9v.9c.25-.5.9-1.05 1.9-1.05 2 0 2.4 1.35 2.4 3.05V16.5h-2v-3.15c0-.75 0-1.7-1.05-1.7s-1.2.8-1.2 1.65V16.5h-2V10z"/></svg>
+                            </div>
+                        </div>
+                        <div class="mock-dash-grid">
+                            <div class="mock-dash-card">
+                                <div class="mock-dash-card-icon blue">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </div>
+                                <div class="mock-dash-card-text">
+                                    <span class="lbl">Vues totales</span>
+                                    <span class="val">2.4M<span class="delta">+46k</span></span>
+                                </div>
+                            </div>
+                            <div class="mock-dash-card">
+                                <div class="mock-dash-card-icon pink">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                </div>
+                                <div class="mock-dash-card-text">
+                                    <span class="lbl">Likes</span>
+                                    <span class="val">187K<span class="delta">+4k</span></span>
+                                </div>
+                            </div>
+                            <div class="mock-dash-card">
+                                <div class="mock-dash-card-icon green">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                                </div>
+                                <div class="mock-dash-card-text">
+                                    <span class="lbl">Engagement</span>
+                                    <span class="val">4.8%<span class="delta">+0.3</span></span>
+                                </div>
+                            </div>
+                            <div class="mock-dash-card">
+                                <div class="mock-dash-card-icon purple">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                                </div>
+                                <div class="mock-dash-card-text">
+                                    <span class="lbl">Contenus</span>
+                                    <span class="val">147<span class="delta">+12</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mock-dash-chart">
+                            <span class="mock-dash-chart-lbl">Évolution 30j</span>
+                            <svg viewBox="0 0 300 32" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="dashGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#FF69B4" stop-opacity="0.35"/>
+                                        <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M0,26 Q40,22 80,16 T160,8 T240,12 T300,4 L300,32 L0,32 Z" fill="url(#dashGrad)"/>
+                                <path d="M0,26 Q40,22 80,16 T160,8 T240,12 T300,4" fill="none" stroke="#FF69B4" stroke-width="1.8" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
                 <ul class="compare-list">
-                    <li><span class="v">&#x2713;</span> Scraping automatique</li>
-                    <li><span class="v">&#x2713;</span> 3 plateformes, 1 dashboard</li>
-                    <li><span class="v">&#x2713;</span> KPIs en temps reel</li>
-                    <li><span class="v">&#x2713;</span> Export CSV en 1 clic</li>
-                    <li><span class="v">&#x2713;</span> Tout centralise, toujours</li>
+                    <li>
+                        <span class="compare-icon v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                        Toutes les données dans un dashboard
+                    </li>
+                    <li>
+                        <span class="compare-icon v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                        Pilotage de la stratégie de création de contenus<br>en data-driven
+                    </li>
+                    <li>
+                        <span class="compare-icon v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                        Reporting & exports en un clic
+                    </li>
                 </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- HOW -->
+<section class="section" id="how">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Simple.</p>
+            <h2>Prêt en 3 minutes.</h2>
+        </div>
+        <div class="how-grid">
+            <!-- Step 1: Google login -->
+            <div class="how-card c1 reveal">
+                <div class="how-visual">
+                    <div class="how-mock-login">
+                        <div class="how-mock-login-title">Connexion</div>
+                        <div class="how-mock-login-btn">
+                            <svg class="how-mock-login-google" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                            Continuer avec Google
+                        </div>
+                        <div class="how-mock-login-divider"></div>
+                        <div class="how-mock-login-cta">Commencer</div>
+                    </div>
+                </div>
+                <div class="how-content">
+                    <div class="how-num">01</div>
+                    <h3>Connectez-vous</h3>
+                    <p>Un clic avec Google. Gratuit, sans carte bancaire.</p>
+                </div>
+            </div>
+
+            <!-- Step 2: Add accounts -->
+            <div class="how-card c2 reveal">
+                <div class="how-visual">
+                    <div class="how-mock-add">
+                        <div class="how-mock-add-input">username_tiktok</div>
+                        <div class="how-mock-add-platforms">
+                            <div class="how-mock-add-plat"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#000"/><path d="M20.5 9.5c.4 1.7 1.6 2.9 3.3 3.3v2.7c-1.4.1-2.7-.3-3.8-1.1v6.4c0 2.4-1.9 4.3-4.3 4.3s-4.3-1.9-4.3-4.3 1.9-4.3 4.3-4.3v2.7c-.9 0-1.6.7-1.6 1.6s.7 1.6 1.6 1.6 1.6-.7 1.6-1.6V8h2.7c.1.6.3 1.1.5 1.5z" fill="#fff"/></svg></div>
+                            <div class="how-mock-add-plat"><svg viewBox="0 0 32 32"><defs><linearGradient id="igHowG" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FED576"/><stop offset="30%" stop-color="#F47133"/><stop offset="70%" stop-color="#BC3081"/><stop offset="100%" stop-color="#4C63D2"/></linearGradient></defs><rect width="32" height="32" rx="7" fill="url(#igHowG)"/><rect x="8" y="8" width="16" height="16" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="21" cy="11" r="1" fill="#fff"/></svg></div>
+                            <div class="how-mock-add-plat"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#FF0000"/><path d="M13 11v10l8-5z" fill="#fff"/></svg></div>
+                            <div class="how-mock-add-plat"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0A66C2"/><path d="M11 13h2.5v8H11v-8zm1.25-3.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM15 13h2.4v1.1c.4-.7 1.3-1.3 2.6-1.3 2.4 0 2.5 1.6 2.5 3.5V21H20v-3.7c0-.9-.2-1.7-1.2-1.7s-1.3.8-1.3 1.7V21H15v-8z" fill="#fff"/></svg></div>
+                        </div>
+                        <div class="how-mock-add-btn">+ Ajouter</div>
+                    </div>
+                </div>
+                <div class="how-content">
+                    <div class="how-num">02</div>
+                    <h3>Ajoutez vos comptes</h3>
+                    <p>Usernames TikTok, Instagram, YouTube, LinkedIn.</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Dashboard -->
+            <div class="how-card c3 reveal">
+                <div class="how-visual">
+                    <div class="how-mock-dash3">
+                        <div class="how-mock-dash3-row">
+                            <div class="how-mock-dash3-kpi">
+                                <div class="how-mock-dash3-lbl">Vues</div>
+                                <div class="how-mock-dash3-val">2.4M<span class="delta">+18%</span></div>
+                            </div>
+                            <div class="how-mock-dash3-kpi">
+                                <div class="how-mock-dash3-lbl">Likes</div>
+                                <div class="how-mock-dash3-val">142K<span class="delta">+24%</span></div>
+                            </div>
+                        </div>
+                        <div class="how-mock-dash3-chart">
+                            <svg viewBox="0 0 200 40" preserveAspectRatio="none">
+                                <defs><linearGradient id="howChartG" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FF69B4" stop-opacity=".25"/><stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/></linearGradient></defs>
+                                <path d="M0,32 L20,28 L40,30 L60,22 L80,24 L100,16 L120,18 L140,10 L160,12 L180,6 L200,4 L200,40 L0,40 Z" fill="url(#howChartG)"/>
+                                <path d="M0,32 L20,28 L40,30 L60,22 L80,24 L100,16 L120,18 L140,10 L160,12 L180,6 L200,4" fill="none" stroke="#FF69B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="how-content">
+                    <div class="how-num">03</div>
+                    <h3>Pilotez votre création de contenus</h3>
+                    <p>Analysez en temps réel vos statistiques grâce aux tableaux détaillés.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -643,64 +2082,306 @@
 <section class="section section-alt" id="features">
     <div class="section-inner">
         <div class="section-hd reveal">
-            <p class="eyebrow eyebrow-accent">Fonctionnalites</p>
+            <p class="eyebrow eyebrow-accent">Fonctionnalités</p>
             <h2>Tout ce qu'il vous faut.</h2>
         </div>
-        <div class="bento">
-            <div class="bento-item span-2 accent reveal">
-                <div class="bento-bars">
-                    <div style="height:40%;background:rgba(255,255,255,.25);"></div>
-                    <div style="height:65%;background:rgba(255,255,255,.35);"></div>
-                    <div style="height:50%;background:rgba(255,255,255,.3);"></div>
-                    <div style="height:85%;background:rgba(255,255,255,.4);"></div>
-                    <div style="height:55%;background:rgba(255,255,255,.25);"></div>
-                    <div style="height:75%;background:rgba(255,255,255,.35);"></div>
+        <div class="features-grid">
+            <!-- Dashboard unifié (large) -->
+            <div class="feat-card span-4 reveal">
+                <div class="feat-visual">
+                    <div class="feat-mock-dash">
+                        <div class="feat-mock-dash-bar">
+                            <div class="feat-mock-dash-dots"><div></div><div></div><div></div></div>
+                            <div class="feat-mock-dash-bar-line"></div>
+                        </div>
+                        <div class="feat-mock-dash-grid">
+                            <div class="feat-mock-dash-kpi">
+                                <div class="feat-mock-dash-kpi-lbl">Vues</div>
+                                <div class="feat-mock-dash-kpi-val">2.4M<span class="delta">+12%</span></div>
+                            </div>
+                            <div class="feat-mock-dash-kpi">
+                                <div class="feat-mock-dash-kpi-lbl">Likes</div>
+                                <div class="feat-mock-dash-kpi-val">187K<span class="delta">+8%</span></div>
+                            </div>
+                            <div class="feat-mock-dash-kpi">
+                                <div class="feat-mock-dash-kpi-lbl">Eng.</div>
+                                <div class="feat-mock-dash-kpi-val">4.8%<span class="delta">+0.3</span></div>
+                            </div>
+                            <div class="feat-mock-dash-kpi">
+                                <div class="feat-mock-dash-kpi-lbl">Vidéos</div>
+                                <div class="feat-mock-dash-kpi-val">147<span class="delta">+12</span></div>
+                            </div>
+                        </div>
+                        <div class="feat-mock-dash-chart">
+                            <svg viewBox="0 0 300 30" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="featDashGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#FF69B4" stop-opacity="0.4"/>
+                                        <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M0,24 Q40,20 80,14 T160,8 T240,12 T300,4 L300,30 L0,30 Z" fill="url(#featDashGrad)"/>
+                                <path d="M0,24 Q40,20 80,14 T160,8 T240,12 T300,4" fill="none" stroke="#FF69B4" stroke-width="1.8" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
-                <h3>Dashboard unifie</h3>
-                <p>Vues, likes, partages — tout centralise.</p>
+                <div class="feat-content">
+                    <h3>Dashboard unifié</h3>
+                    <p>Toutes vos métriques au même endroit. Vues, likes, partages, engagement — centralisés dans une interface claire et instantanée.</p>
+                </div>
             </div>
-            <div class="bento-item dark reveal">
-                <h3>Multi-plateforme</h3>
-                <p>TikTok, YouTube, Instagram. Fini de jongler.</p>
+
+            <!-- Multi-plateforme -->
+            <div class="feat-card span-2 dark reveal">
+                <div class="feat-visual">
+                    <div class="feat-platforms">
+                        <div class="feat-plat"><svg viewBox="0 0 24 24" fill="#000"><rect width="24" height="24" rx="6"/><path fill="#fff" d="M16.8 8.65a3.65 3.65 0 0 1-2.85-3.2V5h-2.6v10.3a2.2 2.2 0 0 1-2.15 1.9 2.2 2.2 0 0 1-2.2-2.2 2.2 2.2 0 0 1 2.2-2.2c.2 0 .4.05.6.1V10.2a4.8 4.8 0 0 0-.6-.05A4.8 4.8 0 0 0 4.4 15a4.8 4.8 0 0 0 4.8 4.8 4.8 4.8 0 0 0 4.8-4.8v-4.45a6.2 6.2 0 0 0 3.6 1.15v-2.65a3.65 3.65 0 0 1-.8-.4z"/></svg></div>
+                        <div class="feat-plat"><svg viewBox="0 0 24 24"><defs><linearGradient id="featIg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#feda75"/><stop offset="50%" stop-color="#d62976"/><stop offset="100%" stop-color="#4f5bd5"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#featIg)"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="17" cy="7" r="1.1" fill="#fff"/><rect x="3" y="3" width="18" height="18" rx="6" fill="none" stroke="#fff" stroke-width="1.6"/></svg></div>
+                        <div class="feat-plat"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#FF0000"/><polygon points="10,7 10,17 17,12" fill="#fff"/></svg></div>
+                        <div class="feat-plat"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0A66C2"/><path fill="#fff" d="M8 10h2v6.5H8V10zm1-3.25a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4zM11 10h1.9v.9c.25-.5.9-1.05 1.9-1.05 2 0 2.4 1.35 2.4 3.05V16.5h-2v-3.15c0-.75 0-1.7-1.05-1.7s-1.2.8-1.2 1.65V16.5h-2V10z"/></svg></div>
+                    </div>
+                </div>
+                <div class="feat-content">
+                    <h3>4 plateformes</h3>
+                    <p>TikTok, Instagram, YouTube et LinkedIn. Tous vos comptes connectés en quelques secondes.</p>
+                </div>
             </div>
-            <div class="bento-item reveal">
-                <h3>Suivi quotidien</h3>
-                <p>Graphiques jour par jour. Tendances claires.</p>
+
+            <!-- Temps réel -->
+            <div class="feat-card span-2 reveal">
+                <div class="feat-visual">
+                    <div class="feat-chart">
+                        <div class="feat-chart-live">Live</div>
+                        <svg viewBox="0 0 200 100" preserveAspectRatio="none" class="feat-chart-svg">
+                            <defs>
+                                <linearGradient id="featLiveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#FF69B4" stop-opacity="0.35"/>
+                                    <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M0,75 L20,68 L40,72 L60,55 L80,48 L100,52 L120,38 L140,30 L160,22 L180,28 L200,12 L200,100 L0,100 Z" fill="url(#featLiveGrad)"/>
+                            <path d="M0,75 L20,68 L40,72 L60,55 L80,48 L100,52 L120,38 L140,30 L160,22 L180,28 L200,12" fill="none" stroke="#FF69B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="200" cy="12" r="3" fill="#FF69B4"/>
+                            <circle cx="200" cy="12" r="6" fill="none" stroke="#FF69B4" stroke-width="1" opacity="0.4"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="feat-content">
+                    <h3>Temps réel</h3>
+                    <p>Données mises à jour automatiquement. Pas besoin d'actualiser.</p>
+                </div>
             </div>
-            <div class="bento-item dark reveal">
-                <h3>Projets</h3>
-                <p>Organisez par campagne.</p>
+
+            <!-- Concurrents -->
+            <div class="feat-card span-2 dark reveal">
+                <div class="feat-visual">
+                    <div class="feat-compare">
+                        <div class="feat-compare-row">
+                            <div class="feat-compare-lbl">
+                                <span style="color:#fff">Vous</span>
+                                <span style="color:#FF69B4">2.4M</span>
+                            </div>
+                            <div class="feat-compare-bar"><div class="feat-compare-bar-fill" style="width:78%"></div></div>
+                        </div>
+                        <div class="feat-compare-row">
+                            <div class="feat-compare-lbl">
+                                <span>@concurrent</span>
+                                <span style="color:#7b61ff">1.6M</span>
+                            </div>
+                            <div class="feat-compare-bar"><div class="feat-compare-bar-fill alt" style="width:55%"></div></div>
+                        </div>
+                        <div class="feat-compare-row">
+                            <div class="feat-compare-lbl">
+                                <span>@autre</span>
+                                <span style="color:#7b61ff">920K</span>
+                            </div>
+                            <div class="feat-compare-bar"><div class="feat-compare-bar-fill alt" style="width:30%"></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feat-content">
+                    <h3>Espionnez vos concurrents</h3>
+                    <p>Ajoutez les comptes de vos rivaux et comparez leurs performances en un coup d'œil.</p>
+                </div>
             </div>
-            <div class="bento-item span-2 reveal">
-                <h3>Collaboration & export</h3>
-                <p>Partagez l'acces, exportez en CSV.</p>
+
+            <!-- Export -->
+            <div class="feat-card span-2 reveal">
+                <div class="feat-visual">
+                    <div class="feat-export">
+                        <div class="feat-export-file">
+                            <div class="feat-export-row"></div>
+                            <div class="feat-export-row short"></div>
+                            <div class="feat-export-row"></div>
+                            <div class="feat-export-row short"></div>
+                            <div class="feat-export-row"></div>
+                        </div>
+                        <svg class="feat-export-arrow" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                </div>
+                <div class="feat-content">
+                    <h3>Export & rapports</h3>
+                    <p>Exportez vos données en CSV en un clic. Partagez avec votre équipe.</p>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- HOW -->
-<section class="section section-dark" id="how">
+<!-- ADVANTAGES -->
+<section class="section" id="advantages">
     <div class="section-inner">
         <div class="section-hd reveal">
-            <p class="eyebrow eyebrow-accent">Simple.</p>
-            <h2>Pret en 3 minutes.</h2>
+            <p class="eyebrow eyebrow-accent">Nos avantages</p>
+            <h2>Conçu pour vous faire gagner du temps</h2>
         </div>
-        <div class="steps">
-            <div class="step reveal">
-                <div class="step-n" style="color:var(--accent);">01</div>
-                <h3>Connectez-vous</h3>
-                <p>Un clic avec Google. Gratuit, sans CB.</p>
+        <div class="advantages">
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>Économisez 10h par semaine</h3>
+                    <p>Plus besoin de jongler entre les onglets et de copier-coller vos stats. Tout est centralisé et mis à jour automatiquement.</p>
+                </div>
             </div>
-            <div class="step reveal">
-                <div class="step-n" style="color:var(--accent);">02</div>
-                <h3>Ajoutez vos comptes</h3>
-                <p>Usernames TikTok, YouTube, Instagram.</p>
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>4 plateformes, 1 dashboard</h3>
+                    <p>TikTok, Instagram, YouTube, LinkedIn — toutes vos plateformes connectées dans une vue unifiée et intuitive.</p>
+                </div>
             </div>
-            <div class="step reveal">
-                <div class="step-n" style="color:var(--accent);">03</div>
-                <h3>Analysez</h3>
-                <p>Scraping + stats en temps reel.</p>
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>Données en temps réel</h3>
+                    <p>Vos métriques sont actualisées automatiquement chaque jour. Voyez l'impact de votre contenu instantanément.</p>
+                </div>
+            </div>
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>Décisions data-driven</h3>
+                    <p>Identifiez ce qui marche, doublez la mise sur vos contenus performants et optimisez votre stratégie.</p>
+                </div>
+            </div>
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>Analyse de la concurrence</h3>
+                    <p>Trackez vos concurrents et benchmarkez vos performances pour rester en tête de votre marché.</p>
+                </div>
+            </div>
+            <div class="adv-card reveal">
+                <div class="adv-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <div class="adv-content">
+                    <h3>Export en 1 clic</h3>
+                    <p>Téléchargez vos rapports en CSV ou PDF pour partager facilement avec votre équipe ou vos clients.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SECURITY -->
+<section class="section" id="security">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Confiance</p>
+            <h2>Sécurité et conformité.</h2>
+        </div>
+        <div class="trust-grid">
+            <div class="trust-card reveal">
+                <div class="trust-icon shield">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                </div>
+                <div class="trust-text">
+                    <h3>Vos données restent privées</h3>
+                    <p>Hébergées en Europe (Paris, AWS eu-west-3) avec chiffrement de bout en bout. Vos données ne quittent jamais l'UE.</p>
+                </div>
+            </div>
+            <div class="trust-card reveal">
+                <div class="trust-icon uptime">
+                    <div class="uptime-ring">
+                        <svg viewBox="0 0 80 80"><circle class="uptime-ring-bg" cx="40" cy="40" r="36"/><circle class="uptime-ring-fill" cx="40" cy="40" r="36"/></svg>
+                        <div class="uptime-ring-label">
+                            <span class="uptime-ring-val">99.9%</span>
+                            <span class="uptime-ring-lbl">Uptime</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="trust-text">
+                    <h3>Fiabilité garantie</h3>
+                    <p>Infrastructure disponible 24/7. Vos données sont sauvegardées automatiquement et sécurisées en continu.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section testi-section section-alt" id="testimonials">
+    <div class="section-inner">
+        <div class="section-hd reveal">
+            <p class="eyebrow eyebrow-accent">Témoignages</p>
+            <h2>Ce que disent nos utilisateurs.</h2>
+        </div>
+        <!-- Row 1 → scrolls left -->
+        <div class="testi-marquee-wrap">
+            <div class="testi-marquee">
+                <div class="testi-card"><p class="testi-text">Tracking Lab a transformé notre façon de <strong>piloter nos campagnes créateurs</strong>. On voit enfin les stats qui comptent en un coup d'œil.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">S</div><div><div class="testi-name">Sarah M.</div><div class="testi-role">Directrice marketing, agence créative</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">On suit <strong>plus de 200 comptes</strong> pour nos clients. L'export CSV et les snapshots quotidiens nous font gagner un temps fou sur les reportings.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">L</div><div><div class="testi-name">Lucas D.</div><div class="testi-role">Fondateur, Social Media Lab</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">Le <strong>suivi des concurrents</strong> est un game-changer. On voit exactement ce qui marche chez eux et on adapte notre stratégie.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">A</div><div><div class="testi-name">Antoine B.</div><div class="testi-role">Growth Manager, agence UGC</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">Interface propre, données fiables, et le <strong>support répond en quelques heures</strong>. Rien à redire, c'est devenu indispensable.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">J</div><div><div class="testi-name">Julie P.</div><div class="testi-role">Freelance social media</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <!-- duplicate set for seamless loop -->
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">Tracking Lab a transformé notre façon de <strong>piloter nos campagnes créateurs</strong>. On voit enfin les stats qui comptent en un coup d'œil.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">S</div><div><div class="testi-name">Sarah M.</div><div class="testi-role">Directrice marketing, agence créative</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">On suit <strong>plus de 200 comptes</strong> pour nos clients. L'export CSV et les snapshots quotidiens nous font gagner un temps fou sur les reportings.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">L</div><div><div class="testi-name">Lucas D.</div><div class="testi-role">Fondateur, Social Media Lab</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">Le <strong>suivi des concurrents</strong> est un game-changer. On voit exactement ce qui marche chez eux et on adapte notre stratégie.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">A</div><div><div class="testi-name">Antoine B.</div><div class="testi-role">Growth Manager, agence UGC</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">Interface propre, données fiables, et le <strong>support répond en quelques heures</strong>. Rien à redire, c'est devenu indispensable.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">J</div><div><div class="testi-name">Julie P.</div><div class="testi-role">Freelance social media</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+            </div>
+        </div>
+        <!-- Row 2 → scrolls right -->
+        <div class="testi-marquee-wrap">
+            <div class="testi-marquee">
+                <div class="testi-card"><p class="testi-text">L'outil est <strong>incroyablement simple</strong>. J'ai ajouté mes comptes TikTok et YouTube en 2&nbsp;minutes, dashboard prêt.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">T</div><div><div class="testi-name">Thomas R.</div><div class="testi-role">Créateur de contenu, 450K abonnés</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">Enfin un outil qui <strong>centralise toutes les plateformes</strong>. Plus besoin de jongler entre TikTok Analytics, YouTube Studio et Insta.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">M</div><div><div class="testi-name">Marie K.</div><div class="testi-role">Content Manager, startup e-commerce</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">On a réduit notre temps de reporting de <strong>60%</strong>. Les snapshots quotidiens et les exports font tout le travail.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">N</div><div><div class="testi-name">Nicolas F.</div><div class="testi-role">Social Media Manager, agence digitale</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card"><p class="testi-text">Le dashboard est <strong>ultra-clair</strong>. Mes clients adorent les rapports que je leur envoie maintenant.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">C</div><div><div class="testi-name">Clara V.</div><div class="testi-role">Consultante influence marketing</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <!-- duplicate set for seamless loop -->
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">L'outil est <strong>incroyablement simple</strong>. J'ai ajouté mes comptes TikTok et YouTube en 2&nbsp;minutes, dashboard prêt.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">T</div><div><div class="testi-name">Thomas R.</div><div class="testi-role">Créateur de contenu, 450K abonnés</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">Enfin un outil qui <strong>centralise toutes les plateformes</strong>. Plus besoin de jongler entre TikTok Analytics, YouTube Studio et Insta.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">M</div><div><div class="testi-name">Marie K.</div><div class="testi-role">Content Manager, startup e-commerce</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">On a réduit notre temps de reporting de <strong>60%</strong>. Les snapshots quotidiens et les exports font tout le travail.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">N</div><div><div class="testi-name">Nicolas F.</div><div class="testi-role">Social Media Manager, agence digitale</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
+                <div class="testi-card" aria-hidden="true"><p class="testi-text">Le dashboard est <strong>ultra-clair</strong>. Mes clients adorent les rapports que je leur envoie maintenant.</p><div class="testi-bottom"><div class="testi-author"><div class="testi-avatar">C</div><div><div class="testi-name">Clara V.</div><div class="testi-role">Consultante influence marketing</div></div></div><div class="testi-stars"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div></div></div>
             </div>
         </div>
     </div>
@@ -712,54 +2393,72 @@
         <div class="section-hd reveal">
             <p class="eyebrow eyebrow-accent">Tarifs</p>
             <h2>Simple et transparent.</h2>
-            <p>Commencez gratuitement.</p>
+            <p>Commencez, maintenant, gratuitement&nbsp;!</p>
+        </div>
+        <div class="pricing-toggle reveal">
+            <span class="pricing-toggle-label" data-period="monthly">Mensuel</span>
+            <div class="pricing-toggle-switch on" id="pricingToggle"></div>
+            <span class="pricing-toggle-label active" data-period="annual">Annuel</span>
+            <span class="pricing-badge">-20% DE RÉDUCTION</span>
         </div>
         <div class="pricing">
             <div class="price-card reveal">
                 <div class="price-name">Starter</div>
                 <div class="price-val">0&#8364; <span>HT/mois</span></div>
-                <div class="price-sub">Decouvrir l'outil</div>
+                <div class="price-sub">Découverte de l'outil</div>
                 <div class="price-sep"></div>
                 <ul class="price-list">
-                    <li><span class="ok">&#x2713;</span> 5 comptes</li>
-                    <li><span class="ok">&#x2713;</span> TikTok + YouTube</li>
-                    <li><span class="ok">&#x2713;</span> Dashboard</li>
+                    <li><span class="ok">&#x2713;</span> 1 compte TikTok ou YouTube</li>
+                    <li><span class="ok">&#x2713;</span> 100 photos &amp; vidéos trackées</li>
+                    <li><span class="ok">&#x2713;</span> Dashboard de base</li>
                     <li><span class="ok">&#x2713;</span> 1 projet</li>
-                    <li class="dim"><span class="no">&times;</span> Instagram</li>
-                    <li class="dim"><span class="no">&times;</span> Acces partages</li>
+                    <li><span class="ok">&#x2713;</span> 1 Mise à jour des statistiques quotidienne</li>
+                    <li class="dim"><span class="no">&times;</span> Instagram &amp; LinkedIn</li>
+                    <li class="dim"><span class="no">&times;</span> Import / Export CSV</li>
+                    <li class="dim"><span class="no">&times;</span> Accès partagés</li>
+                    <li class="dim"><span class="no">&times;</span> Accès aux concurrents</li>
                 </ul>
                 <a href="/login" class="btn btn-outline" style="width:100%;justify-content:center;">Commencer</a>
             </div>
             <div class="price-card pop reveal">
                 <div class="price-tag">Populaire</div>
                 <div class="price-name">Pro</div>
-                <div class="price-val">29&#8364; <span>HT/mois</span></div>
-                <div class="price-sub">Createurs serieux</div>
+                <div class="price-val" data-monthly="29" data-annual="23"><span class="price-old" style="display:inline">29&#8364;</span>23&#8364; <span>HT/mois</span></div>
+                <div class="price-sub">Pour optimiser vos performances</div>
                 <div class="price-sep"></div>
                 <ul class="price-list">
-                    <li><span class="ok">&#x2713;</span> 20 comptes</li>
+                    <li><span class="ok">&#x2713;</span> 5 comptes</li>
+                    <li><span class="ok">&#x2713;</span> 1 000 photos &amp; vidéos trackées</li>
                     <li><span class="ok">&#x2713;</span> Toutes les plateformes</li>
                     <li><span class="ok">&#x2713;</span> Dashboard complet</li>
                     <li><span class="ok">&#x2713;</span> 5 projets</li>
-                    <li><span class="ok">&#x2713;</span> 2 acces partages</li>
+                    <li><span class="ok">&#x2713;</span> 2 accès partagés</li>
                     <li><span class="ok">&#x2713;</span> Export CSV</li>
+                    <li class="dim"><span class="no">&times;</span> Analytic complet</li>
+                    <li class="dim"><span class="no">&times;</span> Import CSV</li>
+                    <li class="dim"><span class="no">&times;</span> Accès aux concurrents</li>
                 </ul>
-                <a href="/login" class="btn btn-primary" style="width:100%;justify-content:center;">Démarrer</a>
+                <a href="/login" class="btn btn-primary" style="width:100%;justify-content:center;">Essai gratuit</a>
+                <div class="price-trial">Payez 0&#8364; aujourd'hui &middot; Annulez à tout moment</div>
             </div>
             <div class="price-card reveal">
-                <div class="price-name">Agency</div>
-                <div class="price-val">99&#8364; <span>HT/mois</span></div>
-                <div class="price-sub">Agences et labs</div>
+                <div class="price-name">Entreprises</div>
+                <div class="price-val" data-monthly="79" data-annual="63"><span class="price-old" style="display:inline">79&#8364;</span>63&#8364; <span>HT/mois</span></div>
+                <div class="price-sub">Pour un pilotage complet</div>
                 <div class="price-sep"></div>
                 <ul class="price-list">
-                    <li><span class="ok">&#x2713;</span> Comptes illimites</li>
+                    <li><span class="ok">&#x2713;</span> Comptes illimités</li>
+                    <li><span class="ok">&#x2713;</span> Photos + vidéos illimités trackés</li>
+                    <li><span class="ok">&#x2713;</span> Accès à l'analyse des concurrents</li>
+                    <li><span class="ok">&#x2713;</span> Dashboard + analytic complet</li>
                     <li><span class="ok">&#x2713;</span> Toutes les plateformes</li>
-                    <li><span class="ok">&#x2713;</span> Projets illimites</li>
-                    <li><span class="ok">&#x2713;</span> Acces illimites</li>
-                    <li><span class="ok">&#x2713;</span> Export CSV</li>
+                    <li><span class="ok">&#x2713;</span> Projets illimités</li>
+                    <li><span class="ok">&#x2713;</span> Accès illimités</li>
+                    <li><span class="ok">&#x2713;</span> Import / Export CSV</li>
                     <li><span class="ok">&#x2713;</span> Support prioritaire</li>
                 </ul>
-                <a href="/login" class="btn btn-outline" style="width:100%;justify-content:center;">Choisir Agency</a>
+                <a href="/login" class="btn btn-outline" style="width:100%;justify-content:center;">Essai gratuit</a>
+                <div class="price-trial">Payez 0&#8364; aujourd'hui &middot; Annulez à tout moment</div>
             </div>
         </div>
     </div>
@@ -767,11 +2466,11 @@
 
 <!-- CTA -->
 <section class="cta">
-    <h2>Pret a <em>scaler</em> ?</h2>
-    <p>Rejoignez les createurs et agences qui font confiance a Tracking Lab.</p>
+    <h2>Prêt à <em>scaler</em> ?</h2>
+    <p>Rejoignez les créateurs et agences qui font confiance à Tracking Lab.</p>
     <div class="cta-btns">
-        <a href="/login" class="btn btn-primary btn-lg">Essai gratuit</a>
-        <a href="#pricing" class="btn btn-dark btn-lg">Voir les tarifs</a>
+        <a href="/login" class="btn btn-primary btn-lg">Essai gratuit <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+        <a href="#pricing" class="btn btn-white btn-lg">Voir les tarifs <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10"/></svg></a>
     </div>
 </section>
 
@@ -780,23 +2479,14 @@
     <div class="foot-inner">
         <div class="foot-brand">
             <a href="#" class="logo" style="color:var(--dark);">
-                <div class="logo-mark"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-  <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
-  <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
-  <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
-  <circle cx="16" cy="16" r="1.8" fill="#fff"/>
-  <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-</svg></div>
+                <div class="logo-mark"><svg width="22" height="22" viewBox="0 0 40 40" fill="none"><defs><radialGradient id="footLogoDot" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FF69B4" stop-opacity="1"/><stop offset="55%" stop-color="#FF69B4" stop-opacity="0.6"/><stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/></radialGradient></defs><circle cx="20" cy="20" r="20" fill="url(#footLogoDot)"/><circle cx="20" cy="20" r="7" fill="#FF69B4"/></svg></div>
                 <span>Tracking Lab</span>
             </a>
-            <p>Analytics pour createurs de contenu et agences social media.</p>
+            <p>Analytics pour créateurs de contenu et agences social media.</p>
         </div>
         <div class="foot-col">
             <h4>Produit</h4>
-            <a href="#">Fonctionnalites</a>
+            <a href="#">Fonctionnalités</a>
             <a href="#">Tarifs</a>
             <a href="#">Changelog</a>
         </div>
@@ -807,10 +2497,10 @@
             <a href="#">Contact</a>
         </div>
         <div class="foot-col">
-            <h4>Legal</h4>
+            <h4>Légal</h4>
             <a href="#">CGV</a>
-            <a href="#">Confidentialite</a>
-            <a href="#">Mentions legales</a>
+            <a href="#">Confidentialité</a>
+            <a href="#">Mentions légales</a>
         </div>
     </div>
     <div class="foot-bottom">
@@ -827,6 +2517,112 @@ document.querySelectorAll('.reveal').forEach((el,i) => {
     el.style.transitionDelay = Math.min(i*40,250)+'ms';
     io.observe(el);
 });
+
+// Mobile menu toggle
+(function() {
+    var burger = document.getElementById('navBurger');
+    var menu = document.getElementById('mobileMenu');
+    if (!burger || !menu) return;
+    function close() {
+        burger.classList.remove('open');
+        menu.classList.remove('open');
+        document.body.classList.remove('menu-open');
+        burger.setAttribute('aria-expanded', 'false');
+    }
+    function toggle() {
+        var open = burger.classList.toggle('open');
+        menu.classList.toggle('open', open);
+        document.body.classList.toggle('menu-open', open);
+        burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    burger.addEventListener('click', toggle);
+    menu.querySelectorAll('a').forEach(function(a) { a.addEventListener('click', close); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+})();
+
+// Pricing toggle (Mensuel / Annuel)
+(function() {
+    var toggle = document.getElementById('pricingToggle');
+    if (!toggle) return;
+    var labels = document.querySelectorAll('.pricing-toggle-label');
+    var priceEls = document.querySelectorAll('.price-val[data-monthly]');
+    var isAnnual = true;
+
+    function update() {
+        toggle.classList.toggle('on', isAnnual);
+        labels.forEach(function(l) {
+            l.classList.toggle('active', (isAnnual && l.dataset.period === 'annual') || (!isAnnual && l.dataset.period === 'monthly'));
+        });
+        priceEls.forEach(function(el) {
+            var m = el.dataset.monthly;
+            var a = el.dataset.annual;
+            var oldEl = el.querySelector('.price-old');
+            var suffixEl = el.querySelector('span:last-child');
+            if (isAnnual) {
+                el.childNodes.forEach(function(n) {
+                    if (n.nodeType === 3 && n.textContent.trim()) n.textContent = a + '€ ';
+                });
+                if (oldEl) { oldEl.style.display = 'inline'; oldEl.textContent = m + '€'; }
+                if (suffixEl) suffixEl.textContent = 'HT/mois';
+            } else {
+                el.childNodes.forEach(function(n) {
+                    if (n.nodeType === 3 && n.textContent.trim()) n.textContent = m + '€ ';
+                });
+                if (oldEl) oldEl.style.display = 'none';
+                if (suffixEl) suffixEl.textContent = 'HT/mois';
+            }
+        });
+    }
+
+    toggle.addEventListener('click', function() { isAnnual = !isAnnual; update(); });
+    labels.forEach(function(l) {
+        l.addEventListener('click', function() {
+            isAnnual = l.dataset.period === 'annual';
+            update();
+        });
+    });
+})();
+</script>
+
+<script>
+(function() {
+    const wrap = document.querySelector('.hero-swipe-wrap');
+    const swipe = document.getElementById('heroSwipe');
+    if (!swipe || !wrap) return;
+
+    function measure() {
+        // Reset to get clean measurement
+        swipe.style.transition = 'none';
+        swipe.style.transform = 'none';
+        Array.from(swipe.children).forEach(function(em) { em.style.height = 'auto'; });
+        wrap.style.height = 'auto';
+
+        var h = Math.ceil(swipe.children[0].getBoundingClientRect().height);
+        wrap.style.height = h + 'px';
+        Array.from(swipe.children).forEach(function(em) { em.style.height = h + 'px'; em.style.overflow = 'hidden'; });
+        return h;
+    }
+
+    var h = measure();
+
+    requestAnimationFrame(function() {
+        swipe.style.transition = 'transform .6s cubic-bezier(.77,0,.18,1)';
+    });
+
+    var index = 0;
+    setInterval(function() {
+        index = (index + 1) % swipe.children.length;
+        swipe.style.transform = 'translateY(-' + (index * h) + 'px)';
+    }, 2500);
+
+    window.addEventListener('resize', function() {
+        h = measure();
+        requestAnimationFrame(function() {
+            swipe.style.transition = 'transform .6s cubic-bezier(.77,0,.18,1)';
+            swipe.style.transform = 'translateY(-' + (index * h) + 'px)';
+        });
+    });
+})();
 </script>
 
 </body>

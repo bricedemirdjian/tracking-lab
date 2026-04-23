@@ -7,63 +7,139 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css?v=20260409">
     <style>
-        .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
-        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
-        .admin-header h1 { font-size: 24px; color: var(--text-primary); letter-spacing: -0.3px; }
+        :root {
+            --admin-accent: #FF69B4;
+            --admin-accent-hover: #f05aa0;
+            --admin-bg: #fafafa;
+            --admin-bg-card: #fff;
+            --admin-bg-secondary: #f5f5f7;
+            --admin-text: #1a1a1a;
+            --admin-text-secondary: #555;
+            --admin-text-muted: #999;
+            --admin-border: #eaeaea;
+            --admin-warning: #ffc107;
+            --admin-success: #34c759;
+            --admin-radius: 12px;
+            --admin-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); font-size: 14px; }
+        a { text-decoration: none; color: inherit; }
+
+        /* Header */
+        .adm-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; background: #fff; border-bottom: 1px solid var(--admin-border); position: sticky; top: 0; z-index: 10; }
+        .adm-brand { display: flex; align-items: center; gap: 12px; }
+        .adm-brand-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+        .adm-brand-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; color: var(--admin-text); line-height: 1.2; }
+        .adm-brand-sub { font-size: 11px; font-weight: 600; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+        .adm-header-right { display: flex; align-items: center; gap: 12px; }
+        .adm-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; border: 1px solid var(--admin-border); background: #fff; color: var(--admin-text); cursor: pointer; transition: all .15s; }
+        .adm-btn:hover { border-color: #ccc; background: var(--admin-bg-secondary); }
+        .adm-btn-primary { background: var(--admin-accent); color: #fff; border-color: var(--admin-accent); }
+        .adm-btn-primary:hover { background: var(--admin-accent-hover); border-color: var(--admin-accent-hover); }
+        .adm-user { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; background: var(--admin-bg-secondary); border-radius: 100px; }
+        .adm-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+        .adm-avatar-placeholder { width: 28px; height: 28px; border-radius: 50%; background: var(--admin-accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+        .adm-user-name { font-size: 13px; font-weight: 600; color: var(--admin-text); }
+
+        /* Container */
+        .admin-container { max-width: 1320px; margin: 0 auto; padding: 32px; }
+        .admin-title { font-size: 24px; font-weight: 800; color: var(--admin-text); letter-spacing: -0.5px; margin: 0 0 4px; }
+        .admin-subtitle { font-size: 13px; color: var(--admin-text-muted); margin-bottom: 28px; }
+
+        /* Stats */
+        .admin-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
+        .admin-stat-card { background: var(--admin-bg-card); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 20px; box-shadow: var(--admin-shadow); }
+        .admin-stat-value { font-size: 28px; font-weight: 800; color: var(--admin-text); letter-spacing: -0.5px; line-height: 1; }
+        .admin-stat-label { font-size: 11px; color: var(--admin-text-muted); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+        /* Table */
+        .table-wrap { background: var(--admin-bg-card); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; box-shadow: var(--admin-shadow); }
         .users-table { width: 100%; border-collapse: collapse; }
-        .users-table th { text-align: left; padding: 12px 16px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
-        .users-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 14px; }
-        .users-table tr:hover td { background: var(--bg-secondary); }
-        .user-row-avatar { width: 36px; height: 36px; border-radius: 50%; margin-right: 10px; vertical-align: middle; }
-        .user-name-cell { display: flex; align-items: center; gap: 10px; }
-        .user-name { font-weight: 600; color: var(--text-primary); }
-        .user-email { font-size: 12px; color: var(--text-muted); }
-        .badge-role { padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-        .badge-admin { background: var(--warning); color: #000; }
-        .badge-user { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
-        .badge-blocked { background: var(--accent); color: #fff; }
-        .badge-active { background: rgba(52,199,89,0.1); color: var(--success); border: 1px solid rgba(52,199,89,0.2); }
-        .admin-actions { display: flex; gap: 8px; }
-        .admin-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
-        .admin-stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; box-shadow: var(--shadow); }
-        .admin-stat-value { font-size: 32px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
-        .admin-stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .users-table th { text-align: left; padding: 14px 16px; color: var(--admin-text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1px solid var(--admin-border); background: var(--admin-bg-secondary); }
+        .users-table td { padding: 14px 16px; border-bottom: 1px solid var(--admin-border); color: var(--admin-text-secondary); font-size: 13px; vertical-align: middle; }
+        .users-table tbody tr:last-child td { border-bottom: none; }
+        .users-table tbody tr:hover td { background: #fafafa; }
+        .user-row-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+        .user-row-avatar-placeholder { width: 36px; height: 36px; border-radius: 50%; background: var(--admin-accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+        .user-name-cell { display: flex; align-items: center; gap: 12px; }
+        .user-name { font-weight: 700; color: var(--admin-text); font-size: 13px; }
+        .user-email { font-size: 12px; color: var(--admin-text-muted); margin-top: 2px; }
+
+        /* Badges */
+        .badge-role { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-admin { background: var(--admin-accent); color: #fff; }
+        .badge-manager { background: linear-gradient(135deg, #007aff, #0056d3); color: #fff; box-shadow: 0 1px 4px rgba(0,122,255,0.3); }
+        .badge-user { background: var(--admin-bg-secondary); color: var(--admin-text-secondary); border: 1px solid var(--admin-border); }
+        .badge-blocked { background: #ff3b30; color: #fff; }
+        .badge-active { background: rgba(52,199,89,0.1); color: var(--admin-success); border: 1px solid rgba(52,199,89,0.25); }
+        .badge-plan { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; }
+        .badge-plan-starter { background: var(--admin-bg-secondary); color: var(--admin-text-secondary); border: 1px solid var(--admin-border); }
+        .badge-plan-pro { background: linear-gradient(135deg, #FF69B4, #f05aa0); color: #fff; box-shadow: 0 1px 4px rgba(255,105,180,0.3); }
+        .badge-plan-agency { background: linear-gradient(135deg, #1a1a1a, #333); color: #fff; }
+
+        /* Select */
+        .plan-select { padding: 6px 28px 6px 10px; border-radius: 8px; border: 1px solid var(--admin-border); background: #fff; color: var(--admin-text); font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"); background-repeat: no-repeat; background-position: right 8px center; }
+        .plan-select:hover { border-color: #ccc; }
+        .plan-select:focus { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
+
+        /* Action buttons */
+        .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .btn-action { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--admin-border); background: #fff; color: var(--admin-text-secondary); cursor: pointer; transition: all .15s; }
+        .btn-action:hover { border-color: #ccc; background: var(--admin-bg-secondary); }
+        .btn-action-warn { color: #e6a100; }
+        .btn-action-warn:hover { background: rgba(255,193,7,0.08); border-color: rgba(255,193,7,0.3); }
+        .btn-action-danger { color: var(--admin-accent); }
+        .btn-action-danger:hover { background: rgba(255,105,180,0.06); border-color: rgba(255,105,180,0.3); }
+
+        @media (max-width: 900px) {
+            .admin-stats { grid-template-columns: repeat(2, 1fr); }
+            .admin-container { padding: 20px; }
+            .adm-header { padding: 14px 20px; }
+        }
     </style>
 </head>
 <body>
-    <header class="app-header">
-        <div class="logo">
-            <div class="logo-icon"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
-                <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
-                <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
-                <circle cx="16" cy="16" r="1.8" fill="#fff"/>
-                <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-            </svg></div>
+    <header class="adm-header">
+        <a href="/dashboard" class="adm-brand">
+            <div class="adm-brand-icon">
+                <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+                    <defs><radialGradient id="adminLogoDot" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#FF69B4" stop-opacity="1"/>
+                        <stop offset="55%" stop-color="#FF69B4" stop-opacity="0.6"/>
+                        <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+                    </radialGradient></defs>
+                    <circle cx="20" cy="20" r="20" fill="url(#adminLogoDot)"/>
+                    <circle cx="20" cy="20" r="7" fill="#FF69B4"/>
+                </svg>
+            </div>
             <div>
-                <h1>Tracking Lab</h1>
-                <span class="subtitle">Administration</span>
+                <div class="adm-brand-title">Tracking Lab</div>
+                <div class="adm-brand-sub">Administration</div>
             </div>
-        </div>
-        <div class="header-actions">
-            <a href="/" class="btn btn-secondary btn-sm">Dashboard</a>
-            <div class="user-info">
+        </a>
+        <div class="adm-header-right">
+            <a href="/dashboard" class="adm-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Dashboard
+            </a>
+            <div class="adm-user">
                 {% if user.avatar_url %}
-                <img src="{{ user.avatar_url }}" class="user-avatar" alt="" referrerpolicy="no-referrer">
+                <img src="{{ user.avatar_url }}" class="adm-avatar" alt="" referrerpolicy="no-referrer">
+                {% else %}
+                <span class="adm-avatar-placeholder">{{ (user.name or user.email)[0] | upper }}</span>
                 {% endif %}
-                <span class="user-name">{{ user.name or user.email }}</span>
-                <a href="/logout" class="btn btn-secondary btn-sm" title="Deconnexion">&#x2190;</a>
+                <span class="adm-user-name">{{ user.name or user.email }}</span>
             </div>
+            <a href="/logout" class="adm-btn" title="Deconnexion">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            </a>
         </div>
     </header>
 
     <div class="admin-container">
-        <div class="admin-header">
-            <h1>Gestion des utilisateurs</h1>
-        </div>
+        <h1 class="admin-title">Gestion des utilisateurs</h1>
+        <p class="admin-subtitle">Visualisez, modifiez les plans et gerez les acces de vos utilisateurs.</p>
 
         <div class="admin-stats">
             <div class="admin-stat-card">
@@ -71,21 +147,30 @@
                 <div class="admin-stat-label">Utilisateurs</div>
             </div>
             <div class="admin-stat-card">
+                <div class="admin-stat-value" id="planStarter">-</div>
+                <div class="admin-stat-label">Starter</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="admin-stat-value" id="planPro">-</div>
+                <div class="admin-stat-label">Pro</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="admin-stat-value" id="planAgency">-</div>
+                <div class="admin-stat-label">Entreprises</div>
+            </div>
+            <div class="admin-stat-card">
                 <div class="admin-stat-value" id="totalAccounts">-</div>
                 <div class="admin-stat-label">Comptes trackes</div>
             </div>
-            <div class="admin-stat-card">
-                <div class="admin-stat-value" id="totalVideos">-</div>
-                <div class="admin-stat-label">Videos en base</div>
-            </div>
         </div>
 
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+        <div class="table-wrap">
             <table class="users-table">
                 <thead>
                     <tr>
                         <th>Utilisateur</th>
                         <th>Role</th>
+                        <th>Plan</th>
                         <th>Statut</th>
                         <th>Comptes</th>
                         <th>Videos</th>
@@ -95,13 +180,16 @@
                     </tr>
                 </thead>
                 <tbody id="usersTableBody">
-                    <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Chargement...</td></tr>
+                    <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Chargement...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 
     <script>
+        const PLAN_LABELS = { starter: 'Starter', pro: 'Pro', agency: 'Entreprises' };
+        const PLAN_CLASSES = { starter: 'badge-plan-starter', pro: 'badge-plan-pro', agency: 'badge-plan-agency' };
+
         async function loadUsers() {
             try {
                 const res = await fetch('/api/admin/users');
@@ -109,41 +197,74 @@
                 if (res.status === 403) { window.location.href = '/'; return; }
                 const users = await res.json();
 
+                const counts = { starter: 0, pro: 0, agency: 0 };
+                users.forEach(u => {
+                    const p = u.plan || 'starter';
+                    if (counts[p] !== undefined) counts[p]++;
+                });
+
                 document.getElementById('totalUsers').textContent = users.length;
+                document.getElementById('planStarter').textContent = counts.starter;
+                document.getElementById('planPro').textContent = counts.pro;
+                document.getElementById('planAgency').textContent = counts.agency;
                 document.getElementById('totalAccounts').textContent = users.reduce((s, u) => s + (u.account_count || 0), 0);
-                document.getElementById('totalVideos').textContent = users.reduce((s, u) => s + (u.video_count || 0), 0);
 
                 const tbody = document.getElementById('usersTableBody');
                 if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Aucun utilisateur</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Aucun utilisateur</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = users.map(u => {
-                    const avatar = u.avatar_url ? `<img src="${u.avatar_url}" class="user-row-avatar" referrerpolicy="no-referrer">` : '';
-                    const roleBadge = u.role === 'admin' ? '<span class="badge-role badge-admin">Admin</span>' : '<span class="badge-role badge-user">User</span>';
+                    const initial = (u.name || u.email || '?')[0].toUpperCase();
+                    const avatar = u.avatar_url
+                        ? `<img src="${u.avatar_url}" class="user-row-avatar" referrerpolicy="no-referrer">`
+                        : `<span class="user-row-avatar-placeholder">${initial}</span>`;
+
+                    // Role display: admin = fixed badge, others = editable dropdown
+                    let roleCell;
+                    if (u.role === 'admin') {
+                        roleCell = '<span class="badge-role badge-admin">Admin</span>';
+                    } else {
+                        roleCell = `<select class="plan-select" onchange="changeRole(${u.id}, this.value)" title="Manager = voit les donnees de l admin">
+                            <option value="user" ${u.role==='user'?'selected':''}>User</option>
+                            <option value="manager" ${u.role==='manager'?'selected':''}>Manager</option>
+                        </select>`;
+                    }
                     const statusBadge = u.blocked ? '<span class="badge-role badge-blocked">Bloque</span>' : '<span class="badge-role badge-active">Actif</span>';
+
+                    const plan = u.plan || 'starter';
+                    const planBadge = `<span class="badge-plan ${PLAN_CLASSES[plan]}">${PLAN_LABELS[plan]}</span>`;
+                    const planSelect = u.role !== 'admin'
+                        ? `<select class="plan-select" onchange="changePlan(${u.id}, this.value)">
+                                <option value="starter" ${plan==='starter'?'selected':''}>Starter</option>
+                                <option value="pro" ${plan==='pro'?'selected':''}>Pro</option>
+                                <option value="agency" ${plan==='agency'?'selected':''}>Entreprises</option>
+                           </select>`
+                        : '<span style="color:var(--admin-text-muted);font-size:12px;font-weight:600">Illimite</span>';
+
                     const created = u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '-';
                     const lastLogin = u.last_login ? new Date(u.last_login).toLocaleDateString('fr-FR') : '-';
 
                     let actions = '';
                     if (u.role !== 'admin') {
                         if (u.blocked) {
-                            actions += `<button class="btn btn-secondary btn-sm" onclick="unblockUser(${u.id})">Debloquer</button>`;
+                            actions += `<button class="btn-action" onclick="unblockUser(${u.id})">Debloquer</button>`;
                         } else {
-                            actions += `<button class="btn btn-secondary btn-sm" style="color:var(--warning)" onclick="blockUser(${u.id})">Bloquer</button>`;
+                            actions += `<button class="btn-action btn-action-warn" onclick="blockUser(${u.id})">Bloquer</button>`;
                         }
-                        actions += ` <button class="btn btn-secondary btn-sm" style="color:var(--accent)" onclick="deleteUser(${u.id}, '${(u.name || u.email).replace(/'/g, "\\'")}')">Supprimer</button>`;
+                        actions += ` <button class="btn-action btn-action-danger" onclick="deleteUser(${u.id}, '${(u.name || u.email).replace(/'/g, "\\'")}')">Supprimer</button>`;
                     } else {
-                        actions = '<span style="color:var(--text-muted);font-size:12px">-</span>';
+                        actions = '<span style="color:var(--admin-text-muted);font-size:12px">-</span>';
                     }
 
                     return `<tr>
                         <td><div class="user-name-cell">${avatar}<div><div class="user-name">${u.name || '-'}</div><div class="user-email">${u.email}</div></div></div></td>
-                        <td>${roleBadge}</td>
+                        <td>${roleCell}</td>
+                        <td>${planSelect}</td>
                         <td>${statusBadge}</td>
-                        <td>${u.account_count || 0}</td>
-                        <td>${u.video_count || 0}</td>
+                        <td style="font-weight:700;color:var(--admin-text)">${u.account_count || 0}</td>
+                        <td style="font-weight:700;color:var(--admin-text)">${u.video_count || 0}</td>
                         <td>${created}</td>
                         <td>${lastLogin}</td>
                         <td><div class="admin-actions">${actions}</div></td>
@@ -151,6 +272,42 @@
                 }).join('');
             } catch (e) {
                 console.error('Error loading users:', e);
+            }
+        }
+
+        async function changeRole(id, role) {
+            try {
+                const res = await fetch(`/api/admin/role/${id}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ role })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.error || 'Erreur');
+                }
+                loadUsers();
+            } catch (e) {
+                console.error('Error changing role:', e);
+                loadUsers();
+            }
+        }
+
+        async function changePlan(id, plan) {
+            try {
+                const res = await fetch(`/api/admin/plan/${id}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ plan })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.error || 'Erreur');
+                }
+                loadUsers();
+            } catch (e) {
+                console.error('Error changing plan:', e);
+                loadUsers();
             }
         }
 

@@ -40,6 +40,9 @@ CACHE_TTL_SEC   = int(os.environ.get("SCRAPER_CACHE_TTL", "300"))
 REQUEST_TIMEOUT = int(os.environ.get("SCRAPER_TIMEOUT", "30"))
 MAX_RETRIES     = int(os.environ.get("SCRAPER_MAX_RETRIES", "3"))
 BASE_BACKOFF    = float(os.environ.get("SCRAPER_BASE_BACKOFF", "0.5"))
+# How many parallel per-video metadata fetches for YouTube (pass 2).
+# Conservative default to avoid saturating the default ThreadPoolExecutor.
+YT_DETAIL_CONCURRENCY = int(os.environ.get("SCRAPER_YT_DETAIL_CONCURRENCY", "8"))
 
 _SUPABASE_PROXY = "https://vpirlefqxnvmxbmndhmn.supabase.co/functions/v1"
 _PROXY_SECRET   = os.environ.get("SCRAPER_PROXY_SECRET", "tracking-lab-2026")
@@ -62,6 +65,17 @@ _TIKTOK_HOSTS = [
 # ── TTL cache (in-memory) ─────────────────────────────────────────────
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock: Optional[asyncio.Lock] = None
+
+# YouTube per-video detail fetch bounded semaphore (shared across all accounts).
+_yt_detail_sem: Optional[asyncio.Semaphore] = None
+
+
+def _get_yt_detail_sem() -> asyncio.Semaphore:
+    """Lazy-init the YouTube detail semaphore bound to the running loop."""
+    global _yt_detail_sem
+    if _yt_detail_sem is None:
+        _yt_detail_sem = asyncio.Semaphore(YT_DETAIL_CONCURRENCY)
+    return _yt_detail_sem
 
 
 def _get_cache_lock() -> asyncio.Lock:
@@ -127,12 +141,14 @@ async def _get_session() -> aiohttp.ClientSession:
 
 async def close_session() -> None:
     """Close the shared aiohttp session (call on shutdown)."""
-    global _session, _session_lock
+    global _session, _session_lock, _cache_lock, _yt_detail_sem
     async with _get_session_lock():
         if _session and not _session.closed:
             await _session.close()
         _session = None
     _session_lock = None
+    _cache_lock = None
+    _yt_detail_sem = None
 
 
 # ── HTTP helper with retries ──────────────────────────────────────────
@@ -301,21 +317,65 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
     return winner
 
 
-# ── YouTube (yt-dlp wrapped) ──────────────────────────────────────────
+# ── YouTube (yt-dlp wrapped, 2-pass: listing + parallel details) ─────
 async def fetch_youtube_async(username: str) -> Optional[list[dict]]:
+    """
+    YouTube fetch in 2 passes:
+      1. Fast listing (extract_flat="in_playlist") → video IDs + views.
+      2. Parallel per-video detail fetches (bounded semaphore) → likes,
+         comments, timestamp, description, full thumbnails.
+
+    Pass 2 is best-effort: if any detail fetch fails, we keep the listing
+    record for that video — never regresses below v1 data quality.
+    """
     cache_key = f"yt:{username}"
     cached = await _cache_get(cache_key)
     if cached is not None:
         print(f"  [YouTube] cache hit @{username}")
         return cached
 
-    data = await asyncio.to_thread(_ytdlp_youtube_sync, username)
-    if data:
-        print(f"  [YouTube] @{username}: {len(data)} videos")
-        await _cache_set(cache_key, data)
-    else:
-        print(f"  [YouTube] @{username}: no data")
-    return data
+    # Pass 1: fast listing
+    listing = await asyncio.to_thread(_ytdlp_youtube_list_sync, username)
+    if not listing:
+        print(f"  [YouTube] @{username}: no data (listing empty)")
+        return None
+
+    # Pass 2: per-video detail fetches, bounded by a global semaphore
+    sem = _get_yt_detail_sem()
+
+    async def enrich(entry: dict) -> dict:
+        video_url = (
+            entry.get("url")
+            or entry.get("webpage_url")
+            or (f"https://www.youtube.com/watch?v={entry['id']}" if entry.get("id") else None)
+        )
+        if not video_url:
+            return entry
+        async with sem:
+            detail = await asyncio.to_thread(_ytdlp_youtube_video_detail_sync, video_url)
+        if not detail:
+            return entry
+        merged = dict(entry)
+        # Copy only real-valued fields from detail; keep listing fallbacks otherwise.
+        for k in (
+            "like_count", "comment_count", "timestamp", "upload_date",
+            "description", "title", "duration", "view_count",
+            "thumbnail", "thumbnails", "channel_follower_count", "uploader",
+            "webpage_url",
+        ):
+            v = detail.get(k)
+            if v is not None:
+                merged[k] = v
+        return merged
+
+    enriched = await asyncio.gather(*(enrich(e) for e in listing))
+    enriched_count = sum(1 for v in enriched if v.get("like_count") is not None)
+    print(
+        f"  [YouTube] @{username}: {len(enriched)} videos "
+        f"({enriched_count} with likes/comments)"
+    )
+    await _cache_set(cache_key, enriched)
+    return enriched
 
 
 # ── yt-dlp sync helpers (called via asyncio.to_thread) ────────────────
@@ -364,8 +424,11 @@ def _ytdlp_tiktok_sync(username: str, host: str) -> Optional[list[dict]]:
     return videos or None
 
 
-def _ytdlp_youtube_sync(username: str) -> Optional[list[dict]]:
-    """YouTube shorts fetch via yt-dlp library."""
+def _ytdlp_youtube_list_sync(username: str) -> Optional[list[dict]]:
+    """
+    YouTube pass 1: fast listing of last 30 shorts via extract_flat.
+    Returns list of dicts with id + view_count + url (but no likes/comments/timestamp).
+    """
     try:
         import yt_dlp
     except ImportError:
@@ -400,9 +463,9 @@ def _ytdlp_youtube_sync(username: str) -> Optional[list[dict]]:
     except Exception as e:
         err = str(e).lower()
         if any(p in err for p in ("unavailable", "private", "not found", "does not exist", "404")):
-            print(f"  [yt-dlp/yt] permanent error @{username}: {e}")
+            print(f"  [yt-dlp/yt-list] permanent error @{username}: {e}")
         else:
-            print(f"  [yt-dlp/yt] error @{username}: {str(e)[:150]}")
+            print(f"  [yt-dlp/yt-list] error @{username}: {str(e)[:150]}")
         return None
 
     if not info:
@@ -410,6 +473,50 @@ def _ytdlp_youtube_sync(username: str) -> Optional[list[dict]]:
     entries = info.get("entries", [info])
     videos = [e for e in entries if e]
     return videos or None
+
+
+def _ytdlp_youtube_video_detail_sync(video_url: str) -> Optional[dict]:
+    """
+    YouTube pass 2: full metadata for a single video.
+
+    Returns the raw yt-dlp info_dict (which includes like_count, comment_count,
+    timestamp, description, etc.) or None on failure.
+
+    IMPORTANT: we set ignore_no_formats_error=True + skip_download=True so
+    yt-dlp doesn't crash with "Requested format is not available" when no
+    playable format is returned by YouTube — we only care about metadata.
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        return None
+
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "ignore_no_formats_error": True,   # don't crash if no format is available
+        "socket_timeout": 15,
+        "retries": 1,
+        "nocheckcertificate": True,
+        "geo_bypass": True,
+        "user_agent": _USER_AGENT,
+        "getcomments": False,              # don't fetch comment bodies
+        "http_headers": {
+            "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://www.youtube.com/",
+        },
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(video_url, download=False)
+    except Exception as e:
+        # Silent for per-video fails; listing data survives
+        msg = str(e)[:120]
+        if "Requested format is not available" not in msg:
+            print(f"  [yt-dlp/yt-detail] {video_url}: {msg}")
+        return None
 
 
 # ── DB storage dispatch ───────────────────────────────────────────────
@@ -496,8 +603,21 @@ async def _process_and_store(
             cfc = vdata.get("channel_follower_count", 0)
             if cfc:
                 followers = cfc
+            # Prefer unix `timestamp`, fall back to `upload_date` (YYYYMMDD) for YouTube
             create_ts = vdata.get("timestamp")
-            create_time = datetime.fromtimestamp(create_ts).isoformat() if create_ts else None
+            create_time = None
+            if create_ts:
+                try:
+                    create_time = datetime.fromtimestamp(create_ts).isoformat()
+                except (ValueError, OSError):
+                    pass
+            if not create_time:
+                upload_date = vdata.get("upload_date")
+                if upload_date and len(upload_date) == 8:
+                    try:
+                        create_time = datetime.strptime(upload_date, "%Y%m%d").isoformat()
+                    except ValueError:
+                        pass
 
             # Thumbnails: prefer originCover > cover > first available
             thumbnail = vdata.get("thumbnail")

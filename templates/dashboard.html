@@ -5,345 +5,909 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260409">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260409f">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
-<body>
+<body class="has-sidebar">
 
-    <!-- Header -->
-    <header class="app-header">
-        <div class="logo">
-            <div class="logo-icon"><svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="12" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
-                <circle cx="16" cy="16" r="8" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
-                <circle cx="16" cy="16" r="4" stroke="#fff" stroke-width="2"/>
-                <circle cx="16" cy="16" r="1.8" fill="#fff"/>
-                <line x1="16" y1="2" x2="16" y2="8" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="16" y1="24" x2="16" y2="30" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="2" y1="16" x2="8" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="24" y1="16" x2="30" y2="16" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
-            </svg></div>
+    <!-- ═══════ SIDEBAR ═══════ -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="sidebar-logo">
+                <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+                    <defs>
+                        <radialGradient id="logoDot" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#FF69B4" stop-opacity="1"/>
+                            <stop offset="55%" stop-color="#FF69B4" stop-opacity="0.6"/>
+                            <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+                        </radialGradient>
+                    </defs>
+                    <circle cx="20" cy="20" r="20" fill="url(#logoDot)"/>
+                    <circle cx="20" cy="20" r="7" fill="#FF69B4"/>
+                </svg>
+            </div>
             <div>
-                <h1>Tracking Lab</h1>
-                <span class="subtitle">Suivi des performances de votre lab interne</span>
+                <div class="sidebar-title">Tracking Lab</div>
+                <div class="sidebar-plan">Votre espace</div>
             </div>
         </div>
-        <div class="header-actions">
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-label">Analytics</div>
+                <a class="nav-item active" data-page="analytics" onclick="switchPage('analytics')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Vue d'ensemble
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Lab interne</div>
+                <a class="nav-item" data-page="overview" onclick="switchPage('overview')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Vue d'ensemble
+                </a>
+                <a class="nav-item" data-page="accounts" onclick="switchPage('accounts')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Comptes
+                    <span class="nav-badge" id="sidebarAccountsBadge">0</span>
+                </a>
+                <a class="nav-item" data-page="videos" onclick="switchPage('videos')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Vidéos
+                </a>
+                <a class="nav-item" data-page="table" onclick="switchPage('table')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Tableau détaillé
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Concurrents</div>
+                <a class="nav-item" data-page="c-overview" onclick="switchPage('c-overview')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Vue d'ensemble
+                </a>
+                <a class="nav-item" data-page="c-accounts" onclick="switchPage('c-accounts')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Comptes
+                    <span class="nav-badge" id="sidebarCompetitorsBadge">0</span>
+                </a>
+                <a class="nav-item" data-page="c-videos" onclick="switchPage('c-videos')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Vidéos
+                </a>
+                <a class="nav-item" data-page="c-table" onclick="switchPage('c-table')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Tableau détaillé
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-actions">
+            <button onclick="openProjectsModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Gérer les projets
+            </button>
+            <button onclick="openAccountsModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Gérer les comptes
+            </button>
+            <button onclick="openImportModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Importer CSV
+            </button>
+            <button onclick="exportCSV()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Exporter CSV
+            </button>
             {% if user.role == 'admin' %}
-            <a href="/admin" class="btn btn-secondary btn-sm" style="background:var(--warning);color:#000;border:none">
+            <a href="/admin" class="sidebar-action-btn admin-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 Admin
             </a>
             {% endif %}
-            <button class="btn btn-secondary btn-sm" onclick="openProjectsModal()">
-                Gerer les projets
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="openAccountsModal()">
-                Gerer les comptes
-            </button>
-            <a href="/billing" class="btn btn-secondary btn-sm">
-                Mon abonnement
-            </a>
-            <button class="btn btn-secondary btn-sm" onclick="openImportModal()">
-                Importer CSV
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
-                Exporter CSV
-            </button>
-            <button class="btn btn-primary" id="scrapeBtn" onclick="startScraping()">
-                Scraper les donnees
-            </button>
-            <div class="user-info">
+        </div>
+
+        <div class="sidebar-account">
+            <div class="sidebar-account-header">
                 {% if user.avatar_url %}
-                <img src="{{ user.avatar_url }}" class="user-avatar" alt="" referrerpolicy="no-referrer">
+                <img src="{{ user.avatar_url }}" class="sidebar-avatar-lg" alt="" referrerpolicy="no-referrer">
+                {% else %}
+                <div class="sidebar-avatar-lg-placeholder">{{ (user.name or user.email)[0] | upper }}</div>
                 {% endif %}
-                <span class="user-name">{{ user.name or user.email }}</span>
-                <a href="/logout" class="btn btn-secondary btn-sm" title="Deconnexion">&#x2190;</a>
-            </div>
-        </div>
-    </header>
-
-    <main class="main-content">
-
-        <!-- Filters -->
-        <div class="filters-bar">
-            <div class="filter-group">
-                <label>Projet</label>
-                <select id="filterProject" onchange="onProjectFilter(this.value)">
-                    <option value="all">Tous les projets</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Compte</label>
-                <select id="filterAccount">
-                    <option value="all">Tous les comptes</option>
-                </select>
-            </div>
-            <div class="filter-group filter-date">
-                <label>&#128197; Date debut</label>
-                <input type="date" id="filterDateFrom" placeholder="Date debut">
-            </div>
-            <div class="filter-group filter-date">
-                <label>&#128197; Date fin</label>
-                <input type="date" id="filterDateTo" placeholder="Date fin">
-            </div>
-            <div class="filter-group" style="margin-left:auto">
-                <label>&nbsp;</label>
-                <button class="btn btn-secondary btn-sm" onclick="state.dateFrom=null;state.dateTo=null;document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';state.selectedAccount='all';document.getElementById('filterAccount').value='all';state.selectedProject='all';document.getElementById('filterProject').value='all';loadDashboard();">
-                    Reinitialiser les filtres
-                </button>
-            </div>
-        </div>
-
-        <!-- KPIs -->
-        <div class="kpi-grid">
-            <div class="kpi-card highlight">
-                <div class="kpi-label">Contenus</div>
-                <div class="kpi-value" id="kpiVideos">0</div>
-                <div class="kpi-icon">&#127909;</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Vues totales</div>
-                <div class="kpi-value" id="kpiViews">0</div>
-                <div class="kpi-icon">&#128064;</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Likes</div>
-                <div class="kpi-value" id="kpiLikes">0</div>
-                <div class="kpi-icon">&#10084;</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Commentaires</div>
-                <div class="kpi-value" id="kpiComments">0</div>
-                <div class="kpi-icon">&#128172;</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Partages</div>
-                <div class="kpi-value" id="kpiShares">0</div>
-                <div class="kpi-icon">&#128257;</div>
-            </div>
-            <div class="kpi-card highlight">
-                <div class="kpi-label">Taux d'engagement</div>
-                <div class="kpi-value" id="kpiEngagement">0%</div>
-                <div class="kpi-icon">&#128200;</div>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tab-nav">
-            <button class="tab-btn active" data-tab="overview">Vue d'ensemble</button>
-            <button class="tab-btn" data-tab="charts">Graphiques</button>
-            <button class="tab-btn" data-tab="table">Tableau detaille</button>
-        </div>
-
-        <!-- Tab: Overview -->
-        <div class="tab-content active" id="tab-overview">
-            <!-- Account Cards -->
-            <div class="section-title">
-                Comptes suivis <span class="badge" id="accountsBadge">0 comptes</span>
-            </div>
-            <div class="accounts-grid" id="accountCards"></div>
-
-            <!-- Best Videos -->
-            <div class="section-header" style="margin-top:32px">
-                <div class="section-title" style="margin-bottom:0">
-                    Meilleures videos <span class="badge" id="bestVideosBadge">Top 5</span>
-                </div>
-                <div class="section-header-controls">
-                    <div class="inline-date-filter">
-                        <label>Du</label>
-                        <input type="date" id="bestDateFrom" onchange="onBestDateFilter()">
-                        <label>Au</label>
-                        <input type="date" id="bestDateTo" onchange="onBestDateFilter()">
-                        <button class="btn btn-secondary btn-sm" onclick="clearBestDateFilter()" title="Reinitialiser">&#10005;</button>
-                    </div>
-                    <div class="limit-selector" id="bestVideosLimit">
-                        <button class="limit-btn" data-limit="5" onclick="setBestVideosLimit(5)">5</button>
-                        <button class="limit-btn active" data-limit="10" onclick="setBestVideosLimit(10)">10</button>
-                        <button class="limit-btn" data-limit="20" onclick="setBestVideosLimit(20)">20</button>
-                        <button class="limit-btn" data-limit="50" onclick="setBestVideosLimit(50)">50</button>
-                    </div>
+                <div class="sidebar-account-info">
+                    <div class="sidebar-account-name">{{ user.name or user.email }}</div>
+                    <div class="sidebar-account-email">{{ user.email }}</div>
                 </div>
             </div>
-            <div class="video-cards-grid" id="bestVideosGrid">
-                <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
+            <div class="sidebar-account-links">
+                <a href="/billing" class="sidebar-account-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    Mon abonnement
+                </a>
+                <a href="/logout" class="sidebar-account-link logout">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Déconnexion
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════ MAIN AREA ═══════ -->
+    <div class="app-main">
+        <!-- Mobile sidebar toggle (FAB) - visible only on mobile -->
+        <button id="sidebarToggle" class="mobile-fab" onclick="toggleSidebar()" aria-label="Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <style>
+            .mobile-fab {
+                display: none;
+                position: fixed;
+                top: 14px; left: 14px;
+                z-index: 200;
+                width: 44px; height: 44px;
+                background: #fff;
+                border: 1px solid rgba(0,0,0,.08);
+                border-radius: 12px;
+                color: var(--text);
+                cursor: pointer;
+                box-shadow: 0 4px 14px rgba(0,0,0,.08);
+                align-items: center; justify-content: center;
+                transition: transform .2s, box-shadow .2s;
+            }
+            .mobile-fab:active { transform: scale(.94); }
+            .mobile-fab:hover { box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+            @media (max-width: 768px) {
+                .mobile-fab { display: flex; }
+                .main-content { padding-top: 70px !important; }
+            }
+        </style>
+
+        <main class="main-content">
+
+            <!-- ═══ PAGE: ANALYTICS OVERVIEW (Lab interne + Concurrents) ═══ -->
+            <div class="page active" id="page-analytics">
+                <div class="a-grid">
+
+                    <!-- ── Lab interne ── -->
+                    <div class="a-card a-lab">
+                        <div class="a-card-accent"></div>
+                        <div class="a-card-head">
+                            <div class="a-card-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                                Lab interne
+                            </div>
+                            <span class="a-badge" id="a-labCount">0 comptes</span>
+                        </div>
+                        <div class="a-filters">
+                            <select id="a-labProject" onchange="onAnalyticsLabFilter()">
+                                <option value="all">Tous les projets</option>
+                            </select>
+                            <div class="a-date">
+                                <input type="date" id="a-labDateFrom" onchange="onAnalyticsLabFilter()">
+                                <span>–</span>
+                                <input type="date" id="a-labDateTo" onchange="onAnalyticsLabFilter()">
+                            </div>
+                            <button class="a-reset" onclick="resetAnalyticsLabFilter()" title="Réinitialiser">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="a-hero">
+                            <div class="a-hero-value" id="a-labViews">0</div>
+                            <div class="a-hero-label">vues totales</div>
+                        </div>
+
+                        <div class="a-metrics">
+                            <div class="a-metric">
+                                <div class="a-metric-val" id="a-labVideos">0</div>
+                                <div class="a-metric-lbl">Contenus</div>
+                            </div>
+                            <div class="a-metric">
+                                <div class="a-metric-val" id="a-labLikes">0</div>
+                                <div class="a-metric-lbl">Likes</div>
+                            </div>
+                            <div class="a-metric a-metric-accent">
+                                <div class="a-metric-val" id="a-labEngagement">0%</div>
+                                <div class="a-metric-lbl">Engagement</div>
+                            </div>
+                        </div>
+
+                        <div class="a-secondary">
+                            <div class="a-sec-item"><span id="a-labComments">0</span> commentaires</div>
+                            <div class="a-sec-item"><span id="a-labShares">0</span> partages</div>
+                            <div class="a-sec-item"><span id="a-labAvgViews">0</span> moy/vid</div>
+                            <div class="a-sec-item"><span id="a-labAccounts">0</span> comptes</div>
+                        </div>
+
+                        <div class="a-table-wrap">
+                            <table class="a-table">
+                                <thead>
+                                    <tr><th>Compte</th><th>Vues</th><th>Likes</th><th>Engage.</th></tr>
+                                </thead>
+                                <tbody id="a-labActivityBody">
+                                    <tr><td colspan="4" class="a-table-empty">Chargement...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="a-detail-btn" onclick="switchPage('overview')">Voir le détail <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+
+                    <!-- ── Concurrents ── -->
+                    <div class="a-card a-comp">
+                        <div class="a-card-accent"></div>
+                        <div class="a-card-head">
+                            <div class="a-card-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Concurrents
+                            </div>
+                            <span class="a-badge" id="a-compCount">0 comptes</span>
+                        </div>
+                        <div class="a-filters">
+                            <select id="a-compAccount" onchange="onAnalyticsCompFilter()">
+                                <option value="all">Tous les comptes</option>
+                            </select>
+                            <div class="a-date">
+                                <input type="date" id="a-compDateFrom" onchange="onAnalyticsCompFilter()">
+                                <span>–</span>
+                                <input type="date" id="a-compDateTo" onchange="onAnalyticsCompFilter()">
+                            </div>
+                            <button class="a-reset" onclick="resetAnalyticsCompFilter()" title="Réinitialiser">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="a-hero">
+                            <div class="a-hero-value" id="a-compViews">0</div>
+                            <div class="a-hero-label">vues totales</div>
+                        </div>
+
+                        <div class="a-metrics">
+                            <div class="a-metric">
+                                <div class="a-metric-val" id="a-compVideos">0</div>
+                                <div class="a-metric-lbl">Contenus</div>
+                            </div>
+                            <div class="a-metric">
+                                <div class="a-metric-val" id="a-compLikes">0</div>
+                                <div class="a-metric-lbl">Likes</div>
+                            </div>
+                            <div class="a-metric a-metric-accent">
+                                <div class="a-metric-val" id="a-compEngagement">0%</div>
+                                <div class="a-metric-lbl">Engagement</div>
+                            </div>
+                        </div>
+
+                        <div class="a-secondary">
+                            <div class="a-sec-item"><span id="a-compComments">0</span> commentaires</div>
+                            <div class="a-sec-item"><span id="a-compShares">0</span> partages</div>
+                            <div class="a-sec-item"><span id="a-compAvgViews">0</span> moy/vid</div>
+                            <div class="a-sec-item"><span id="a-compAccounts">0</span> comptes</div>
+                        </div>
+
+                        <div class="a-table-wrap">
+                            <table class="a-table">
+                                <thead>
+                                    <tr><th>Compte</th><th>Vues</th><th>Likes</th><th>Engage.</th></tr>
+                                </thead>
+                                <tbody id="a-compActivityBody">
+                                    <tr><td colspan="4" class="a-table-empty">Chargement...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="a-detail-btn" onclick="switchPage('c-overview')">Voir le détail <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+
+                </div>
             </div>
 
-            <!-- Latest Videos -->
-            <div class="section-header" style="margin-top:32px">
-                <div class="section-title" style="margin-bottom:0">
-                    Dernieres videos <span class="badge" id="latestVideosBadge">0</span>
-                </div>
-                <div class="section-header-controls">
-                    <div class="inline-date-filter">
-                        <label>Du</label>
-                        <input type="date" id="latestDateFrom" onchange="onLatestDateFilter()">
-                        <label>Au</label>
-                        <input type="date" id="latestDateTo" onchange="onLatestDateFilter()">
-                        <button class="btn btn-secondary btn-sm" onclick="clearLatestDateFilter()" title="Reinitialiser">&#10005;</button>
-                    </div>
-                    <div class="limit-selector" id="latestVideosLimit">
-                        <button class="limit-btn" data-limit="5" onclick="setLatestVideosLimit(5)">5</button>
-                        <button class="limit-btn active" data-limit="10" onclick="setLatestVideosLimit(10)">10</button>
-                        <button class="limit-btn" data-limit="20" onclick="setLatestVideosLimit(20)">20</button>
-                        <button class="limit-btn" data-limit="50" onclick="setLatestVideosLimit(50)">50</button>
-                    </div>
-                </div>
-            </div>
-            <div class="video-cards-grid" id="latestVideosGrid">
-                <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
-            </div>
+            <!-- ═══ PAGE: VUE D'ENSEMBLE ═══ -->
+            <div class="page" id="page-overview">
 
-            <!-- Main Charts -->
-            <div class="charts-grid">
-                <div class="chart-card full-width">
-                    <div class="chart-header">
-                        <h3>Vues gagnees par jour et par compte</h3>
-                        <div class="inline-date-filter">
-                            <label>Du</label>
-                            <input type="date" id="viewsChartDateFrom" onchange="onViewsChartDateFilter()">
-                            <label>Au</label>
-                            <input type="date" id="viewsChartDateTo" onchange="onViewsChartDateFilter()">
-                            <button class="btn btn-secondary btn-sm" onclick="clearViewsChartDateFilter()" title="Reinitialiser">&#10005;</button>
+                <!-- Filter Bar -->
+                <div class="page-filter-bar">
+                    <div class="analytics-filter-pill">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        <select id="filterProject" onchange="onProjectFilter(this.value)">
+                            <option value="all">Tous les projets</option>
+                        </select>
+                    </div>
+                    <div class="analytics-filter-pill">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <select id="filterAccount">
+                            <option value="all">Tous les comptes</option>
+                        </select>
+                    </div>
+                    <div class="analytics-filter-pill date">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <input type="date" id="filterDateFrom">
+                        <span>-</span>
+                        <input type="date" id="filterDateTo">
+                    </div>
+                    <button class="analytics-filter-reset" onclick="resetAllFilters()" title="Réinitialiser">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </button>
+                    <div class="filter-spacer"></div>
+                    <label class="auto-scrape-label">
+                        <input type="checkbox" id="autoScrapeToggle" onchange="toggleAutoScrape(this.checked)">
+                        Auto-scrape
+                    </label>
+                    <button class="scrape-btn-inline" id="scrapeBtn" onclick="startScraping()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        Scraper
+                    </button>
+                </div>
+
+                <!-- KPI Grid (8 cards, 2 rows of 4) -->
+                <div class="kpi-grid-new">
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap green">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Contenus</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiVideos">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap blue">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Vues totales</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiViews">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap pink">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Likes</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiLikes">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap purple">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Commentaires</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiComments">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap orange">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Partages</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiShares">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap teal">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Taux d'engagement</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiEngagement">0%</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap indigo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Comptes actifs</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiActiveAccounts">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap amber">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Moy. vues/vidéo</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiAvgViews">0</div>
+                    </div>
+                </div>
+
+                <!-- Account Activity Table -->
+                <div class="activity-card">
+                    <div class="activity-header">
+                        <h3>Activité des comptes</h3>
+                        <span class="activity-badge" id="activityBadge">0 comptes</span>
+                    </div>
+                    <div class="activity-table-wrap">
+                        <table class="activity-table">
+                            <thead>
+                                <tr>
+                                    <th>Compte</th>
+                                    <th class="sortable text-center" data-sort="videos" onclick="sortActivityTable('videos')">Vidéos <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right sorted" data-sort="views" onclick="sortActivityTable('views')">Vues <span class="sort-arrows" style="display:none">&#x25B2;&#x25BC;</span><span class="sort-indicator">&#x25BC;</span></th>
+                                    <th class="sortable text-right" data-sort="likes" onclick="sortActivityTable('likes')">Likes <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="engagement" onclick="sortActivityTable('engagement')">Engagement <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="avg_views" onclick="sortActivityTable('avg_views')">Moy. vues/vid <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountActivityBody">
+                                <tr><td colspan="6" style="text-align:center;padding:30px;color:#86868b">Chargement...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Overview Charts -->
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="chart-header">
+                            <h3>Vues gagnées par jour et par compte</h3>
+                            <div class="inline-date-filter">
+                                <label>Du</label>
+                                <input type="date" id="viewsChartDateFrom" onchange="onViewsChartDateFilter()">
+                                <label>Au</label>
+                                <input type="date" id="viewsChartDateTo" onchange="onViewsChartDateFilter()">
+                                <button class="btn btn-secondary btn-sm" onclick="clearViewsChartDateFilter()" title="Réinitialiser">&#10005;</button>
+                            </div>
+                        </div>
+                        <div id="viewsPerDayTable" class="posts-per-day-grid single-row"></div>
+                    </div>
+                    <div class="chart-card full-width">
+                        <div class="chart-header">
+                            <h3>Publications par jour</h3>
+                            <div class="inline-date-filter">
+                                <label>Du</label>
+                                <input type="date" id="postsChartDateFrom" onchange="onPostsChartDateFilter()">
+                                <label>Au</label>
+                                <input type="date" id="postsChartDateTo" onchange="onPostsChartDateFilter()">
+                                <button class="btn btn-secondary btn-sm" onclick="clearPostsChartDateFilter()" title="Réinitialiser">&#10005;</button>
+                            </div>
+                        </div>
+                        <div id="postsPerDayTable" class="posts-per-day-grid single-row"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Taux d'engagement par compte</h3>
+                        <div class="chart-container">
+                            <canvas id="engagementByAccountChart"></canvas>
                         </div>
                     </div>
-                    <div id="viewsPerDayTable" class="posts-per-day-grid single-row"></div>
-                </div>
-                <div class="chart-card full-width">
-                    <div class="chart-header">
-                        <h3>Publications par jour</h3>
-                        <div class="inline-date-filter">
-                            <label>Du</label>
-                            <input type="date" id="postsChartDateFrom" onchange="onPostsChartDateFilter()">
-                            <label>Au</label>
-                            <input type="date" id="postsChartDateTo" onchange="onPostsChartDateFilter()">
-                            <button class="btn btn-secondary btn-sm" onclick="clearPostsChartDateFilter()" title="Reinitialiser">&#10005;</button>
+                    <div class="chart-card">
+                        <h3>Répartition de l'engagement</h3>
+                        <div class="chart-container">
+                            <canvas id="engagementChart"></canvas>
                         </div>
                     </div>
-                    <div id="postsPerDayTable" class="posts-per-day-grid single-row"></div>
-                </div>
-                <div class="chart-card">
-                    <h3>Taux d'engagement par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="engagementByAccountChart"></canvas>
+                    <div class="chart-card full-width">
+                        <h3>Comparaison des comptes (Vues, Likes, Partages)</h3>
+                        <div class="chart-container">
+                            <canvas id="comparisonChart"></canvas>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-card">
-                    <h3>Repartition de l'engagement</h3>
-                    <div class="chart-container">
-                        <canvas id="engagementChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card full-width">
-                    <h3>Comparaison des comptes (Vues, Likes, Partages)</h3>
-                    <div class="chart-container">
-                        <canvas id="comparisonChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Tab: Charts -->
-        <div class="tab-content" id="tab-charts">
-            <div class="charts-grid">
-                <div class="chart-card full-width">
-                    <h3>Engagement journalier (Likes, Commentaires, Partages)</h3>
-                    <div class="chart-container">
-                        <canvas id="timelineChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Likes par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="likesPerAccountChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Nombre de contenus par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="contentPerAccountChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card full-width">
-                    <h3>Vues moyennes par video et par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="avgViewsChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Partages par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="sharesPerAccountChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Commentaires par compte</h3>
-                    <div class="chart-container">
-                        <canvas id="commentsPerAccountChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab: Table -->
-        <div class="tab-content" id="tab-table">
-            <!-- Best Videos (grid) -->
-            <div class="section-header">
-                <div class="section-title" style="margin-bottom:0">
-                    Meilleures videos <span class="badge" id="tableBestBadge">Top 5</span>
-                </div>
-                <div class="section-header-controls">
-                    <div class="limit-selector" id="tableBestLimit">
-                        <button class="limit-btn active" data-limit="5" onclick="setTableBestLimit(5)">5</button>
-                        <button class="limit-btn" data-limit="10" onclick="setTableBestLimit(10)">10</button>
-                        <button class="limit-btn" data-limit="20" onclick="setTableBestLimit(20)">20</button>
-                        <button class="limit-btn" data-limit="50" onclick="setTableBestLimit(50)">50</button>
-                        <button class="limit-btn" data-limit="all" onclick="setTableBestLimit('all')">ALL</button>
-                    </div>
-                </div>
-            </div>
-            <div class="video-cards-wrap" id="tableBestGrid">
-                <div style="text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
             </div>
 
-            <!-- Latest Videos (grid) -->
-            <div class="section-header" style="margin-top:32px">
-                <div class="section-title" style="margin-bottom:0">
-                    Dernieres videos <span class="badge" id="tableLatestBadge">5</span>
+            <!-- ═══ PAGE: COMPTES ═══ -->
+            <div class="page" id="page-accounts">
+                <div class="page-header">
+                    <div class="page-title">Comptes suivis <span class="badge" id="accountsBadge">0 comptes</span></div>
                 </div>
-                <div class="section-header-controls">
-                    <div class="inline-date-filter">
-                        <label>Du</label>
-                        <input type="date" id="tableLatestDateFrom" onchange="onTableLatestDateFilter()">
-                        <label>Au</label>
-                        <input type="date" id="tableLatestDateTo" onchange="onTableLatestDateFilter()">
-                        <button class="btn btn-secondary btn-sm" onclick="clearTableLatestDateFilter()" title="Reinitialiser">&#10005;</button>
-                    </div>
-                    <div class="limit-selector" id="tableLatestLimit">
-                        <button class="limit-btn active" data-limit="5" onclick="setTableLatestLimit(5)">5</button>
-                        <button class="limit-btn" data-limit="10" onclick="setTableLatestLimit(10)">10</button>
-                        <button class="limit-btn" data-limit="20" onclick="setTableLatestLimit(20)">20</button>
-                        <button class="limit-btn" data-limit="50" onclick="setTableLatestLimit(50)">50</button>
-                        <button class="limit-btn" data-limit="all" onclick="setTableLatestLimit('all')">ALL</button>
-                    </div>
+                <div class="platform-filters" id="platformFilters">
+                    <button class="platform-pill active" data-platform="all" onclick="filterByPlatform('all')">Tous</button>
+                    <button class="platform-pill" data-platform="tiktok" onclick="filterByPlatform('tiktok')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/></svg>
+                        TikTok <span class="platform-count" id="countTiktok">0</span>
+                    </button>
+                    <button class="platform-pill" data-platform="instagram" onclick="filterByPlatform('instagram')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor"/></svg>
+                        Instagram <span class="platform-count" id="countInstagram">0</span>
+                    </button>
+                    <button class="platform-pill" data-platform="youtube" onclick="filterByPlatform('youtube')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><rect width="22" height="16" x="1" y="4" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><polygon points="10,8.5 16,12 10,15.5" fill="currentColor"/></svg>
+                        YouTube <span class="platform-count" id="countYoutube">0</span>
+                    </button>
                 </div>
+                <div class="accounts-grid" id="accountCards"></div>
             </div>
-            <div class="video-cards-wrap" id="tableLatestGrid">
-                <div style="text-align:center;padding:30px;color:var(--text-muted)">Chargement...</div>
-            </div>
-        </div>
 
-    </main>
+            <!-- ═══ PAGE: VIDÉOS ═══ -->
+            <div class="page" id="page-videos">
+                <div class="section-header">
+                    <div class="section-title" style="margin-bottom:0">
+                        Meilleures vidéos <span class="badge" id="bestVideosBadge">Top 5</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="bestDateFrom" onchange="onBestDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="bestDateTo" onchange="onBestDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearBestDateFilter()" title="Réinitialiser">&#10005;</button>
+                        </div>
+                        <div class="limit-selector" id="bestVideosLimit">
+                            <button class="limit-btn" data-limit="5" onclick="setBestVideosLimit(5)">5</button>
+                            <button class="limit-btn active" data-limit="10" onclick="setBestVideosLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setBestVideosLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setBestVideosLimit(50)">50</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-grid" id="bestVideosGrid">
+                    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Dernières vidéos <span class="badge" id="latestVideosBadge">0</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="latestDateFrom" onchange="onLatestDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="latestDateTo" onchange="onLatestDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearLatestDateFilter()" title="Réinitialiser">&#10005;</button>
+                        </div>
+                        <div class="limit-selector" id="latestVideosLimit">
+                            <button class="limit-btn" data-limit="5" onclick="setLatestVideosLimit(5)">5</button>
+                            <button class="limit-btn active" data-limit="10" onclick="setLatestVideosLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setLatestVideosLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setLatestVideosLimit(50)">50</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-grid" id="latestVideosGrid">
+                    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+            </div>
+
+            <!-- ═══ PAGE: TABLEAU DÉTAILLÉ (Graphiques + Vidéos) ═══ -->
+            <div class="page" id="page-table">
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <h3>Engagement journalier (Likes, Commentaires, Partages)</h3>
+                        <div class="chart-container"><canvas id="timelineChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Likes par compte</h3>
+                        <div class="chart-container"><canvas id="likesPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Nombre de contenus par compte</h3>
+                        <div class="chart-container"><canvas id="contentPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card full-width">
+                        <h3>Vues moyennes par vidéo et par compte</h3>
+                        <div class="chart-container"><canvas id="avgViewsChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Partages par compte</h3>
+                        <div class="chart-container"><canvas id="sharesPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Commentaires par compte</h3>
+                        <div class="chart-container"><canvas id="commentsPerAccountChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Meilleures vidéos <span class="badge" id="tableBestBadge">Top 5</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="limit-selector" id="tableBestLimit">
+                            <button class="limit-btn active" data-limit="5" onclick="setTableBestLimit(5)">5</button>
+                            <button class="limit-btn" data-limit="10" onclick="setTableBestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setTableBestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setTableBestLimit(50)">50</button>
+                            <button class="limit-btn" data-limit="all" onclick="setTableBestLimit('all')">ALL</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-wrap" id="tableBestGrid">
+                    <div style="text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Dernières vidéos <span class="badge" id="tableLatestBadge">5</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="tableLatestDateFrom" onchange="onTableLatestDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="tableLatestDateTo" onchange="onTableLatestDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearTableLatestDateFilter()" title="Réinitialiser">&#10005;</button>
+                        </div>
+                        <div class="limit-selector" id="tableLatestLimit">
+                            <button class="limit-btn active" data-limit="5" onclick="setTableLatestLimit(5)">5</button>
+                            <button class="limit-btn" data-limit="10" onclick="setTableLatestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setTableLatestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setTableLatestLimit(50)">50</button>
+                            <button class="limit-btn" data-limit="all" onclick="setTableLatestLimit('all')">ALL</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-wrap" id="tableLatestGrid">
+                    <div style="text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+            </div>
+
+            <!-- ═══ PAGE: CONCURRENTS - VUE D'ENSEMBLE ═══ -->
+            <div class="page" id="page-c-overview">
+
+                <!-- Filter Bar -->
+                <div class="page-filter-bar">
+                    <div class="analytics-filter-pill">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <select id="c-overviewAccount" onchange="onCompOverviewFilter()">
+                            <option value="all">Tous les comptes</option>
+                        </select>
+                    </div>
+                    <div class="analytics-filter-pill date">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <input type="date" id="c-overviewDateFrom" onchange="onCompOverviewFilter()">
+                        <span>-</span>
+                        <input type="date" id="c-overviewDateTo" onchange="onCompOverviewFilter()">
+                    </div>
+                    <button class="analytics-filter-reset" onclick="resetCompOverviewFilter()" title="Réinitialiser">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </button>
+                    <div class="filter-spacer"></div>
+                    <button class="scrape-btn-inline" onclick="startScraping()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        Scraper
+                    </button>
+                </div>
+
+                <div class="kpi-grid-new">
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap green">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Contenus</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiVideos">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap blue">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Vues totales</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiViews">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap pink">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Likes</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiLikes">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap purple">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Commentaires</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiComments">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap orange">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Partages</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiShares">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap teal">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Taux d'engagement</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiEngagement">0%</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap indigo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Comptes suivis</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiActiveAccounts">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap amber">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Moy. vues/vidéo</span>
+                        </div>
+                        <div class="kpi-value-new" id="c-kpiAvgViews">0</div>
+                    </div>
+                </div>
+
+                <div class="activity-card">
+                    <div class="activity-header">
+                        <h3>Activité des concurrents</h3>
+                        <span class="activity-badge" id="c-activityBadge">0 comptes</span>
+                    </div>
+                    <div class="activity-table-wrap">
+                        <table class="activity-table">
+                            <thead>
+                                <tr>
+                                    <th>Compte</th>
+                                    <th class="sortable text-center" data-sort="videos" onclick="sortCompetitorActivityTable('videos')">Vidéos <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right sorted" data-sort="views" onclick="sortCompetitorActivityTable('views')">Vues <span class="sort-arrows" style="display:none">&#x25B2;&#x25BC;</span><span class="sort-indicator">&#x25BC;</span></th>
+                                    <th class="sortable text-right" data-sort="likes" onclick="sortCompetitorActivityTable('likes')">Likes <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="engagement" onclick="sortCompetitorActivityTable('engagement')">Engagement <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="avg_views" onclick="sortCompetitorActivityTable('avg_views')">Moy. vues/vid <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="c-accountActivityBody">
+                                <tr><td colspan="6" style="text-align:center;padding:30px;color:#86868b">Chargement...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ═══ PAGE: CONCURRENTS - COMPTES ═══ -->
+            <div class="page" id="page-c-accounts">
+                <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px">
+                    <div class="page-title" style="margin-bottom:0">Comptes concurrents <span class="badge" id="c-accountsBadge">0 comptes</span></div>
+                    <button class="btn btn-primary btn-sm" onclick="openCompetitorModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Ajouter un concurrent
+                    </button>
+                </div>
+                <div class="platform-filters" id="c-platformFilters">
+                    <button class="platform-pill active" data-platform="all" onclick="filterCompetitorByPlatform('all')">Tous</button>
+                    <button class="platform-pill" data-platform="tiktok" onclick="filterCompetitorByPlatform('tiktok')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/></svg>
+                        TikTok <span class="platform-count" id="c-countTiktok">0</span>
+                    </button>
+                    <button class="platform-pill" data-platform="instagram" onclick="filterCompetitorByPlatform('instagram')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor"/></svg>
+                        Instagram <span class="platform-count" id="c-countInstagram">0</span>
+                    </button>
+                    <button class="platform-pill" data-platform="youtube" onclick="filterCompetitorByPlatform('youtube')">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><rect width="22" height="16" x="1" y="4" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><polygon points="10,8.5 16,12 10,15.5" fill="currentColor"/></svg>
+                        YouTube <span class="platform-count" id="c-countYoutube">0</span>
+                    </button>
+                </div>
+                <div class="accounts-grid" id="c-accountCards"></div>
+            </div>
+
+            <!-- ═══ PAGE: CONCURRENTS - VIDÉOS ═══ -->
+            <div class="page" id="page-c-videos">
+                <div class="section-header">
+                    <div class="section-title" style="margin-bottom:0">
+                        Meilleures vidéos <span class="badge" id="c-bestVideosBadge">Top 10</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="limit-selector" id="c-bestVideosLimit">
+                            <button class="limit-btn" data-limit="5" onclick="setCompetitorBestLimit(5)">5</button>
+                            <button class="limit-btn active" data-limit="10" onclick="setCompetitorBestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setCompetitorBestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setCompetitorBestLimit(50)">50</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-grid" id="c-bestVideosGrid">
+                    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Dernières vidéos <span class="badge" id="c-latestVideosBadge">0</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="limit-selector" id="c-latestVideosLimit">
+                            <button class="limit-btn" data-limit="5" onclick="setCompetitorLatestLimit(5)">5</button>
+                            <button class="limit-btn active" data-limit="10" onclick="setCompetitorLatestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setCompetitorLatestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setCompetitorLatestLimit(50)">50</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-grid" id="c-latestVideosGrid">
+                    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+            </div>
+
+            <!-- ═══ PAGE: CONCURRENTS - TABLEAU DÉTAILLÉ (Graphiques + Vidéos) ═══ -->
+            <div class="page" id="page-c-table">
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <h3>Engagement journalier (Likes, Commentaires, Partages)</h3>
+                        <div class="chart-container"><canvas id="c-timelineChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Likes par compte</h3>
+                        <div class="chart-container"><canvas id="c-likesPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Nombre de contenus par compte</h3>
+                        <div class="chart-container"><canvas id="c-contentPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card full-width">
+                        <h3>Vues moyennes par vidéo et par compte</h3>
+                        <div class="chart-container"><canvas id="c-avgViewsChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Partages par compte</h3>
+                        <div class="chart-container"><canvas id="c-sharesPerAccountChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Commentaires par compte</h3>
+                        <div class="chart-container"><canvas id="c-commentsPerAccountChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Meilleures vidéos <span class="badge" id="c-tableBestBadge">Top 5</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="limit-selector" id="c-tableBestLimit">
+                            <button class="limit-btn active" data-limit="5" onclick="setCTableBestLimit(5)">5</button>
+                            <button class="limit-btn" data-limit="10" onclick="setCTableBestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setCTableBestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setCTableBestLimit(50)">50</button>
+                            <button class="limit-btn" data-limit="all" onclick="setCTableBestLimit('all')">ALL</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-wrap" id="c-tableBestGrid">
+                    <div style="text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+                <div class="section-header" style="margin-top:32px">
+                    <div class="section-title" style="margin-bottom:0">
+                        Dernières vidéos <span class="badge" id="c-tableLatestBadge">5</span>
+                    </div>
+                    <div class="section-header-controls">
+                        <div class="inline-date-filter">
+                            <label>Du</label>
+                            <input type="date" id="c-tableLatestDateFrom" onchange="onCTableLatestDateFilter()">
+                            <label>Au</label>
+                            <input type="date" id="c-tableLatestDateTo" onchange="onCTableLatestDateFilter()">
+                            <button class="btn btn-secondary btn-sm" onclick="clearCTableLatestDateFilter()" title="Réinitialiser">&#10005;</button>
+                        </div>
+                        <div class="limit-selector" id="c-tableLatestLimit">
+                            <button class="limit-btn active" data-limit="5" onclick="setCTableLatestLimit(5)">5</button>
+                            <button class="limit-btn" data-limit="10" onclick="setCTableLatestLimit(10)">10</button>
+                            <button class="limit-btn" data-limit="20" onclick="setCTableLatestLimit(20)">20</button>
+                            <button class="limit-btn" data-limit="50" onclick="setCTableLatestLimit(50)">50</button>
+                            <button class="limit-btn" data-limit="all" onclick="setCTableLatestLimit('all')">ALL</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="video-cards-wrap" id="c-tableLatestGrid">
+                    <div style="text-align:center;padding:30px;color:var(--text-3)">Chargement...</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ═══════ MODALS ═══════ -->
 
     <!-- Import Modal -->
     <div class="modal-overlay hidden" id="importModal">
         <div class="modal">
-            <h2>Importer des donnees CSV</h2>
-            <p>Format attendu: username;video_id;description;date;views;likes;comments;shares;saves (separateur: point-virgule)</p>
+            <h2>Importer des données CSV</h2>
+            <p>Format attendu: username;video_id;description;date;views;likes;comments;shares;saves (séparateur : point-virgule)</p>
             <div class="file-upload" onclick="document.getElementById('csvFileInput').click()">
                 <input type="file" id="csvFileInput" accept=".csv">
                 <p style="font-size:32px;margin-bottom:8px">&#128196;</p>
-                <p>Cliquez pour selectionner un fichier CSV</p>
+                <p>Cliquez pour sélectionner un fichier CSV</p>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeImportModal()">Annuler</button>
@@ -355,14 +919,15 @@
     <!-- Accounts Management Modal -->
     <div class="modal-overlay hidden" id="accountsModal">
         <div class="modal">
-            <h2>Gerer les comptes</h2>
-            <p>Ajoutez ou supprimez les comptes a suivre.</p>
+            <h2>Gérer les comptes</h2>
+            <p>Ajoutez ou supprimez les comptes à suivre.</p>
             <div id="accountsList" class="accounts-list"></div>
             <div class="add-account-form">
                 <select id="newAccountPlatform" style="width:auto;min-width:120px">
                     <option value="tiktok">TikTok</option>
                     <option value="instagram">Instagram</option>
                     <option value="youtube">YouTube Shorts</option>
+                    <option value="linkedin">LinkedIn</option>
                 </select>
                 <input type="text" id="newAccountInput" placeholder="@nom_utilisateur" onkeydown="if(event.key==='Enter')addAccount()">
                 <button class="btn btn-primary btn-sm" onclick="addAccount()">Ajouter</button>
@@ -376,12 +941,12 @@
     <!-- Projects Management Modal -->
     <div class="modal-overlay hidden" id="projectsModal">
         <div class="modal" style="max-width:600px">
-            <h2>Gerer les projets</h2>
+            <h2>Gérer les projets</h2>
             <p>Organisez vos comptes en projets.</p>
             <div id="projectsList" class="accounts-list" style="max-height:400px;overflow-y:auto"></div>
             <div class="add-account-form">
                 <input type="text" id="newProjectInput" placeholder="Nom du projet" onkeydown="if(event.key==='Enter')createNewProject()">
-                <button class="btn btn-primary btn-sm" onclick="createNewProject()">Creer</button>
+                <button class="btn btn-primary btn-sm" onclick="createNewProject()">Créer</button>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeProjectsModal()">Fermer</button>
@@ -401,9 +966,31 @@
         </div>
     </div>
 
+    <!-- Competitor Accounts Modal -->
+    <div class="modal-overlay hidden" id="competitorModal">
+        <div class="modal">
+            <h2>Gérer les concurrents</h2>
+            <p>Ajoutez ou supprimez les comptes concurrents à surveiller.</p>
+            <div id="competitorList" class="accounts-list"></div>
+            <div class="add-account-form">
+                <select id="competitorPlatform" style="width:auto;min-width:120px">
+                    <option value="tiktok">TikTok</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="youtube">YouTube Shorts</option>
+                    <option value="linkedin">LinkedIn</option>
+                </select>
+                <input type="text" id="competitorInput" placeholder="@nom_utilisateur" onkeydown="if(event.key==='Enter')addCompetitor()">
+                <button class="btn btn-primary btn-sm" onclick="addCompetitor()">Ajouter</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeCompetitorModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Bar -->
     <div class="status-bar" id="statusBar"></div>
 
-    <script src="/static/js/app.js?v=20260409"></script>
+    <script src="/static/js/app.js?v=20260409e"></script>
 </body>
 </html>

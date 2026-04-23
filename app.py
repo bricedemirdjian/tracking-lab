@@ -15,11 +15,16 @@ from database import (
     get_project_accounts, set_project_accounts, get_account_usernames_for_project,
     get_all_users, set_user_blocked, set_user_role, delete_user_and_data,
     get_user_subscription, upsert_subscription, get_subscription_by_customer,
+    set_user_plan, get_user_plan,
 )
 from functools import wraps
 from tiktok_scraper import scrape_all_accounts_for_user, scrape_single_account_for_user
 from auth import auth_bp, init_auth
 from stripe_billing import PLANS, get_plan, create_checkout_session, create_portal_session, get_price_plan
+from analytics import (
+    compute_hashtag_stats, get_viral_videos, detect_trends,
+    get_growth_metrics, get_top_content, generate_insights, run_full_analysis
+)
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -29,10 +34,19 @@ scrape_status = {}
 app = Flask(__name__)
 
 # Production config
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tiktok-tracker-dev-secret-2024')
+IS_PRODUCTION = bool(
+    os.environ.get('RENDER') or os.environ.get('PRODUCTION') or os.environ.get('VERCEL')
+)
+
+_secret_key = os.environ.get('SECRET_KEY')
+if IS_PRODUCTION and not _secret_key:
+    raise RuntimeError(
+        "SECRET_KEY env var is required in production. "
+        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+    )
+app.config['SECRET_KEY'] = _secret_key or 'tiktok-tracker-dev-secret-2024'
 app.config['GOOGLE_CLIENT_ID'] = os.environ.get('GOOGLE_CLIENT_ID')
 app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
-IS_PRODUCTION = os.environ.get('RENDER', False) or os.environ.get('PRODUCTION', False) or os.environ.get('VERCEL', False)
 
 # Debug: log OAuth config status at startup
 print(f"[Config] GOOGLE_CLIENT_ID present: {app.config['GOOGLE_CLIENT_ID'] is not None}")
@@ -57,8 +71,6 @@ def admin_required(f):
 
 @app.route("/")
 def index():
-    if current_user.is_authenticated:
-        return render_template("dashboard.html", user=current_user)
     return render_template("landing.html")
 
 
@@ -106,6 +118,48 @@ def api_admin_delete(user_id):
         return jsonify({"error": "Impossible de se supprimer soi-meme"}), 400
     delete_user_and_data(user_id)
     return jsonify({"status": "success"})
+
+
+@app.route("/api/admin/plan/<int:user_id>", methods=["POST"])
+@admin_required
+def api_admin_set_plan(user_id):
+    plan = request.json.get("plan", "").strip() if request.json else ""
+    if plan not in ("starter", "pro", "agency"):
+        return jsonify({"error": "Plan invalide (starter / pro / agency)"}), 400
+    try:
+        set_user_plan(user_id, plan)
+        return jsonify({"status": "success", "plan": plan})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/role/<int:user_id>", methods=["POST"])
+@admin_required
+def api_admin_set_role(user_id):
+    """Change user role. Manager = voit les donnees de l'admin. User = ses propres donnees."""
+    if user_id == current_user.id:
+        return jsonify({"error": "Impossible de modifier son propre role"}), 400
+    role = request.json.get("role", "").strip() if request.json else ""
+    if role not in ("user", "manager"):
+        return jsonify({"error": "Role invalide (user / manager)"}), 400
+    try:
+        set_user_role(user_id, role)
+        return jsonify({"status": "success", "role": role})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/plans")
+@admin_required
+def api_admin_plans():
+    """Return plan catalog (name + limits) for admin UI."""
+    return jsonify(PLANS)
+
+
+def _current_plan():
+    """Return plan dict for the current user."""
+    plan_name = get_user_plan(current_user.data_user_id)
+    return get_plan(plan_name)
 
 
 def _resolve_project_usernames(user_id, project_id):
@@ -178,11 +232,18 @@ def stripe_webhook():
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
     webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+    # Signature is MANDATORY — never accept unsigned events. An attacker could
+    # otherwise forge checkout.session.completed and grant themselves a plan.
+    if not webhook_secret:
+        print("[Stripe] STRIPE_WEBHOOK_SECRET not configured — rejecting webhook")
+        return jsonify({"error": "Webhook not configured"}), 503
+    if not sig_header:
+        return jsonify({"error": "Missing Stripe-Signature"}), 400
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            event = stripe.Event.construct_from(request.json, stripe.api_key)
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except stripe.error.SignatureVerificationError:
+        return jsonify({"error": "Invalid signature"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -190,22 +251,48 @@ def stripe_webhook():
         session = event.data.object
         customer_id = session.get('customer')
         subscription_id = session.get('subscription')
-        customer_email = session.get('customer_email') or session.get('customer_details', {}).get('email')
+        customer_email = (
+            session.get('customer_email')
+            or session.get('customer_details', {}).get('email')
+        )
         if subscription_id:
-            sub = stripe.Subscription.retrieve(subscription_id)
-            price_id = sub['items']['data'][0]['price']['id']
-            plan_name = get_price_plan(price_id)
-            period_end = datetime.fromtimestamp(sub['current_period_end']).isoformat()
-            # Find user by email
-            from database import get_connection, _fetchone, _q
-            conn = get_connection()
-            user = _fetchone(conn, "SELECT id FROM users WHERE email = %s", (customer_email,))
-            conn.close()
-            if user:
-                upsert_subscription(user['id'], plan_name, 'active',
-                                    stripe_customer_id=customer_id,
-                                    stripe_subscription_id=subscription_id,
-                                    current_period_end=period_end)
+            try:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                price_id = sub['items']['data'][0]['price']['id']
+                plan_name = get_price_plan(price_id)
+                period_end = datetime.fromtimestamp(sub['current_period_end']).isoformat()
+                from database import get_connection, _fetchone
+                conn = get_connection()
+                user = _fetchone(
+                    conn, "SELECT id, name, email FROM users WHERE email = %s",
+                    (customer_email,),
+                )
+                conn.close()
+                if user:
+                    upsert_subscription(
+                        user['id'], plan_name, 'active',
+                        stripe_customer_id=customer_id,
+                        stripe_subscription_id=subscription_id,
+                        current_period_end=period_end,
+                    )
+                    # Fire welcome/confirmation emails (best-effort, non-blocking)
+                    try:
+                        from emailer import send_payment_confirmation
+                        send_payment_confirmation(
+                            to_email=user['email'],
+                            user_name=user.get('name') or user['email'].split('@')[0],
+                            plan_name=plan_name,
+                            period_end_iso=period_end,
+                        )
+                    except Exception as em:
+                        print(f"[Stripe] email send failed: {em}")
+                else:
+                    # User hasn't signed up yet — stash the subscription intent
+                    # under email so it's claimed on first login.
+                    print(f"[Stripe] subscription for unknown email {customer_email} — "
+                          f"will claim on first login")
+            except Exception as e:
+                print(f"[Stripe] checkout.session.completed handler error: {e}")
 
     elif event.type in ('customer.subscription.updated', 'customer.subscription.deleted'):
         sub = event.data.object
@@ -218,10 +305,12 @@ def stripe_webhook():
         db_sub = get_subscription_by_customer(customer_id)
         if db_sub:
             period_end = datetime.fromtimestamp(sub.get('current_period_end', 0)).isoformat()
-            upsert_subscription(db_sub['user_id'], plan_name,
-                                'active' if status == 'active' else 'cancelled',
-                                stripe_subscription_id=sub.id,
-                                current_period_end=period_end)
+            upsert_subscription(
+                db_sub['user_id'], plan_name,
+                'active' if status == 'active' else 'cancelled',
+                stripe_subscription_id=sub.id,
+                current_period_end=period_end,
+            )
 
     return jsonify({"status": "ok"})
 
@@ -241,6 +330,17 @@ def api_create_project():
     name = request.json.get("name", "").strip() if request.json else ""
     if not name:
         return jsonify({"error": "Nom du projet requis"}), 400
+
+    # Plan limit: max_projects (admins bypass)
+    if not current_user.is_admin:
+        plan = _current_plan()
+        existing = get_projects(user_id=current_user.data_user_id)
+        if len(existing) >= plan.get("max_projects", 1):
+            return jsonify({
+                "error": f"Limite de {plan['max_projects']} projet(s) atteinte sur le plan {plan['name']}. Passez au plan superieur.",
+                "upgrade_required": True
+            }), 403
+
     try:
         project = create_project(user_id=current_user.data_user_id, name=name)
         return jsonify(project)
@@ -265,9 +365,29 @@ def api_delete_project(project_id):
     return jsonify({"status": "success"})
 
 
+def _assert_project_owner(project_id):
+    """Raise 403/404-style tuple (body, status) if current user doesn't own project."""
+    from database import get_connection, _fetchone
+    conn = get_connection()
+    row = _fetchone(
+        conn,
+        "SELECT id, user_id FROM projects WHERE id = %s",
+        (project_id,),
+    )
+    conn.close()
+    if not row:
+        return jsonify({"error": "Projet introuvable"}), 404
+    if row['user_id'] != current_user.data_user_id and not current_user.is_admin:
+        return jsonify({"error": "Accès refusé"}), 403
+    return None
+
+
 @app.route("/api/projects/<int:project_id>/accounts")
 @login_required
 def api_project_accounts(project_id):
+    denial = _assert_project_owner(project_id)
+    if denial:
+        return denial
     accounts = get_project_accounts(project_id)
     return jsonify(accounts)
 
@@ -275,6 +395,9 @@ def api_project_accounts(project_id):
 @app.route("/api/projects/<int:project_id>/accounts", methods=["POST"])
 @login_required
 def api_set_project_accounts(project_id):
+    denial = _assert_project_owner(project_id)
+    if denial:
+        return denial
     account_ids = request.json.get("account_ids", []) if request.json else []
     set_project_accounts(project_id, account_ids)
     return jsonify({"status": "success"})
@@ -286,10 +409,15 @@ def api_set_project_accounts(project_id):
 @login_required
 def api_accounts():
     project_id = request.args.get("project_id", None)
+    competitor = request.args.get("competitor", None)
+    is_competitor = True if competitor == "true" else False if competitor == "false" else None
     if project_id and project_id != "all":
         accounts = get_project_accounts(int(project_id))
+        # Filter by competitor flag if specified
+        if is_competitor is not None:
+            accounts = [a for a in accounts if a.get('is_competitor') == is_competitor]
     else:
-        accounts = get_all_accounts(user_id=current_user.data_user_id)
+        accounts = get_all_accounts(user_id=current_user.data_user_id, is_competitor=is_competitor)
     return jsonify(accounts)
 
 
@@ -298,11 +426,36 @@ def api_accounts():
 def api_add_account():
     username = request.json.get("username", "").strip().lstrip("@").lower() if request.json else ""
     platform = request.json.get("platform", "tiktok") if request.json else "tiktok"
+    is_competitor = request.json.get("is_competitor", False) if request.json else False
     if not username:
         return jsonify({"error": "Nom d'utilisateur requis"}), 400
-    if platform not in ("tiktok", "instagram", "youtube"):
+    if platform not in ("tiktok", "instagram", "youtube", "linkedin"):
         platform = "tiktok"
-    add_tracked_account(user_id=current_user.data_user_id, username=username, platform=platform)
+
+    # Admins bypass plan limits (they don't have a paying plan themselves)
+    if not current_user.is_admin:
+        plan = _current_plan()
+        # Platform restriction
+        if platform not in plan.get("platforms", []):
+            return jsonify({
+                "error": f"La plateforme {platform} nest pas disponible sur le plan {plan['name']}. Passez au plan Pro ou Entreprises.",
+                "upgrade_required": True
+            }), 403
+        # Competitor tracking requires Agency
+        if is_competitor and not plan.get("competitor_access"):
+            return jsonify({
+                "error": f"Le suivi des concurrents est reserve au plan Entreprises.",
+                "upgrade_required": True
+            }), 403
+        # Max accounts
+        existing = get_all_accounts(user_id=current_user.data_user_id)
+        if len(existing) >= plan.get("max_accounts", 1):
+            return jsonify({
+                "error": f"Limite de {plan['max_accounts']} compte(s) atteinte sur le plan {plan['name']}. Passez au plan superieur.",
+                "upgrade_required": True
+            }), 403
+
+    add_tracked_account(user_id=current_user.data_user_id, username=username, platform=platform, is_competitor=is_competitor)
 
     # On Vercel: don't auto-scrape (too slow, timeout risk). User clicks "Scraper" instead.
     # Locally: scrape in background thread.
@@ -324,6 +477,16 @@ def api_remove_account():
     return jsonify({"status": "success"})
 
 
+def _resolve_competitor_usernames(user_id, competitor_param, project_usernames):
+    """If competitor param is set and no project filter, restrict to competitor/non-competitor accounts."""
+    if competitor_param in ("true", "false") and not project_usernames:
+        is_comp = competitor_param == "true"
+        comp_accounts = get_all_accounts(user_id=user_id, is_competitor=is_comp)
+        unames = [a['username'] for a in comp_accounts]
+        return unames if unames else ["__none__"]
+    return project_usernames
+
+
 @app.route("/api/videos")
 @login_required
 def api_videos():
@@ -333,6 +496,7 @@ def api_videos():
     sort_by = request.args.get("sort_by", "create_time")
     sort_order = request.args.get("sort_order", "DESC")
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
 
     videos = get_videos(account, date_from, date_to, sort_by, sort_order, user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(videos)
@@ -346,6 +510,14 @@ def api_stats():
     date_to = request.args.get("date_to", None)
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    # Competitor filter: restrict to competitor/non-competitor account usernames
+    competitor = request.args.get("competitor", None)
+    if competitor in ("true", "false") and not project_usernames:
+        is_comp = competitor == "true"
+        comp_accounts = get_all_accounts(user_id=current_user.data_user_id, is_competitor=is_comp)
+        project_usernames = [a['username'] for a in comp_accounts]
+        if not project_usernames:
+            project_usernames = ["__none__"]  # Force empty result
     try:
         per_account = get_aggregated_stats(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
         global_stats = get_global_stats(date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
@@ -381,6 +553,7 @@ def api_evolution():
     date_to = request.args.get("date_to", None)
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
     data = get_daily_evolution(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(data)
 
@@ -394,6 +567,7 @@ def api_best_videos():
     limit = int(request.args.get("limit", 10))
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
     videos = get_videos(account, date_from, date_to, sort_by="views", sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(videos[:limit])
 
@@ -407,6 +581,7 @@ def api_latest_videos():
     limit = int(request.args.get("limit", 10))
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
     videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames, exclude_no_date=True)
     return jsonify(videos[:limit])
 
@@ -418,6 +593,7 @@ def api_posts_per_day():
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
+    project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
     videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="ASC", user_id=current_user.data_user_id, account_usernames=project_usernames, exclude_no_date=True)
 
     # Group by date and account+platform
@@ -461,6 +637,8 @@ def api_scrape():
         scrape_status[user_id]["current_account"] = uname
 
     def on_account_done(uname, success, video_count):
+        # "success" is True when videos were fetched OR when the profile
+        # legitimately has no content yet. Only true scrape exceptions go to errors.
         status = scrape_status[user_id]
         status["completed"] += 1
         status["done_accounts"].append({
@@ -477,7 +655,8 @@ def api_scrape():
             if username:
                 on_account_start(username)
                 result = scrape_single_account_for_user(username, user_id)
-                on_account_done(username, result.get("status") == "success", result.get("videos", 0))
+                is_ok = result.get("status") in ("success", "no_data")
+                on_account_done(username, is_ok, result.get("videos", 0))
             else:
                 scrape_all_accounts_for_user(user_id, on_start=on_account_start, on_done=on_account_done)
         finally:
@@ -493,9 +672,15 @@ def api_scrape():
             uname = acc["username"]
             platform = acc.get("platform", "tiktok")
             on_account_start(uname)
-            result = scrape_single_account_for_user(uname, user_id, platform=platform)
-            on_account_done(uname, result.get("status") == "success", result.get("videos", 0))
-            return result
+            try:
+                result = scrape_single_account_for_user(uname, user_id, platform=platform)
+                is_ok = result.get("status") in ("success", "no_data")
+                on_account_done(uname, is_ok, result.get("videos", 0))
+                return result
+            except Exception as e:
+                print(f"  @{uname} ({platform}): exception - {e}")
+                on_account_done(uname, False, 0)
+                return {"status": "error", "videos": 0}
 
         target_accounts = accounts if not username else [a for a in accounts if a["username"] == username]
         with ThreadPoolExecutor(max_workers=6) as executor:
@@ -519,9 +704,184 @@ def api_scrape_status():
     return jsonify(status)
 
 
+def _cron_auth_check():
+    """Verify CRON_SECRET header. Returns error response or None if OK."""
+    cron_secret = os.environ.get("CRON_SECRET")
+    auth_header = request.headers.get("Authorization", "")
+    if cron_secret and auth_header != f"Bearer {cron_secret}":
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
+
+
+def _cron_scrape(platform_filter=None):
+    """
+    Shared cron scrape logic.
+    platform_filter: list of platforms to scrape, e.g. ["tiktok", "youtube"].
+                     None = all platforms.
+    """
+    from database import get_connection, _fetchall
+
+    started = time.time()
+    max_duration = 55  # leave 5s margin before Vercel timeout
+
+    if platform_filter:
+        placeholders = ",".join(["%s"] * len(platform_filter))
+        query = f"SELECT DISTINCT user_id FROM accounts WHERE user_id IS NOT NULL AND platform IN ({placeholders})"
+        conn = get_connection()
+        users = _fetchall(conn, query, platform_filter)
+        conn.close()
+    else:
+        conn = get_connection()
+        users = _fetchall(conn, "SELECT DISTINCT user_id FROM accounts WHERE user_id IS NOT NULL")
+        conn.close()
+
+    if not users:
+        label = ", ".join(platform_filter) if platform_filter else "all"
+        return jsonify({"status": "ok", "message": "Aucun utilisateur", "platforms": label, "users": 0})
+
+    results = {}
+    for user_row in users:
+        if time.time() - started > max_duration:
+            results["_timeout"] = True
+            break
+
+        uid = user_row["user_id"]
+        try:
+            accounts = get_all_accounts(user_id=uid)
+            if platform_filter:
+                accounts = [a for a in accounts if a.get("platform", "tiktok") in platform_filter]
+            scraped = {}
+            for acc in accounts:
+                if time.time() - started > max_duration:
+                    results["_timeout"] = True
+                    break
+                uname = acc["username"]
+                plat = acc.get("platform", "tiktok")
+                try:
+                    r = scrape_single_account_for_user(uname, uid, platform=plat)
+                    scraped[uname] = r.get("status", "error")
+                except Exception as e:
+                    scraped[uname] = f"error: {str(e)[:100]}"
+            results[str(uid)] = {"accounts": len(accounts), "scraped": len(scraped)}
+        except Exception as e:
+            results[str(uid)] = {"error": str(e)[:200]}
+
+    elapsed = round(time.time() - started, 1)
+    label = ", ".join(platform_filter) if platform_filter else "all"
+    return jsonify({
+        "status": "ok",
+        "platforms": label,
+        "users": len(users),
+        "results": results,
+        "elapsed_s": elapsed,
+    })
+
+
+@app.route("/api/cron/daily-scrape", methods=["GET"])
+def api_cron_daily_scrape():
+    """Legacy endpoint — scrapes all platforms."""
+    err = _cron_auth_check()
+    if err:
+        return err
+    return _cron_scrape(platform_filter=None)
+
+
+@app.route("/api/cron/scrape-tiktok-youtube", methods=["GET"])
+def api_cron_scrape_tiktok_youtube():
+    """Hourly cron — TikTok + YouTube only."""
+    err = _cron_auth_check()
+    if err:
+        return err
+    return _cron_scrape(platform_filter=["tiktok", "youtube"])
+
+
+@app.route("/api/cron/scrape-instagram", methods=["GET"])
+def api_cron_scrape_instagram():
+    """Twice daily cron (9h & 18h) — Instagram only."""
+    err = _cron_auth_check()
+    if err:
+        return err
+    return _cron_scrape(platform_filter=["instagram"])
+
+
+# ──────────────────────────────────────────────
+# ANALYTICS ENDPOINTS
+# ──────────────────────────────────────────────
+
+@app.route("/api/analytics/hashtags", methods=["GET"])
+@login_required
+def api_analytics_hashtags():
+    """Top hashtags ranked by composite score."""
+    days = int(request.args.get("days", 30))
+    data = compute_hashtag_stats(user_id=current_user.data_user_id, days=days)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/virality", methods=["GET"])
+@login_required
+def api_analytics_virality():
+    """Videos ranked by virality score."""
+    days = int(request.args.get("days", 30))
+    limit = int(request.args.get("limit", 20))
+    data = get_viral_videos(user_id=current_user.data_user_id, limit=limit, days=days)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/trends", methods=["GET"])
+@login_required
+def api_analytics_trends():
+    """Emerging trends: hashtags, formats, week-over-week metrics."""
+    data = detect_trends(user_id=current_user.data_user_id)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/growth", methods=["GET"])
+@login_required
+def api_analytics_growth():
+    """Growth metrics per account (followers, engagement, posting frequency)."""
+    days = int(request.args.get("days", 30))
+    data = get_growth_metrics(user_id=current_user.data_user_id, days=days)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/top-content", methods=["GET"])
+@login_required
+def api_analytics_top_content():
+    """Top & flop content by virality score."""
+    days = int(request.args.get("days", 30))
+    limit = int(request.args.get("limit", 10))
+    data = get_top_content(user_id=current_user.data_user_id, days=days, limit=limit)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/insights", methods=["GET"])
+@login_required
+def api_analytics_insights():
+    """Auto-generated marketing insights and recommendations."""
+    data = generate_insights(user_id=current_user.data_user_id)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/report", methods=["GET"])
+@login_required
+def api_analytics_report():
+    """Full analysis pipeline — consolidated report."""
+    data = run_full_analysis(user_id=current_user.data_user_id)
+    return jsonify(data)
+
+
 @app.route("/api/import-csv", methods=["POST"])
 @login_required
 def api_import_csv():
+    # Plan limit: import CSV reserve au plan Entreprises
+    if not current_user.is_admin:
+        plan = _current_plan()
+        if not plan.get("import_csv"):
+            return jsonify({
+                "error": f"Limport CSV est reserve au plan Entreprises.",
+                "upgrade_required": True
+            }), 403
+
     if "file" not in request.files:
         return jsonify({"error": "Aucun fichier fourni"}), 400
 
@@ -570,6 +930,15 @@ def api_import_csv():
 @app.route("/api/export-csv")
 @login_required
 def api_export_csv():
+    # Plan limit: export CSV (Pro + Agency)
+    if not current_user.is_admin:
+        plan = _current_plan()
+        if not plan.get("export_csv"):
+            return jsonify({
+                "error": f"Lexport CSV est disponible sur le plan Pro ou Entreprises.",
+                "upgrade_required": True
+            }), 403
+
     account = request.args.get("account", "all")
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)

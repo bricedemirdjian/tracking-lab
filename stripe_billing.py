@@ -7,34 +7,54 @@ PLANS = {
     'starter': {
         'name': 'Starter',
         'price': 0,
-        'max_accounts': 5,
+        'price_annual': 0,
+        'max_accounts': 1,
+        'max_videos': 100,
         'max_projects': 1,
         'max_shared_users': 0,
         'platforms': ['tiktok', 'youtube'],
         'instagram': False,
+        'linkedin': False,
         'export_csv': False,
+        'import_csv': False,
+        'competitor_access': False,
+        'analytics_full': False,
     },
     'pro': {
         'name': 'Pro',
         'price': 29,
+        'price_annual': 23,
         'price_id': os.environ.get('STRIPE_PRO_PRICE_ID'),
-        'max_accounts': 20,
+        'price_id_annual': os.environ.get('STRIPE_PRO_ANNUAL_PRICE_ID'),
+        'max_accounts': 5,
+        'max_videos': 1000,
         'max_projects': 5,
         'max_shared_users': 2,
-        'platforms': ['tiktok', 'youtube', 'instagram'],
+        'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
         'instagram': True,
+        'linkedin': True,
         'export_csv': True,
+        'import_csv': False,
+        'competitor_access': False,
+        'analytics_full': False,
     },
     'agency': {
-        'name': 'Agency',
-        'price': 99,
+        'name': 'Entreprises',
+        'price': 79,
+        'price_annual': 63,
         'price_id': os.environ.get('STRIPE_AGENCY_PRICE_ID'),
+        'price_id_annual': os.environ.get('STRIPE_AGENCY_ANNUAL_PRICE_ID'),
         'max_accounts': 9999,
+        'max_videos': 999999,
         'max_projects': 9999,
         'max_shared_users': 9999,
-        'platforms': ['tiktok', 'youtube', 'instagram'],
+        'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
         'instagram': True,
+        'linkedin': True,
         'export_csv': True,
+        'import_csv': True,
+        'competitor_access': True,
+        'analytics_full': True,
     },
 }
 
@@ -75,6 +95,6 @@ def get_subscription(subscription_id):
 
 def get_price_plan(price_id):
     for plan_name, plan in PLANS.items():
-        if plan.get('price_id') == price_id:
+        if plan.get('price_id') == price_id or plan.get('price_id_annual') == price_id:
             return plan_name
     return 'starter'

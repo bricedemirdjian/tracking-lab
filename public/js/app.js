@@ -51,8 +51,47 @@ let state = {
     // Latest videos date filter
     latestDateFrom: null,
     latestDateTo: null,
+    // Activity table sort
+    activitySortBy: "views",
+    activitySortOrder: "DESC",
+    activityAccounts: [],
+    activityPerAccount: [],
+    // Platform filter
+    platformFilter: "all",
+    allAccounts: [],
+    allPerAccount: [],
     // Project accounts modal
     editingProjectId: null,
+    // Competitor state
+    competitorDataLoaded: false,
+    competitorAccounts: [],
+    competitorPerAccount: [],
+    competitorActivitySortBy: "views",
+    competitorActivitySortOrder: "DESC",
+    competitorPlatformFilter: "all",
+    competitorAllAccounts: [],
+    competitorAllPerAccount: [],
+    competitorBestLimit: 10,
+    competitorLatestLimit: 10,
+    // Competitor overview filters
+    cOverviewAccount: "all",
+    cOverviewDateFrom: null,
+    cOverviewDateTo: null,
+    // Competitor charts/table
+    competitorChartsLoaded: false,
+    competitorTableLoaded: false,
+    cTableBestLimit: 5,
+    cTableLatestLimit: 5,
+    cTableLatestDateFrom: null,
+    cTableLatestDateTo: null,
+    // Analytics overview
+    analyticsLoaded: false,
+    aLabProject: "all",
+    aLabDateFrom: null,
+    aLabDateTo: null,
+    aCompAccount: "all",
+    aCompDateFrom: null,
+    aCompDateTo: null,
     // Chart date filters (default: last 7 days)
     viewsChartDateFrom: (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toLocaleDateString('en-CA'); })(),
     viewsChartDateTo: new Date().toLocaleDateString('en-CA'),
@@ -62,13 +101,15 @@ let state = {
 
 // Platform icon helper
 function platformIcon(platform, size = 14) {
+    const uid = Math.random().toString(36).substr(2, 6);
     const svgs = {
-        tiktok: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><path fill="#fff" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/></svg>`,
-        instagram: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><defs><linearGradient id="ig${size}" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#feda75"/><stop offset="25%" style="stop-color:#fa7e1e"/><stop offset="50%" style="stop-color:#d62976"/><stop offset="75%" style="stop-color:#962fbf"/><stop offset="100%" style="stop-color:#4f5bd5"/></linearGradient></defs><rect x="2" y="2" width="20" height="20" rx="5" fill="url(#ig${size})"/><circle cx="12" cy="12" r="5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="17.5" cy="6.5" r="1.2" fill="#fff"/></svg>`,
+        tiktok: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><path fill="#010101" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/></svg>`,
+        instagram: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><defs><linearGradient id="ig${uid}" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#feda75"/><stop offset="25%" style="stop-color:#fa7e1e"/><stop offset="50%" style="stop-color:#d62976"/><stop offset="75%" style="stop-color:#962fbf"/><stop offset="100%" style="stop-color:#4f5bd5"/></linearGradient></defs><rect x="2" y="2" width="20" height="20" rx="5" fill="url(#ig${uid})"/><circle cx="12" cy="12" r="5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="17.5" cy="6.5" r="1.2" fill="#fff"/></svg>`,
         snapchat: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><path fill="#FFFC00" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.19c-.12.27-.47.46-.73.52-.26.06-.54.09-.81.15-.18.04-.37.08-.5.2-.13.12-.2.3-.34.42a1.5 1.5 0 0 1-.87.35c-.38 0-.72-.18-1.08-.33-.5-.21-1.06-.44-1.65-.07a3.8 3.8 0 0 0-1.47 1.34c-.31.46-.67.76-1.13.76-.07 0-.14 0-.21-.02-.73-.15-.88-.93-1.31-1.23-.23-.16-.56-.2-.85-.25-.24-.04-.49-.08-.71-.17-.36-.15-.56-.42-.47-.72.06-.21.23-.36.4-.47.56-.34 1.17-.57 1.63-1.02.38-.37.6-.85.38-1.36-.14-.32-.4-.57-.65-.8-.34-.31-.7-.6-.93-1.01-.32-.55-.27-1.24.21-1.62.29-.23.66-.3 1.02-.27.08.01.16.02.24.04-.02-.46.01-.93.08-1.39.18-1.21.72-2.3 1.63-3.12A4.94 4.94 0 0 1 12 5.5c1.26 0 2.43.47 3.33 1.3.91.82 1.45 1.91 1.63 3.12.07.46.1.93.08 1.39.08-.02.16-.03.24-.04.36-.03.73.04 1.02.27.48.38.53 1.07.21 1.62-.23.41-.59.7-.93 1.01-.25.23-.51.48-.65.8-.22.51 0 .99.38 1.36.46.45 1.07.68 1.63 1.02.17.11.34.26.4.47z"/></svg>`,
-        youtube: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><rect width="24" height="24" rx="4" fill="#FF0000"/><polygon points="10,7.5 16,12 10,16.5" fill="#fff"/></svg>`
+        youtube: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><rect width="24" height="24" rx="4" fill="#FF0000"/><polygon points="10,7.5 16,12 10,16.5" fill="#fff"/></svg>`,
+        linkedin: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M7.5 9.5h-2v7h2v-7zm-1-3.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm10 3.2h-1.9c0 0 0 0 0 0h-.1v7h2v-3.9c0-1.1.4-1.8 1.3-1.8.8 0 1.2.6 1.2 1.8v3.9h2v-4.3c0-2.1-1.1-3.2-2.7-3.2-1.2 0-1.8.6-2.1 1.1V9.5h-.7z"/></svg>`
     };
-    const names = { tiktok: 'TikTok', instagram: 'Instagram', snapchat: 'Snapchat', youtube: 'YouTube Shorts' };
+    const names = { tiktok: 'TikTok', instagram: 'Instagram', snapchat: 'Snapchat', youtube: 'YouTube Shorts', linkedin: 'LinkedIn' };
     const svg = svgs[platform] || svgs.tiktok;
     const name = names[platform] || 'TikTok';
     return `<span title="${name}" style="display:inline-flex;align-items:center">${svg}</span>`;
@@ -138,11 +179,12 @@ async function loadDashboard() {
     try {
         const tableBestLimitVal = state.tableBestLimit === 'all' ? 9999 : state.tableBestLimit;
         const tableLatestLimitVal = state.tableLatestLimit === 'all' ? 9999 : state.tableLatestLimit;
+        const competitorFlag = state.selectedProject === "all" ? "false" : undefined;
         const [accounts, stats, evolution, bestVideos, latestVideos, postsPerDay, tableBest, tableLatest] = await Promise.all([
-            fetchAPI("/api/accounts", { project_id: state.selectedProject }),
-            fetchAPI("/api/stats", params),
+            fetchAPI("/api/accounts", { project_id: state.selectedProject, competitor: competitorFlag }),
+            fetchAPI("/api/stats", { ...params, competitor: competitorFlag }),
             // Evolution chart: filter by account + optional chart date filter
-            fetchAPI("/api/evolution", { account: state.selectedAccount, project_id: state.selectedProject, date_from: state.viewsChartDateFrom, date_to: state.viewsChartDateTo }),
+            fetchAPI("/api/evolution", { account: state.selectedAccount, project_id: state.selectedProject, date_from: state.viewsChartDateFrom, date_to: state.viewsChartDateTo, competitor: competitorFlag }),
             // Best videos: filter by account + optional dedicated date filter
             fetchAPI("/api/best-videos", {
                 account: state.selectedAccount,
@@ -150,6 +192,7 @@ async function loadDashboard() {
                 date_from: state.bestDateFrom,
                 date_to: state.bestDateTo,
                 project_id: state.selectedProject,
+                competitor: competitorFlag,
             }),
             // Latest videos: filter by account + optional dedicated date filter
             fetchAPI("/api/latest-videos", {
@@ -158,13 +201,15 @@ async function loadDashboard() {
                 date_from: state.latestDateFrom,
                 date_to: state.latestDateTo,
                 project_id: state.selectedProject,
+                competitor: competitorFlag,
             }),
-            fetchAPI("/api/posts-per-day", { account: state.selectedAccount, project_id: state.selectedProject, date_from: state.postsChartDateFrom, date_to: state.postsChartDateTo }),
+            fetchAPI("/api/posts-per-day", { account: state.selectedAccount, project_id: state.selectedProject, date_from: state.postsChartDateFrom, date_to: state.postsChartDateTo, competitor: competitorFlag }),
             // Table tab: best videos (same API)
             fetchAPI("/api/best-videos", {
                 account: state.selectedAccount,
                 limit: tableBestLimitVal,
                 project_id: state.selectedProject,
+                competitor: competitorFlag,
             }),
             // Table tab: latest videos (same API)
             fetchAPI("/api/latest-videos", {
@@ -173,6 +218,7 @@ async function loadDashboard() {
                 date_from: state.tableLatestDateFrom,
                 date_to: state.tableLatestDateTo,
                 project_id: state.selectedProject,
+                competitor: competitorFlag,
             }),
         ]);
 
@@ -188,7 +234,8 @@ async function loadDashboard() {
         const badge = document.getElementById("accountsBadge");
         if (badge) badge.textContent = accounts.length + " comptes";
 
-        renderKPIs(stats.global);
+        renderKPIs(stats.global, accounts);
+        renderAccountActivity(accounts, stats.per_account);
         renderAccountCards(accounts, stats.per_account);
         renderBestVideos(bestVideos);
         renderLatestVideos(latestVideos);
@@ -197,6 +244,10 @@ async function loadDashboard() {
         // Table tab: use same API data
         renderVideoCards(tableBest, "tableBestGrid", "tableBestBadge", "Top ");
         renderVideoCards(tableLatest, "tableLatestGrid", "tableLatestBadge", "");
+
+        // Update sidebar badge
+        const sidebarBadge = document.getElementById("sidebarAccountsBadge");
+        if (sidebarBadge) sidebarBadge.textContent = accounts.length;
     } catch (err) {
         console.error("Error loading dashboard:", err);
         showStatus("Erreur de chargement des donnees", "error");
@@ -216,19 +267,38 @@ function populateAccountFilter(accounts) {
     filterSelect.value = currentValue || "all";
 }
 
-// Render KPIs
-function renderKPIs(global) {
+// Render KPIs (8 cards)
+function renderKPIs(global, accounts) {
     document.getElementById("kpiVideos").textContent = formatNumber(global.total_videos);
     document.getElementById("kpiViews").textContent = formatNumber(global.total_views);
     document.getElementById("kpiLikes").textContent = formatNumber(global.total_likes);
     document.getElementById("kpiComments").textContent = formatNumber(global.total_comments);
     document.getElementById("kpiShares").textContent = formatNumber(global.total_shares);
     document.getElementById("kpiEngagement").textContent = global.engagement_rate.toFixed(2) + "%";
+    // New KPIs
+    const activeAccounts = accounts ? accounts.length : 0;
+    document.getElementById("kpiActiveAccounts").textContent = activeAccounts;
+    const avgViews = global.total_videos > 0 ? Math.round(global.total_views / global.total_videos) : 0;
+    document.getElementById("kpiAvgViews").textContent = formatNumber(avgViews);
 }
 
-// Render Account Cards
-function renderAccountCards(accounts, perAccount) {
-    const container = document.getElementById("accountCards");
+// Render Account Activity Table
+function renderAccountActivity(accounts, perAccount) {
+    // Store for re-sorting without re-fetch
+    state.activityAccounts = accounts;
+    state.activityPerAccount = perAccount;
+    renderActivityTableSorted();
+}
+
+function renderActivityTableSorted() {
+    const accounts = state.activityAccounts;
+    const perAccount = state.activityPerAccount;
+    const tbody = document.getElementById("accountActivityBody");
+    const badge = document.getElementById("activityBadge");
+    if (!tbody) return;
+
+    if (badge) badge.textContent = accounts.length + " comptes";
+
     const statsMap = {};
     perAccount.forEach(s => {
         const key = s.account_username + ":" + (s.platform || "tiktok");
@@ -236,10 +306,164 @@ function renderAccountCards(accounts, perAccount) {
     });
 
     if (accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#86868b">Aucun compte suivi. Ajoutez des comptes pour commencer.</td></tr>';
+        return;
+    }
+
+    // Build enriched rows for sorting
+    const rows = accounts.map(account => {
+        const s = statsMap[account.username + ":" + (account.platform || "tiktok")] || {};
+        const totalEng = (s.total_likes||0) + (s.total_comments||0) + (s.total_shares||0) + (s.total_saves||0);
+        const engRate = (s.total_views||0) > 0 ? ((totalEng / s.total_views) * 100) : 0;
+        const avgViews = (s.total_videos||0) > 0 ? Math.round((s.total_views||0) / s.total_videos) : 0;
+        return {
+            account,
+            stats: s,
+            name: (account.display_name || account.username).toLowerCase(),
+            videos: s.total_videos || 0,
+            views: s.total_views || 0,
+            likes: s.total_likes || 0,
+            engagement: engRate,
+            avg_views: avgViews,
+        };
+    });
+
+    // Sort
+    const sortKey = state.activitySortBy;
+    const sortDir = state.activitySortOrder === "ASC" ? 1 : -1;
+    rows.sort((a, b) => {
+        if (sortKey === "name") {
+            return a.name < b.name ? -1 * sortDir : a.name > b.name ? 1 * sortDir : 0;
+        }
+        return (a[sortKey] - b[sortKey]) * sortDir;
+    });
+
+    // Update header indicators
+    document.querySelectorAll(".activity-table thead th.sortable").forEach(th => {
+        const col = th.dataset.sort;
+        const indicator = th.querySelector(".sort-indicator");
+        const arrows = th.querySelector(".sort-arrows");
+        if (col === sortKey) {
+            th.classList.add("sorted");
+            indicator.textContent = state.activitySortOrder === "DESC" ? " \u25BC" : " \u25B2";
+            if (arrows) arrows.style.display = "none";
+        } else {
+            th.classList.remove("sorted");
+            indicator.textContent = "";
+            if (arrows) arrows.style.display = "";
+        }
+    });
+
+    // Max engagement for bar scaling
+    const maxEng = Math.max(1, ...rows.map(r => r.engagement));
+
+    tbody.innerHTML = rows.map(row => {
+        const account = row.account;
+        const s = row.stats;
+        const color = getAccountColor(account.username);
+        const initial = account.username.charAt(0).toUpperCase();
+        const displayName = account.display_name || account.username;
+        const pIcon = platformIcon(account.platform, 14);
+
+        const engRate = row.engagement;
+        const engClass = engRate >= 5 ? "eng-high" : engRate >= 2 ? "eng-mid" : "eng-low";
+        const engBarColor = engRate >= 5 ? "var(--success)" : engRate >= 2 ? "var(--warning)" : "var(--accent)";
+        const engBarWidth = Math.min(100, (engRate / Math.min(maxEng, 15)) * 100);
+
+        return `<tr onclick="selectAccount('${account.username}')">
+            <td>
+                <div class="activity-account">
+                    <div class="activity-avatar" style="background:${color}">${initial}</div>
+                    <div class="activity-account-info">
+                        <div class="activity-account-name">${pIcon} ${displayName}</div>
+                        <div class="activity-account-handle">@${account.username}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="text-center"><span class="activity-videos-count">${row.videos}</span></td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.views) || "0"}</span></td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.likes) || "0"}</span></td>
+            <td class="text-right">
+                <div class="activity-eng">
+                    <span class="activity-eng-value ${engClass}">${engRate.toFixed(2)}%</span>
+                    <div class="activity-eng-bar"><div class="activity-eng-bar-fill" style="width:${engBarWidth}%;background:${engBarColor}"></div></div>
+                </div>
+            </td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.avg_views) || "0"}</span></td>
+        </tr>`;
+    }).join("");
+}
+
+function sortActivityTable(column) {
+    if (state.activitySortBy === column) {
+        state.activitySortOrder = state.activitySortOrder === "DESC" ? "ASC" : "DESC";
+    } else {
+        state.activitySortBy = column;
+        state.activitySortOrder = "DESC";
+    }
+    renderActivityTableSorted();
+}
+
+// Render Account Cards
+function renderAccountCards(accounts, perAccount) {
+    // Store for platform filtering
+    state.allAccounts = accounts;
+    state.allPerAccount = perAccount;
+    updatePlatformCounts(accounts);
+    renderAccountCardsFiltered();
+}
+
+function updatePlatformCounts(accounts) {
+    const counts = { tiktok: 0, instagram: 0, youtube: 0 };
+    accounts.forEach(a => {
+        const p = a.platform || "tiktok";
+        if (counts[p] !== undefined) counts[p]++;
+    });
+    const elTT = document.getElementById("countTiktok");
+    const elIG = document.getElementById("countInstagram");
+    const elYT = document.getElementById("countYoutube");
+    if (elTT) elTT.textContent = counts.tiktok;
+    if (elIG) elIG.textContent = counts.instagram;
+    if (elYT) elYT.textContent = counts.youtube;
+}
+
+function filterByPlatform(platform) {
+    state.platformFilter = platform;
+    document.querySelectorAll(".platform-pill").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.platform === platform);
+    });
+    renderAccountCardsFiltered();
+}
+
+function renderAccountCardsFiltered() {
+    const accounts = state.platformFilter === "all"
+        ? state.allAccounts
+        : state.allAccounts.filter(a => (a.platform || "tiktok") === state.platformFilter);
+    const perAccount = state.allPerAccount;
+
+    const container = document.getElementById("accountCards");
+    if (!container) return;
+    const statsMap = {};
+    perAccount.forEach(s => {
+        const key = s.account_username + ":" + (s.platform || "tiktok");
+        statsMap[key] = s;
+    });
+
+    // Update badge
+    const badge = document.getElementById("accountsBadge");
+    if (badge) {
+        if (state.platformFilter === "all") {
+            badge.textContent = state.allAccounts.length + " comptes";
+        } else {
+            badge.textContent = accounts.length + " / " + state.allAccounts.length + " comptes";
+        }
+    }
+
+    if (accounts.length === 0) {
         container.innerHTML = `
-            <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+            <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">
                 <p style="font-size:32px;margin-bottom:12px">&#128269;</p>
-                <p>Aucun compte suivi. Cliquez sur <strong>"Gerer les comptes"</strong> pour ajouter des comptes TikTok.</p>
+                <p>Aucun compte${state.platformFilter !== 'all' ? ' sur cette plateforme' : ' suivi'}.</p>
             </div>
         `;
         return;
@@ -1064,19 +1288,73 @@ function selectAccount(username) {
     loadDashboard();
 }
 
-function switchTab(tabName) {
-    state.activeTab = tabName;
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.tab === tabName);
+// Sidebar page navigation
+function switchPage(pageName) {
+    state.activeTab = pageName;
+    // Update sidebar nav
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.page === pageName);
     });
-    document.querySelectorAll(".tab-content").forEach(el => {
-        el.classList.toggle("active", el.id === "tab-" + tabName);
+    // Update page visibility
+    document.querySelectorAll(".page").forEach(el => {
+        el.classList.toggle("active", el.id === "page-" + pageName);
     });
-    if (tabName === "overview" || tabName === "charts") {
+    // Resize charts when switching to a page with charts
+    if (pageName === "overview" || pageName === "table" || pageName === "c-table") {
         setTimeout(() => {
             Object.values(state.charts).forEach(c => c && c.resize && c.resize());
         }, 100);
     }
+    // Load analytics overview on first visit
+    if (pageName === "analytics" && !state.analyticsLoaded) {
+        loadAnalyticsOverview();
+    }
+    // Load competitor data on first visit to any competitor page
+    if (pageName.startsWith("c-") && !state.competitorDataLoaded) {
+        loadCompetitorDashboard();
+    }
+    // Load competitor charts + table on first visit
+    if (pageName === "c-table") {
+        if (!state.competitorChartsLoaded) loadCompetitorChartsData();
+        if (!state.competitorTableLoaded) loadCompetitorTableData();
+    }
+    // Close sidebar on mobile
+    closeSidebar();
+}
+
+// Legacy support
+function switchTab(tabName) {
+    switchPage(tabName);
+}
+
+// Sidebar toggle (mobile)
+function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    sidebar.classList.toggle("open");
+    if (overlay) overlay.classList.toggle("active");
+}
+
+function closeSidebar() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById("sidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        sidebar.classList.remove("open");
+        if (overlay) overlay.classList.remove("active");
+    }
+}
+
+// Reset all filters
+function resetAllFilters() {
+    state.dateFrom = null;
+    state.dateTo = null;
+    state.selectedAccount = "all";
+    state.selectedProject = "all";
+    document.getElementById("filterDateFrom").value = "";
+    document.getElementById("filterDateTo").value = "";
+    document.getElementById("filterAccount").value = "all";
+    document.getElementById("filterProject").value = "all";
+    loadDashboard();
 }
 
 function sortTable(column) {
@@ -1264,7 +1542,7 @@ async function addAccount() {
         input.value = "";
         loadAccountsList();
         loadDashboard();
-        showStatus(`Compte @${username} ajoute ! Scraping en cours...`, "success");
+        showStatus(`Compte @${username} ajouté ! Scraping en cours...`, "success");
         // Poll for new data every 5s until account has videos
         let pollCount = 0;
         const addPoll = setInterval(async () => {
@@ -1294,7 +1572,7 @@ async function removeAccount(username) {
         }
         loadAccountsList();
         loadDashboard();
-        showStatus(`Compte @${username} supprime`, "success");
+        showStatus(`Compte @${username} supprimé`, "success");
     } catch (err) {
         showStatus("Erreur lors de la suppression", "error");
     }
@@ -1369,9 +1647,9 @@ async function createNewProject() {
         input.value = "";
         loadProjectsList();
         loadProjects();
-        showStatus(`Projet "${name}" cree !`, "success");
+        showStatus(`Projet "${name}" créé !`, "success");
     } catch (err) {
-        showStatus("Erreur lors de la creation du projet", "error");
+        showStatus("Erreur lors de la création du projet", "error");
     }
 }
 
@@ -1393,7 +1671,7 @@ async function promptRenameProject(projectId, currentName) {
 }
 
 async function deleteProjectConfirm(projectId, name) {
-    if (!confirm(`Supprimer le projet "${name}" ? Les comptes ne seront pas supprimes.`)) return;
+    if (!confirm(`Supprimer le projet "${name}" ? Les comptes ne seront pas supprimés.`)) return;
     try {
         await fetch(`/api/projects/${projectId}/delete`, {
             method: "POST",
@@ -1406,7 +1684,7 @@ async function deleteProjectConfirm(projectId, name) {
             document.getElementById("filterProject").value = "all";
             loadDashboard();
         }
-        showStatus(`Projet "${name}" supprime`, "success");
+        showStatus(`Projet "${name}" supprimé`, "success");
     } catch (err) {
         showStatus("Erreur lors de la suppression", "error");
     }
@@ -1454,10 +1732,783 @@ async function saveCurrentProjectAccounts() {
             body: JSON.stringify({ account_ids: accountIds })
         });
         closeProjectAccountsModal();
-        showStatus("Comptes du projet mis a jour !", "success");
+        showStatus("Comptes du projet mis à jour !", "success");
         loadDashboard();
     } catch (err) {
         showStatus("Erreur lors de la sauvegarde", "error");
+    }
+}
+
+// ==================== Analytics Overview (Lab + Concurrents) ====================
+
+async function loadAnalyticsOverview() {
+    await Promise.all([loadAnalyticsLab(), loadAnalyticsComp()]);
+    state.analyticsLoaded = true;
+}
+
+async function loadAnalyticsLab() {
+    try {
+        const projectParam = state.aLabProject !== "all" ? state.aLabProject : undefined;
+        const [accounts, stats, projects] = await Promise.all([
+            fetchAPI("/api/accounts", { competitor: "false", project_id: projectParam }),
+            fetchAPI("/api/stats", {
+                competitor: "false",
+                project_id: projectParam,
+                date_from: state.aLabDateFrom,
+                date_to: state.aLabDateTo,
+            }),
+            fetchAPI("/api/projects"),
+        ]);
+        if (!accounts) return;
+
+        // Populate project filter dropdown
+        const sel = document.getElementById("a-labProject");
+        if (sel) {
+            const cur = sel.value;
+            sel.innerHTML = '<option value="all">Tous les projets</option>';
+            if (projects) {
+                projects.forEach(p => {
+                    const opt = document.createElement("option");
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+            }
+            sel.value = cur || "all";
+        }
+
+        const g = stats.global;
+        document.getElementById("a-labCount").textContent = accounts.length + " comptes";
+        document.getElementById("a-labVideos").textContent = formatNumber(g.total_videos);
+        document.getElementById("a-labViews").textContent = formatNumber(g.total_views);
+        document.getElementById("a-labLikes").textContent = formatNumber(g.total_likes);
+        document.getElementById("a-labEngagement").textContent = g.engagement_rate.toFixed(2) + "%";
+        document.getElementById("a-labComments").textContent = formatNumber(g.total_comments);
+        document.getElementById("a-labShares").textContent = formatNumber(g.total_shares);
+        const avg = g.total_videos > 0 ? Math.round(g.total_views / g.total_videos) : 0;
+        document.getElementById("a-labAvgViews").textContent = formatNumber(avg);
+        document.getElementById("a-labAccounts").textContent = accounts.length;
+
+        assignColors(accounts);
+        renderAnalyticsActivityTable(accounts, stats.per_account, "a-labActivityBody");
+    } catch (err) {
+        console.error("Error loading analytics lab:", err);
+    }
+}
+
+async function loadAnalyticsComp() {
+    try {
+        const [accounts, stats] = await Promise.all([
+            fetchAPI("/api/accounts", { competitor: "true" }),
+            fetchAPI("/api/stats", {
+                competitor: "true",
+                account: state.aCompAccount,
+                date_from: state.aCompDateFrom,
+                date_to: state.aCompDateTo,
+            }),
+        ]);
+        if (!accounts) return;
+
+        // Populate account filter dropdown
+        const sel = document.getElementById("a-compAccount");
+        if (sel) {
+            const cur = sel.value;
+            sel.innerHTML = '<option value="all">Tous les comptes</option>';
+            accounts.forEach(a => {
+                const opt = document.createElement("option");
+                opt.value = a.username;
+                opt.textContent = "@" + a.username;
+                sel.appendChild(opt);
+            });
+            sel.value = cur || "all";
+        }
+
+        const g = stats.global;
+        document.getElementById("a-compCount").textContent = accounts.length + " comptes";
+        document.getElementById("a-compVideos").textContent = formatNumber(g.total_videos);
+        document.getElementById("a-compViews").textContent = formatNumber(g.total_views);
+        document.getElementById("a-compLikes").textContent = formatNumber(g.total_likes);
+        document.getElementById("a-compEngagement").textContent = g.engagement_rate.toFixed(2) + "%";
+        document.getElementById("a-compComments").textContent = formatNumber(g.total_comments);
+        document.getElementById("a-compShares").textContent = formatNumber(g.total_shares);
+        const avg = g.total_videos > 0 ? Math.round(g.total_views / g.total_videos) : 0;
+        document.getElementById("a-compAvgViews").textContent = formatNumber(avg);
+        document.getElementById("a-compAccounts").textContent = accounts.length;
+
+        assignColors(accounts);
+        renderAnalyticsActivityTable(accounts, stats.per_account, "a-compActivityBody");
+    } catch (err) {
+        console.error("Error loading analytics comp:", err);
+    }
+}
+
+function onAnalyticsLabFilter() {
+    state.aLabProject = document.getElementById("a-labProject").value;
+    state.aLabDateFrom = document.getElementById("a-labDateFrom").value || null;
+    state.aLabDateTo = document.getElementById("a-labDateTo").value || null;
+    loadAnalyticsLab();
+}
+
+function resetAnalyticsLabFilter() {
+    state.aLabProject = "all";
+    state.aLabDateFrom = null;
+    state.aLabDateTo = null;
+    document.getElementById("a-labProject").value = "all";
+    document.getElementById("a-labDateFrom").value = "";
+    document.getElementById("a-labDateTo").value = "";
+    loadAnalyticsLab();
+}
+
+function onAnalyticsCompFilter() {
+    state.aCompAccount = document.getElementById("a-compAccount").value;
+    state.aCompDateFrom = document.getElementById("a-compDateFrom").value || null;
+    state.aCompDateTo = document.getElementById("a-compDateTo").value || null;
+    loadAnalyticsComp();
+}
+
+function resetAnalyticsCompFilter() {
+    state.aCompAccount = "all";
+    state.aCompDateFrom = null;
+    state.aCompDateTo = null;
+    document.getElementById("a-compAccount").value = "all";
+    document.getElementById("a-compDateFrom").value = "";
+    document.getElementById("a-compDateTo").value = "";
+    loadAnalyticsComp();
+}
+
+function renderAnalyticsActivityTable(accounts, perAccount, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    const statsMap = {};
+    perAccount.forEach(s => {
+        const key = s.account_username + ":" + (s.platform || "tiktok");
+        statsMap[key] = s;
+    });
+
+    if (accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="a-table-empty">Aucun compte</td></tr>';
+        return;
+    }
+
+    // Build rows sorted by views DESC, show top 5
+    const rows = accounts.map(account => {
+        const s = statsMap[account.username + ":" + (account.platform || "tiktok")] || {};
+        const totalEng = (s.total_likes||0) + (s.total_comments||0) + (s.total_shares||0) + (s.total_saves||0);
+        const engRate = (s.total_views||0) > 0 ? ((totalEng / s.total_views) * 100) : 0;
+        return { account, views: s.total_views || 0, likes: s.total_likes || 0, engagement: engRate };
+    }).sort((a, b) => b.views - a.views).slice(0, 5);
+
+    assignColors(accounts);
+
+    tbody.innerHTML = rows.map(row => {
+        const a = row.account;
+        const color = getAccountColor(a.username);
+        const initial = a.username.charAt(0).toUpperCase();
+        const displayName = a.display_name || a.username;
+        const pIcon = platformIcon(a.platform, 12);
+        const engClass = row.engagement >= 5 ? "eng-high" : row.engagement >= 2 ? "eng-mid" : "eng-low";
+
+        return `<tr>
+            <td>
+                <div class="activity-account">
+                    <div class="activity-avatar" style="background:${color}">${initial}</div>
+                    <div class="activity-account-info">
+                        <div class="activity-account-name">${pIcon} ${displayName}</div>
+                        <div class="activity-account-handle">@${a.username}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="text-right">${formatCompact(row.views) || "0"}</td>
+            <td class="text-right">${formatCompact(row.likes) || "0"}</td>
+            <td class="text-right"><span class="${engClass}">${row.engagement.toFixed(2)}%</span></td>
+        </tr>`;
+    }).join("");
+}
+
+// ==================== Competitor Dashboard ====================
+
+async function loadCompetitorDashboard() {
+    try {
+        const filterParams = {
+            competitor: "true",
+            account: state.cOverviewAccount !== "all" ? state.cOverviewAccount : undefined,
+            date_from: state.cOverviewDateFrom,
+            date_to: state.cOverviewDateTo,
+        };
+        const [accounts, stats, bestVideos, latestVideos] = await Promise.all([
+            fetchAPI("/api/accounts", { competitor: "true" }),
+            fetchAPI("/api/stats", filterParams),
+            fetchAPI("/api/best-videos", { ...filterParams, limit: state.competitorBestLimit }),
+            fetchAPI("/api/latest-videos", { ...filterParams, limit: state.competitorLatestLimit }),
+        ]);
+        if (!accounts) return;
+
+        // Assign colors for competitor accounts
+        assignColors(accounts);
+
+        // Store competitor data
+        state.competitorAccounts = accounts;
+
+        // Populate competitor overview account filter
+        populateCompOverviewAccountFilter(accounts);
+
+        // Update sidebar badge
+        const badge = document.getElementById("sidebarCompetitorsBadge");
+        if (badge) badge.textContent = accounts.length;
+
+        // Render KPIs
+        renderCompetitorKPIs(stats.global, accounts);
+
+        // Render activity table
+        state.competitorAccounts = accounts;
+        state.competitorPerAccount = stats.per_account;
+        renderCompetitorActivitySorted();
+
+        // Render account cards
+        state.competitorAllAccounts = accounts;
+        state.competitorAllPerAccount = stats.per_account;
+        updateCompetitorPlatformCounts(accounts);
+        renderCompetitorAccountCardsFiltered();
+
+        // Render videos
+        renderVideoCards(bestVideos, "c-bestVideosGrid", "c-bestVideosBadge", "Top ");
+        renderVideoCards(latestVideos, "c-latestVideosGrid", "c-latestVideosBadge", "");
+
+        state.competitorDataLoaded = true;
+    } catch (err) {
+        console.error("Error loading competitor dashboard:", err);
+    }
+}
+
+function renderCompetitorKPIs(global, accounts) {
+    const el = id => document.getElementById(id);
+    if (!el("c-kpiVideos")) return;
+    el("c-kpiVideos").textContent = formatNumber(global.total_videos);
+    el("c-kpiViews").textContent = formatNumber(global.total_views);
+    el("c-kpiLikes").textContent = formatNumber(global.total_likes);
+    el("c-kpiComments").textContent = formatNumber(global.total_comments);
+    el("c-kpiShares").textContent = formatNumber(global.total_shares);
+    el("c-kpiEngagement").textContent = global.engagement_rate.toFixed(2) + "%";
+    el("c-kpiActiveAccounts").textContent = accounts ? accounts.length : 0;
+    const avgViews = global.total_videos > 0 ? Math.round(global.total_views / global.total_videos) : 0;
+    el("c-kpiAvgViews").textContent = formatNumber(avgViews);
+}
+
+function renderCompetitorActivitySorted() {
+    const accounts = state.competitorAccounts;
+    const perAccount = state.competitorPerAccount;
+    const tbody = document.getElementById("c-accountActivityBody");
+    const badge = document.getElementById("c-activityBadge");
+    if (!tbody) return;
+
+    if (badge) badge.textContent = accounts.length + " comptes";
+
+    const statsMap = {};
+    perAccount.forEach(s => {
+        const key = s.account_username + ":" + (s.platform || "tiktok");
+        statsMap[key] = s;
+    });
+
+    if (accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#86868b">Aucun concurrent suivi. Ajoutez des comptes concurrents pour commencer.</td></tr>';
+        return;
+    }
+
+    const rows = accounts.map(account => {
+        const s = statsMap[account.username + ":" + (account.platform || "tiktok")] || {};
+        const totalEng = (s.total_likes||0) + (s.total_comments||0) + (s.total_shares||0) + (s.total_saves||0);
+        const engRate = (s.total_views||0) > 0 ? ((totalEng / s.total_views) * 100) : 0;
+        const avgViews = (s.total_videos||0) > 0 ? Math.round((s.total_views||0) / s.total_videos) : 0;
+        return {
+            account, stats: s,
+            name: (account.display_name || account.username).toLowerCase(),
+            videos: s.total_videos || 0,
+            views: s.total_views || 0,
+            likes: s.total_likes || 0,
+            engagement: engRate,
+            avg_views: avgViews,
+        };
+    });
+
+    const sortKey = state.competitorActivitySortBy;
+    const sortDir = state.competitorActivitySortOrder === "ASC" ? 1 : -1;
+    rows.sort((a, b) => {
+        if (sortKey === "name") return a.name < b.name ? -1 * sortDir : a.name > b.name ? 1 * sortDir : 0;
+        return (a[sortKey] - b[sortKey]) * sortDir;
+    });
+
+    // Update header indicators for competitor table
+    const table = tbody.closest(".activity-table");
+    if (table) {
+        table.querySelectorAll("thead th.sortable").forEach(th => {
+            const col = th.dataset.sort;
+            const indicator = th.querySelector(".sort-indicator");
+            const arrows = th.querySelector(".sort-arrows");
+            if (col === sortKey) {
+                th.classList.add("sorted");
+                indicator.textContent = state.competitorActivitySortOrder === "DESC" ? " \u25BC" : " \u25B2";
+                if (arrows) arrows.style.display = "none";
+            } else {
+                th.classList.remove("sorted");
+                indicator.textContent = "";
+                if (arrows) arrows.style.display = "";
+            }
+        });
+    }
+
+    const maxEng = Math.max(1, ...rows.map(r => r.engagement));
+
+    tbody.innerHTML = rows.map(row => {
+        const account = row.account;
+        const color = getAccountColor(account.username);
+        const initial = account.username.charAt(0).toUpperCase();
+        const displayName = account.display_name || account.username;
+        const pIcon = platformIcon(account.platform, 14);
+        const engRate = row.engagement;
+        const engClass = engRate >= 5 ? "eng-high" : engRate >= 2 ? "eng-mid" : "eng-low";
+        const engBarColor = engRate >= 5 ? "var(--success)" : engRate >= 2 ? "var(--warning)" : "var(--accent)";
+        const engBarWidth = Math.min(100, (engRate / Math.min(maxEng, 15)) * 100);
+
+        return `<tr>
+            <td>
+                <div class="activity-account">
+                    <div class="activity-avatar" style="background:${color}">${initial}</div>
+                    <div class="activity-account-info">
+                        <div class="activity-account-name">${pIcon} ${displayName}</div>
+                        <div class="activity-account-handle">@${account.username}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="text-center"><span class="activity-videos-count">${row.videos}</span></td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.views) || "0"}</span></td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.likes) || "0"}</span></td>
+            <td class="text-right">
+                <div class="activity-eng">
+                    <span class="activity-eng-value ${engClass}">${engRate.toFixed(2)}%</span>
+                    <div class="activity-eng-bar"><div class="activity-eng-bar-fill" style="width:${engBarWidth}%;background:${engBarColor}"></div></div>
+                </div>
+            </td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.avg_views) || "0"}</span></td>
+        </tr>`;
+    }).join("");
+}
+
+function sortCompetitorActivityTable(column) {
+    if (state.competitorActivitySortBy === column) {
+        state.competitorActivitySortOrder = state.competitorActivitySortOrder === "DESC" ? "ASC" : "DESC";
+    } else {
+        state.competitorActivitySortBy = column;
+        state.competitorActivitySortOrder = "DESC";
+    }
+    renderCompetitorActivitySorted();
+}
+
+// Competitor overview filter functions
+function populateCompOverviewAccountFilter(accounts) {
+    const select = document.getElementById("c-overviewAccount");
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '<option value="all">Tous les comptes</option>';
+    accounts.forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = a.username;
+        opt.textContent = "@" + a.username;
+        select.appendChild(opt);
+    });
+    select.value = current || "all";
+}
+
+function onCompOverviewFilter() {
+    const account = document.getElementById("c-overviewAccount");
+    const dateFrom = document.getElementById("c-overviewDateFrom");
+    const dateTo = document.getElementById("c-overviewDateTo");
+    if (account) state.cOverviewAccount = account.value;
+    if (dateFrom) state.cOverviewDateFrom = dateFrom.value || null;
+    if (dateTo) state.cOverviewDateTo = dateTo.value || null;
+    loadCompetitorDashboard();
+}
+
+function resetCompOverviewFilter() {
+    state.cOverviewAccount = "all";
+    state.cOverviewDateFrom = null;
+    state.cOverviewDateTo = null;
+    const account = document.getElementById("c-overviewAccount");
+    const dateFrom = document.getElementById("c-overviewDateFrom");
+    const dateTo = document.getElementById("c-overviewDateTo");
+    if (account) account.value = "all";
+    if (dateFrom) dateFrom.value = "";
+    if (dateTo) dateTo.value = "";
+    loadCompetitorDashboard();
+}
+
+// ==================== Competitor Charts ====================
+
+async function loadCompetitorChartsData() {
+    try {
+        const [stats, evolution] = await Promise.all([
+            fetchAPI("/api/stats", { competitor: "true" }),
+            fetchAPI("/api/evolution", { competitor: "true" }),
+        ]);
+        if (!stats) return;
+        renderCompetitorCharts(stats, evolution);
+        state.competitorChartsLoaded = true;
+    } catch (err) {
+        console.error("Error loading competitor charts:", err);
+    }
+}
+
+function renderCompetitorCharts(stats, evolution) {
+    const perAccount = stats.per_account || [];
+    const global = stats.global || {};
+
+    // Timeline chart
+    renderGenericTimelineChart(evolution, "c-timelineChart", "cTimeline");
+
+    // Likes per account
+    simpleBarChart("c-likesPerAccountChart", "cLikesPA",
+        perAccount.map(a => accountLabel(a.account_username, a.platform)),
+        perAccount.map(a => a.total_likes),
+        perAccount.map(a => getAccountColor(a.account_username)),
+        "Likes", "likes"
+    );
+
+    // Content per account (doughnut)
+    renderGenericContentDoughnut(perAccount, "c-contentPerAccountChart", "cContentPA");
+
+    // Avg views per account
+    simpleBarChart("c-avgViewsChart", "cAvgViewsPA",
+        perAccount.map(a => accountLabel(a.account_username, a.platform)),
+        perAccount.map(a => a.total_videos > 0 ? Math.round(a.total_views / a.total_videos) : 0),
+        perAccount.map(a => getAccountColor(a.account_username)),
+        "Moy. vues/video", "vues/video"
+    );
+
+    // Shares per account
+    simpleBarChart("c-sharesPerAccountChart", "cSharesPA",
+        perAccount.map(a => accountLabel(a.account_username, a.platform)),
+        perAccount.map(a => a.total_shares),
+        perAccount.map(a => getAccountColor(a.account_username)),
+        "Partages", "partages"
+    );
+
+    // Comments per account
+    simpleBarChart("c-commentsPerAccountChart", "cCommentsPA",
+        perAccount.map(a => accountLabel(a.account_username, a.platform)),
+        perAccount.map(a => a.total_comments),
+        perAccount.map(a => getAccountColor(a.account_username)),
+        "Commentaires", "commentaires"
+    );
+}
+
+function renderGenericTimelineChart(evolution, canvasId, chartKey) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (state.charts[chartKey]) state.charts[chartKey].destroy();
+
+    const dateMap = {};
+    evolution.forEach(d => {
+        if (!dateMap[d.date]) dateMap[d.date] = { likes: 0, comments: 0, shares: 0 };
+        dateMap[d.date].likes += d.likes || 0;
+        dateMap[d.date].comments += d.comments || 0;
+        dateMap[d.date].shares += d.shares || 0;
+    });
+
+    const dates = Object.keys(dateMap).sort();
+    state.charts[chartKey] = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: dates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }); }),
+            datasets: [
+                { label: "Likes", data: dates.map(d => dateMap[d].likes), borderColor: "#fe2c55", backgroundColor: "rgba(254,44,85,0.1)", tension: 0.3, fill: true },
+                { label: "Commentaires", data: dates.map(d => dateMap[d].comments), borderColor: "#25f4ee", backgroundColor: "rgba(37,244,238,0.1)", tension: 0.3, fill: true },
+                { label: "Partages", data: dates.map(d => dateMap[d].shares), borderColor: "#ffaa00", backgroundColor: "rgba(255,170,0,0.1)", tension: 0.3, fill: true },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: "#8888aa", font: { size: 11 } } },
+                tooltip: { backgroundColor: "#1a1a2e", titleColor: "#f0f0f5", bodyColor: "#8888aa", borderColor: "#2a2a40", borderWidth: 1, callbacks: { label: ctx => ctx.dataset.label + ": " + formatNumber(ctx.raw) } },
+                datalabels: { display: false },
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: "#8888aa", font: { size: 10 }, maxTicksLimit: 10 } },
+                y: { grid: { color: "#1a1a2e" }, ticks: { color: "#555570", callback: v => formatNumber(v) } },
+            },
+        },
+    });
+}
+
+function renderGenericContentDoughnut(perAccount, canvasId, chartKey) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (state.charts[chartKey]) state.charts[chartKey].destroy();
+    const usernames = perAccount.map(a => accountLabel(a.account_username, a.platform));
+    const colors = perAccount.map(a => getAccountColor(a.account_username));
+    state.charts[chartKey] = new Chart(ctx, {
+        type: "doughnut",
+        data: { labels: usernames, datasets: [{ data: perAccount.map(a => a.total_videos), backgroundColor: colors.map(c => c + "cc"), borderColor: "#1a1a2e", borderWidth: 3 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom", labels: { color: "#8888aa", font: { size: 11 }, padding: 12 } },
+                tooltip: { backgroundColor: "#1a1a2e", titleColor: "#f0f0f5", bodyColor: "#8888aa", borderColor: "#2a2a40", borderWidth: 1, callbacks: { label: ctx => ctx.label + ": " + ctx.raw + " videos" } },
+                datalabels: { color: "#fff", font: { size: 13, weight: "bold" }, formatter: v => v > 0 ? v : "", display: ctx => ctx.dataset.data[ctx.dataIndex] > 0 },
+            },
+            cutout: "55%",
+        },
+    });
+}
+
+// ==================== Competitor Table ====================
+
+async function loadCompetitorTableData() {
+    try {
+        const bestLimitVal = state.cTableBestLimit === 'all' ? 9999 : state.cTableBestLimit;
+        const latestLimitVal = state.cTableLatestLimit === 'all' ? 9999 : state.cTableLatestLimit;
+        const [best, latest] = await Promise.all([
+            fetchAPI("/api/best-videos", { competitor: "true", limit: bestLimitVal }),
+            fetchAPI("/api/latest-videos", {
+                competitor: "true",
+                limit: latestLimitVal,
+                date_from: state.cTableLatestDateFrom,
+                date_to: state.cTableLatestDateTo,
+            }),
+        ]);
+        if (!best) return;
+        renderVideoCards(best, "c-tableBestGrid", "c-tableBestBadge", "Top ");
+        renderVideoCards(latest, "c-tableLatestGrid", "c-tableLatestBadge", "");
+        state.competitorTableLoaded = true;
+    } catch (err) {
+        console.error("Error loading competitor table:", err);
+    }
+}
+
+function setCTableBestLimit(n) {
+    state.cTableBestLimit = n;
+    document.querySelectorAll("#c-tableBestLimit .limit-btn").forEach(b => b.classList.toggle("active", b.dataset.limit === String(n)));
+    state.competitorTableLoaded = false;
+    loadCompetitorTableData();
+}
+
+function setCTableLatestLimit(n) {
+    state.cTableLatestLimit = n;
+    document.querySelectorAll("#c-tableLatestLimit .limit-btn").forEach(b => b.classList.toggle("active", b.dataset.limit === String(n)));
+    state.competitorTableLoaded = false;
+    loadCompetitorTableData();
+}
+
+function onCTableLatestDateFilter() {
+    state.cTableLatestDateFrom = document.getElementById("c-tableLatestDateFrom").value || null;
+    state.cTableLatestDateTo = document.getElementById("c-tableLatestDateTo").value || null;
+    state.competitorTableLoaded = false;
+    loadCompetitorTableData();
+}
+
+function clearCTableLatestDateFilter() {
+    state.cTableLatestDateFrom = null;
+    state.cTableLatestDateTo = null;
+    document.getElementById("c-tableLatestDateFrom").value = "";
+    document.getElementById("c-tableLatestDateTo").value = "";
+    state.competitorTableLoaded = false;
+    loadCompetitorTableData();
+}
+
+function updateCompetitorPlatformCounts(accounts) {
+    const counts = { tiktok: 0, instagram: 0, youtube: 0 };
+    accounts.forEach(a => {
+        const p = a.platform || "tiktok";
+        if (counts[p] !== undefined) counts[p]++;
+    });
+    const el = id => document.getElementById(id);
+    if (el("c-countTiktok")) el("c-countTiktok").textContent = counts.tiktok;
+    if (el("c-countInstagram")) el("c-countInstagram").textContent = counts.instagram;
+    if (el("c-countYoutube")) el("c-countYoutube").textContent = counts.youtube;
+}
+
+function filterCompetitorByPlatform(platform) {
+    state.competitorPlatformFilter = platform;
+    const container = document.getElementById("c-platformFilters");
+    if (container) {
+        container.querySelectorAll(".platform-pill").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.platform === platform);
+        });
+    }
+    renderCompetitorAccountCardsFiltered();
+}
+
+function renderCompetitorAccountCardsFiltered() {
+    const accounts = state.competitorPlatformFilter === "all"
+        ? state.competitorAllAccounts
+        : state.competitorAllAccounts.filter(a => (a.platform || "tiktok") === state.competitorPlatformFilter);
+    const perAccount = state.competitorAllPerAccount;
+
+    const container = document.getElementById("c-accountCards");
+    if (!container) return;
+    const statsMap = {};
+    perAccount.forEach(s => {
+        const key = s.account_username + ":" + (s.platform || "tiktok");
+        statsMap[key] = s;
+    });
+
+    const badge = document.getElementById("c-accountsBadge");
+    if (badge) {
+        if (state.competitorPlatformFilter === "all") {
+            badge.textContent = state.competitorAllAccounts.length + " comptes";
+        } else {
+            badge.textContent = accounts.length + " / " + state.competitorAllAccounts.length + " comptes";
+        }
+    }
+
+    if (accounts.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">
+                <p style="font-size:32px;margin-bottom:12px">&#128269;</p>
+                <p>Aucun concurrent${state.competitorPlatformFilter !== 'all' ? ' sur cette plateforme' : ' suivi'}.</p>
+                <button class="btn btn-primary" style="margin-top:16px" onclick="openCompetitorModal()">Ajouter un concurrent</button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = "";
+    accounts.forEach(account => {
+        const s = statsMap[account.username + ":" + (account.platform || "tiktok")] || {};
+        const color = getAccountColor(account.username);
+        const initial = account.username.charAt(0).toUpperCase();
+        const displayName = account.display_name || account.username;
+        const totalEng = (s.total_likes || 0) + (s.total_comments || 0) + (s.total_shares || 0) + (s.total_saves || 0);
+        const engRate = (s.total_views || 0) > 0 ? ((totalEng / s.total_views) * 100).toFixed(2) : "0.00";
+        const avgViews = (s.total_videos || 0) > 0 ? Math.round((s.total_views || 0) / s.total_videos) : 0;
+        const nbVideos = s.total_videos || 0;
+        const pIcon = platformIcon(account.platform);
+
+        html += `
+            <div class="account-card">
+                <div class="account-header">
+                    <div class="avatar" style="background:${color}">${initial}</div>
+                    <div class="account-info">
+                        <div class="account-name">${pIcon} ${displayName}</div>
+                        <div class="account-handle">@${account.username}</div>
+                    </div>
+                    <div class="account-contenus-badge">${nbVideos} contenu${nbVideos > 1 ? 's' : ''}</div>
+                </div>
+                <div class="account-metrics">
+                    <div class="account-metric metric-views">
+                        <div class="metric-value">${formatCompact(s.total_views || 0) || "0"}</div>
+                        <div class="metric-label">vues</div>
+                    </div>
+                    <div class="account-metric metric-likes">
+                        <div class="metric-value">${formatCompact(s.total_likes || 0) || "0"}</div>
+                        <div class="metric-label">likes</div>
+                    </div>
+                    <div class="account-metric metric-eng">
+                        <div class="metric-value">${engRate}%</div>
+                        <div class="metric-label">engage.</div>
+                    </div>
+                </div>
+                <div class="account-secondary">
+                    <span>&#128172; <span class="sec-value">${formatNumber(s.total_comments || 0)}</span></span>
+                    <span class="sep">&#183;</span>
+                    <span>&#128257; <span class="sec-value">${formatNumber(s.total_shares || 0)}</span></span>
+                    <span class="sep">&#183;</span>
+                    <span>&#128200; <span class="sec-value">${formatCompact(avgViews) || "0"}</span>/vid</span>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function setCompetitorBestLimit(n) {
+    state.competitorBestLimit = n;
+    document.querySelectorAll("#c-bestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadCompetitorDashboard();
+}
+
+function setCompetitorLatestLimit(n) {
+    state.competitorLatestLimit = n;
+    document.querySelectorAll("#c-latestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadCompetitorDashboard();
+}
+
+// Competitor account management modal
+function openCompetitorModal() {
+    document.getElementById("competitorModal").classList.remove("hidden");
+    loadCompetitorList();
+}
+
+function closeCompetitorModal() {
+    document.getElementById("competitorModal").classList.add("hidden");
+}
+
+async function loadCompetitorList() {
+    const accounts = await fetchAPI("/api/accounts", { competitor: "true" });
+    if (!accounts) return;
+    const list = document.getElementById("competitorList");
+    if (accounts.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:16px">Aucun concurrent suivi</p>';
+        return;
+    }
+    list.innerHTML = accounts.map(a => {
+        const pIcon = platformIcon(a.platform);
+        return `
+        <div class="account-list-item">
+            <span class="account-list-name">${pIcon} @${a.username}</span>
+            <button class="btn-remove" onclick="removeCompetitor('${a.username}')">Supprimer</button>
+        </div>
+    `}).join("");
+}
+
+async function addCompetitor() {
+    const input = document.getElementById("competitorInput");
+    const platformSelect = document.getElementById("competitorPlatform");
+    const username = input.value.trim().replace("@", "");
+    const platform = platformSelect ? platformSelect.value : "tiktok";
+    if (!username) return;
+    try {
+        const res = await fetch("/api/accounts/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, platform, is_competitor: true })
+        });
+        if (res.status === 401) { window.location.href = "/login"; return; }
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showStatus(data.error || "Erreur lors de l'ajout", "error");
+            return;
+        }
+        input.value = "";
+        loadCompetitorList();
+        state.competitorDataLoaded = false;
+        loadCompetitorDashboard();
+        showStatus(`Concurrent @${username} ajouté ! Lancez un scraping pour récupérer les données.`, "success");
+    } catch (err) {
+        showStatus("Erreur lors de l'ajout", "error");
+    }
+}
+
+async function removeCompetitor(username) {
+    if (!confirm(`Supprimer le concurrent @${username} et toutes ses données ?`)) return;
+    try {
+        const res = await fetch("/api/accounts/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+        });
+        if (res.status === 401) { window.location.href = "/login"; return; }
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showStatus(data.error || "Erreur lors de la suppression", "error");
+            return;
+        }
+        loadCompetitorList();
+        state.competitorDataLoaded = false;
+        loadCompetitorDashboard();
+        showStatus(`Concurrent @${username} supprimé`, "success");
+    } catch (err) {
+        showStatus("Erreur lors de la suppression", "error");
     }
 }
 
@@ -1465,6 +2516,13 @@ async function saveCurrentProjectAccounts() {
 
 // Init
 document.addEventListener("DOMContentLoaded", () => {
+    // Add sidebar overlay for mobile
+    const overlay = document.createElement("div");
+    overlay.className = "sidebar-overlay";
+    overlay.id = "sidebarOverlay";
+    overlay.onclick = closeSidebar;
+    document.body.appendChild(overlay);
+
     document.getElementById("filterAccount").addEventListener("change", (e) => {
         state.selectedAccount = e.target.value;
         loadDashboard();
@@ -1477,9 +2535,6 @@ document.addEventListener("DOMContentLoaded", () => {
         state.dateTo = e.target.value || null;
         loadDashboard();
     });
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-    });
     document.querySelectorAll("th[data-sort]").forEach(th => {
         th.addEventListener("click", () => sortTable(th.dataset.sort));
     });
@@ -1490,16 +2545,39 @@ document.addEventListener("DOMContentLoaded", () => {
     if (state.postsChartDateTo) document.getElementById("postsChartDateTo").value = state.postsChartDateTo;
     loadProjects();
     loadDashboard();
-    // Auto-scrape au chargement de la page
+    // Load analytics overview (default page)
+    loadAnalyticsOverview();
+    // Load competitor count for sidebar badge
+    fetchAPI("/api/accounts", { competitor: "true" }).then(accounts => {
+        if (accounts) {
+            const badge = document.getElementById("sidebarCompetitorsBadge");
+            if (badge) badge.textContent = accounts.length;
+        }
+    });
+    // Initialiser le toggle auto-scrape depuis localStorage
+    initAutoScrapeToggle();
+    // Auto-scrape au chargement (seulement si activé)
     autoScrapeOnLoad();
 });
 
+function initAutoScrapeToggle() {
+    const toggle = document.getElementById("autoScrapeToggle");
+    if (!toggle) return;
+    const saved = localStorage.getItem("autoScrapeEnabled");
+    // Activé par défaut (toutes plateformes scrapées au chargement)
+    toggle.checked = saved !== "false";
+}
+
+function toggleAutoScrape(enabled) {
+    localStorage.setItem("autoScrapeEnabled", enabled ? "true" : "false");
+}
+
 async function autoScrapeOnLoad() {
     try {
-        // Verifier si un scraping est deja en cours
+        // Vérifier si un scraping est déjà en cours
         const status = await fetchAPI("/api/scrape-status");
         if (status && status.active) {
-            // Scraping deja en cours, juste suivre la progression
+            // Scraping déjà en cours, juste suivre la progression
             const btn = document.getElementById("scrapeBtn");
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span> Scraping...';
@@ -1507,8 +2585,11 @@ async function autoScrapeOnLoad() {
             startScrapePolling();
             return;
         }
-        // Lancer le scraping automatiquement
-        startScraping();
+        // Lancer le scraping automatiquement (activé par défaut, toutes plateformes)
+        const autoEnabled = localStorage.getItem("autoScrapeEnabled") !== "false";
+        if (autoEnabled) {
+            startScraping();
+        }
     } catch (e) {
         console.error("Auto-scrape error:", e);
     }

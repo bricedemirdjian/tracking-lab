@@ -30,7 +30,27 @@ Thumbs.db
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Vercel
 .vercel/
 .vercel
+
+# Logs
+*.log
+scrape.log
+
+# Preview / scratch files
+preview-*.html
+logo-preview.html
+version3.html
+
+# Local tooling / agent config
+.claude/
+
+# V2 sub-project (separate repo)
+v2/
+
+# Supabase edge function source (deployed separately)
+supabase/

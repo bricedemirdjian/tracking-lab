@@ -71,7 +71,7 @@ def login():
 
     # Dev mode: auto-login when Google OAuth is not configured
     if not os.environ.get('GOOGLE_CLIENT_ID'):
-        user_dict = create_or_update_user(
+        user_dict, is_new = create_or_update_user(
             google_id='dev-local',
             email='dev@local.test',
             name='Dev Local',
@@ -80,6 +80,8 @@ def login():
         user = User(user_dict)
         login_user(user, remember=True)
         seed_user_data(user.id)
+        if is_new:
+            _maybe_send_welcome(user_dict)
         return redirect(url_for('dashboard'))
 
     return render_template('login.html')
@@ -99,7 +101,7 @@ def auth_callback():
         if not userinfo:
             userinfo = oauth.google.get('https://openidconnect.googleapis.com/v1/userinfo').json()
 
-        user_dict = create_or_update_user(
+        user_dict, is_new = create_or_update_user(
             google_id=userinfo['sub'],
             email=userinfo['email'],
             name=userinfo.get('name', ''),
@@ -128,11 +130,27 @@ def auth_callback():
         # Auto-seed historical data for new users with no accounts
         seed_user_data(user.id)
 
+        # Welcome email on first login only (non-blocking, best-effort)
+        if is_new:
+            _maybe_send_welcome(user_dict)
+
         next_page = request.args.get('next', url_for('dashboard'))
         return redirect(next_page)
     except Exception as e:
         print(f"[Auth] Error: {e}")
         return redirect(url_for('auth.login'))
+
+
+def _maybe_send_welcome(user_dict):
+    """Fire the welcome email if Resend is configured. Never raises."""
+    try:
+        from emailer import send_welcome_email
+        send_welcome_email(
+            to_email=user_dict['email'],
+            user_name=user_dict.get('name') or user_dict['email'].split('@')[0],
+        )
+    except Exception as e:
+        print(f"[Auth] welcome email failed (non-fatal): {e}")
 
 
 @auth_bp.route('/logout')
