@@ -133,6 +133,24 @@ def admin_required(f):
     return decorated
 
 
+@app.route("/healthz")
+@limiter.exempt
+def healthz():
+    """Lightweight liveness probe for Render / uptime monitors.
+    Checks DB connectivity. Returns 200 only if the DB round-trips."""
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)[:200]}), 503
+
+
 @app.route("/")
 def index():
     return render_template("landing.html")
