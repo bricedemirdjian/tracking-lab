@@ -285,11 +285,11 @@
             {% endif %}
         </div>
 
-        <!-- Agency -->
+        <!-- ENTREPRISE -->
         <div class="pricing-card {% if sub.plan == 'agency' %}current{% endif %}">
             {% if sub.plan == 'agency' %}<div class="current-badge">Plan actuel</div>{% endif %}
-            <div class="plan-name">Agency</div>
-            <div class="plan-price">99€ <span>HT/mois</span></div>
+            <div class="plan-name">ENTREPRISE</div>
+            <div class="plan-price">79€ <span>HT/mois</span></div>
             <div class="plan-period">Pour les agences et labs</div>
             <div class="plan-divider"></div>
             <ul class="plan-features">
@@ -304,7 +304,7 @@
             {% if sub.plan == 'agency' %}
             <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn-plan btn-plan-secondary" onclick="checkout('agency')">Passer à Agency — 99€ HT/mois</button>
+            <button class="btn-plan btn-plan-secondary" onclick="checkout('agency')">Passer à ENTREPRISE — 79€ HT/mois</button>
             {% endif %}
         </div>
     </div>
