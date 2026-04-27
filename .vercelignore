@@ -1,4 +1,6 @@
 venv/
+.venv/
+env/
 *.db
 *.db-shm
 *.db-wal
@@ -9,5 +11,30 @@ start.sh
 scrape.log
 .DS_Store
 __pycache__/
+*.py[cod]
+*$py.class
 preview-*.html
 version3.html
+
+# Large sub-projects / assets not needed for Flask Lambda
+v2/
+supabase/
+node_modules/
+
+# Local tooling
+.claude/
+.vscode/
+.idea/
+
+# Env files (secrets stored in Vercel dashboard)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Build artifacts / caches
+dist/
+build/
+.next/
