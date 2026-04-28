@@ -1414,6 +1414,32 @@ async function startScraping() {
     }
 }
 
+function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return "0s";
+    if (seconds < 60) return Math.round(seconds) + "s";
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds - m * 60);
+    return m + "m" + String(s).padStart(2, "0");
+}
+
+function formatRelativeTime(timestampSec) {
+    if (!timestampSec) return "";
+    const ageSec = Date.now() / 1000 - timestampSec;
+    if (ageSec < 0) return "à l'instant";
+    if (ageSec < 60) return "il y a " + Math.round(ageSec) + "s";
+    if (ageSec < 3600) return "il y a " + Math.round(ageSec / 60) + " min";
+    if (ageSec < 86400) return "il y a " + Math.round(ageSec / 3600) + "h";
+    return "il y a " + Math.round(ageSec / 86400) + "j";
+}
+
+function updateLastSyncLabel(finishedAt, durationSec) {
+    const el = document.getElementById("lastSyncLabel");
+    if (!el || !finishedAt) return;
+    const dur = durationSec ? " · " + formatDuration(durationSec) : "";
+    el.textContent = "Sync " + formatRelativeTime(finishedAt) + dur;
+    el.style.display = "";
+}
+
 function startScrapePolling() {
     stopScrapePolling();
     scrapePollingTimer = setInterval(async () => {
@@ -1423,12 +1449,17 @@ function startScrapePolling() {
 
             const btn = document.getElementById("scrapeBtn");
 
-            // Update button with progress: X/Y · NN%
+            // Compute elapsed time (server-side started_at in seconds since epoch)
+            const nowSec = Date.now() / 1000;
+            const startedAt = status.started_at || nowSec;
+            const elapsed = Math.max(0, nowSec - startedAt);
+
+            // Update button with progress: X/Y · NN% · 12s (@account)
             if (status.active) {
                 const total = status.total || 0;
                 const done = status.completed || 0;
                 const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                const progress = done + "/" + total + " · " + pct + "%";
+                const progress = done + "/" + total + " · " + pct + "% · " + formatDuration(elapsed);
                 const current = status.current_account ? " (@" + status.current_account + ")" : "";
                 btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span> ' + progress + current;
             }
@@ -1449,11 +1480,17 @@ function startScrapePolling() {
                 btn.disabled = false;
                 btn.innerHTML = 'Scraper les donnees';
                 loadDashboard();
+                // Total duration: from started_at to finished_at (server-side, accurate)
+                const durationSec = status.finished_at && status.started_at
+                    ? (status.finished_at - status.started_at)
+                    : elapsed;
+                const totalDuration = formatDuration(durationSec);
+                updateLastSyncLabel(status.finished_at || (Date.now() / 1000), durationSec);
                 const errors = status.errors ? status.errors.length : 0;
                 if (errors > 0) {
-                    showStatus("Scraping termine ! " + status.completed + "/" + status.total + " comptes (" + errors + " erreurs)", "error");
+                    showStatus("Scraping termine en " + totalDuration + " ! " + status.completed + "/" + status.total + " comptes (" + errors + " erreurs)", "error");
                 } else {
-                    showStatus("Scraping termine ! " + status.completed + "/" + status.total + " comptes scrapes", "success");
+                    showStatus("Scraping termine en " + totalDuration + " ! " + status.completed + "/" + status.total + " comptes scrapes", "success");
                 }
             }
         } catch (e) {
@@ -2600,6 +2637,11 @@ async function autoScrapeOnLoad() {
             lastCompletedCount = status.completed || 0;
             startScrapePolling();
             return;
+        }
+        // Display last sync info if we have a previous scrape on record
+        if (status && status.finished_at) {
+            const dur = status.started_at ? (status.finished_at - status.started_at) : 0;
+            updateLastSyncLabel(status.finished_at, dur);
         }
         // Lancer le scraping automatiquement (activé par défaut, toutes plateformes)
         const autoEnabled = localStorage.getItem("autoScrapeEnabled") !== "false";
