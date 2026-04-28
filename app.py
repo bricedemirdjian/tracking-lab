@@ -794,7 +794,8 @@ def api_scrape():
                 return {"status": "error", "videos": 0}
 
         target_accounts = accounts if not username else [a for a in accounts if a["username"] == username]
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        # Higher concurrency = ~2x faster scrape on Vercel (limited by yt-dlp/HTTP, not CPU).
+        with ThreadPoolExecutor(max_workers=12) as executor:
             list(executor.map(scrape_one, target_accounts))
 
         scrape_status[user_id]["active"] = False

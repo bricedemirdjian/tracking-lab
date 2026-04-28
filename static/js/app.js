@@ -1410,9 +1410,12 @@ function startScrapePolling() {
 
             const btn = document.getElementById("scrapeBtn");
 
-            // Update button with progress
+            // Update button with progress: X/Y · NN%
             if (status.active) {
-                const progress = status.completed + "/" + status.total;
+                const total = status.total || 0;
+                const done = status.completed || 0;
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                const progress = done + "/" + total + " · " + pct + "%";
                 const current = status.current_account ? " (@" + status.current_account + ")" : "";
                 btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span> ' + progress + current;
             }
