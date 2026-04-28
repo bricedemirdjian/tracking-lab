@@ -343,7 +343,14 @@ def stripe_webhook():
                 sub = stripe.Subscription.retrieve(subscription_id)
                 price_id = sub['items']['data'][0]['price']['id']
                 plan_name = get_price_plan(price_id)
-                period_end = datetime.fromtimestamp(sub['current_period_end']).isoformat()
+                # Stripe API 2024-09+: current_period_end moved to items.data[0]
+                # Fall back to top-level for older API versions / older subs.
+                period_end_ts = (
+                    sub['items']['data'][0].get('current_period_end')
+                    or sub.get('current_period_end')
+                    or 0
+                )
+                period_end = datetime.fromtimestamp(period_end_ts).isoformat()
                 from database import get_connection, _fetchone
                 conn = get_connection()
                 user = _fetchone(
@@ -387,7 +394,17 @@ def stripe_webhook():
             plan_name = get_price_plan(price_id)
         db_sub = get_subscription_by_customer(customer_id)
         if db_sub:
-            period_end = datetime.fromtimestamp(sub.get('current_period_end', 0)).isoformat()
+            # Stripe API 2024-09+: current_period_end moved to items.data[0]
+            period_end_ts = 0
+            try:
+                items = sub.get('items', {}).get('data', [])
+                if items:
+                    period_end_ts = items[0].get('current_period_end') or 0
+            except Exception:
+                pass
+            if not period_end_ts:
+                period_end_ts = sub.get('current_period_end', 0)
+            period_end = datetime.fromtimestamp(period_end_ts).isoformat()
             upsert_subscription(
                 db_sub['user_id'], plan_name,
                 'active' if status == 'active' else 'cancelled',
