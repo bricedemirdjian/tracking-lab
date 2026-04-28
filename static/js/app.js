@@ -267,7 +267,7 @@ function populateAccountFilter(accounts) {
     filterSelect.value = currentValue || "all";
 }
 
-// Render KPIs (8 cards)
+// Render KPIs (10 cards)
 function renderKPIs(global, accounts) {
     document.getElementById("kpiVideos").textContent = formatNumber(global.total_videos);
     document.getElementById("kpiViews").textContent = formatNumber(global.total_views);
@@ -275,11 +275,20 @@ function renderKPIs(global, accounts) {
     document.getElementById("kpiComments").textContent = formatNumber(global.total_comments);
     document.getElementById("kpiShares").textContent = formatNumber(global.total_shares);
     document.getElementById("kpiEngagement").textContent = global.engagement_rate.toFixed(2) + "%";
-    // New KPIs
     const activeAccounts = accounts ? accounts.length : 0;
     document.getElementById("kpiActiveAccounts").textContent = activeAccounts;
     const avgViews = global.total_videos > 0 ? Math.round(global.total_views / global.total_videos) : 0;
     document.getElementById("kpiAvgViews").textContent = formatNumber(avgViews);
+    // Followers KPIs
+    const elFollowers = document.getElementById("kpiFollowers");
+    if (elFollowers) elFollowers.textContent = formatNumber(global.total_followers || 0);
+    const elGain = document.getElementById("kpiFollowerGain");
+    if (elGain) {
+        const g = global.follower_gain || 0;
+        const sign = g > 0 ? "+" : (g < 0 ? "-" : "");
+        elGain.textContent = sign + formatNumber(Math.abs(g));
+        elGain.style.color = g > 0 ? "#34c759" : (g < 0 ? "#ff3b30" : "");
+    }
 }
 
 // Render Account Activity Table
@@ -306,7 +315,7 @@ function renderActivityTableSorted() {
     });
 
     if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#86868b">Aucun compte suivi. Ajoutez des comptes pour commencer.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#86868b">Aucun compte suivi. Ajoutez des comptes pour commencer.</td></tr>';
         return;
     }
 
@@ -325,6 +334,8 @@ function renderActivityTableSorted() {
             likes: s.total_likes || 0,
             engagement: engRate,
             avg_views: avgViews,
+            followers: s.followers || account.followers || 0,
+            follower_gain: s.follower_gain || 0,
         };
     });
 
@@ -389,6 +400,8 @@ function renderActivityTableSorted() {
                     <div class="activity-eng-bar"><div class="activity-eng-bar-fill" style="width:${engBarWidth}%;background:${engBarColor}"></div></div>
                 </div>
             </td>
+            <td class="text-right"><span class="activity-metric">${formatCompact(row.followers) || "0"}</span></td>
+            <td class="text-right"><span class="activity-metric" style="color:${row.follower_gain > 0 ? '#34c759' : (row.follower_gain < 0 ? '#ff3b30' : '#86868b')}">${row.follower_gain > 0 ? '+' : ''}${formatCompact(row.follower_gain) || "0"}</span></td>
             <td class="text-right"><span class="activity-metric">${formatCompact(row.avg_views) || "0"}</span></td>
         </tr>`;
     }).join("");

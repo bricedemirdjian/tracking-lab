@@ -721,7 +721,7 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
     try:
         query = """
             SELECT account_username, platform, snapshot_date, total_videos, total_views,
-                   total_likes, total_comments, total_shares, total_saves
+                   total_likes, total_comments, total_shares, total_saves, followers
             FROM daily_snapshots WHERE 1=1
         """
         params = []
@@ -741,7 +741,7 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
         # Fallback for legacy schemas without platform column
         query = """
             SELECT account_username, snapshot_date, total_videos, total_views,
-                   total_likes, total_comments, total_shares, total_saves
+                   total_likes, total_comments, total_shares, total_saves, followers
             FROM daily_snapshots WHERE 1=1
         """
         params = []
@@ -803,6 +803,13 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
             end_val = end_snap.get(m, 0) or 0
             start_val = (start_snap.get(m, 0) or 0) if start_snap else 0
             delta[m] = max(0, end_val - start_val)
+
+        # Followers: keep END value as the "current" count + signed delta (can be
+        # negative if the account loses followers). Don't max(0, ...) the gain.
+        end_followers = end_snap.get('followers', 0) or 0
+        start_followers = (start_snap.get('followers', 0) or 0) if start_snap else end_followers
+        delta['followers'] = end_followers
+        delta['follower_gain'] = end_followers - start_followers
 
         # Averages computed from current totals (snapshot at end of period)
         current_videos = end_snap.get('total_videos', 0) or 1
@@ -876,6 +883,27 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
     query += " GROUP BY account_username, platform"
 
     results = _fetchall(conn, query, params)
+
+    # Enrich with current followers from accounts table (no date range = no gain)
+    if results:
+        usernames_in = list({r['account_username'] for r in results})
+        ph = ', '.join(['%s'] * len(usernames_in))
+        followers_q = f"""
+            SELECT username, platform, followers
+            FROM accounts
+            WHERE username IN ({ph})
+        """
+        fparams = list(usernames_in)
+        if user_id is not None:
+            followers_q += " AND user_id = %s"
+            fparams.append(user_id)
+        rows = _fetchall(conn, followers_q, fparams)
+        followers_map = {(r['username'], r.get('platform') or 'tiktok'): (r.get('followers') or 0) for r in rows}
+        for r in results:
+            key = (r['account_username'], r.get('platform') or 'tiktok')
+            r['followers'] = followers_map.get(key, 0)
+            r['follower_gain'] = 0  # no period set
+
     conn.close()
     return results
 
@@ -937,6 +965,8 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
                 'total_comments': sum(d.get('total_comments', 0) for d in deltas),
                 'total_shares': sum(d.get('total_shares', 0) for d in deltas),
                 'total_saves': sum(d.get('total_saves', 0) for d in deltas),
+                'total_followers': sum(d.get('followers', 0) for d in deltas),
+                'follower_gain': sum(d.get('follower_gain', 0) for d in deltas),
             }
         # Fall through if no snapshot data available (e.g. very fresh accounts)
 
@@ -961,8 +991,24 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
         query += f" AND account_username IN ({placeholders})"
         params.extend(account_usernames)
 
-    result = _fetchone(conn, query, params)
+    result = _fetchone(conn, query, params) or {}
+
+    # Followers: SUM from accounts table (current snapshot, not historical).
+    # No "gain" without a date range — leave at 0.
+    fq = "SELECT COALESCE(SUM(followers), 0) AS total_followers FROM accounts WHERE 1=1"
+    fparams = []
+    if user_id is not None:
+        fq += " AND user_id = %s"
+        fparams.append(user_id)
+    if account_usernames:
+        placeholders = ', '.join(['%s'] * len(account_usernames))
+        fq += f" AND username IN ({placeholders})"
+        fparams.extend(account_usernames)
+    fresult = _fetchone(conn, fq, fparams) or {}
     conn.close()
+
+    result['total_followers'] = fresult.get('total_followers', 0) or 0
+    result['follower_gain'] = 0
     return result
 
 

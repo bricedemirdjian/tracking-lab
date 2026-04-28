@@ -411,6 +411,24 @@
                         </div>
                         <div class="kpi-value-new" id="kpiAvgViews">0</div>
                     </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap purple">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="M19 8v6"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Followers</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiFollowers">0</div>
+                    </div>
+                    <div class="kpi-card-new">
+                        <div class="kpi-header-new">
+                            <div class="kpi-icon-wrap green">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            </div>
+                            <span class="kpi-label-new">Gain followers</span>
+                        </div>
+                        <div class="kpi-value-new" id="kpiFollowerGain">0</div>
+                    </div>
                 </div>
 
                 <!-- Account Activity Table -->
@@ -428,11 +446,13 @@
                                     <th class="sortable text-right sorted" data-sort="views" onclick="sortActivityTable('views')">Vues <span class="sort-arrows" style="display:none">&#x25B2;&#x25BC;</span><span class="sort-indicator">&#x25BC;</span></th>
                                     <th class="sortable text-right" data-sort="likes" onclick="sortActivityTable('likes')">Likes <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
                                     <th class="sortable text-right" data-sort="engagement" onclick="sortActivityTable('engagement')">Engagement <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="followers" onclick="sortActivityTable('followers')">Followers <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
+                                    <th class="sortable text-right" data-sort="follower_gain" onclick="sortActivityTable('follower_gain')">Gain <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
                                     <th class="sortable text-right" data-sort="avg_views" onclick="sortActivityTable('avg_views')">Moy. vues/vid <span class="sort-arrows">&#x25B2;&#x25BC;</span><span class="sort-indicator"></span></th>
                                 </tr>
                             </thead>
                             <tbody id="accountActivityBody">
-                                <tr><td colspan="6" style="text-align:center;padding:30px;color:#86868b">Chargement...</td></tr>
+                                <tr><td colspan="8" style="text-align:center;padding:30px;color:#86868b">Chargement...</td></tr>
                             </tbody>
                         </table>
                     </div>

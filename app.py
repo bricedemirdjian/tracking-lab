@@ -638,8 +638,11 @@ def api_stats():
         per_account = []
 
     # Ensure all values are numeric (PostgreSQL may return None)
-    for key in ["total_videos", "total_views", "total_likes", "total_comments", "total_shares", "total_saves"]:
+    for key in ["total_videos", "total_views", "total_likes", "total_comments", "total_shares", "total_saves", "total_followers"]:
         global_stats[key] = global_stats.get(key) or 0
+    # follower_gain can be negative — preserve the sign, only coerce None -> 0
+    if global_stats.get("follower_gain") is None:
+        global_stats["follower_gain"] = 0
 
     total_engagement = (global_stats["total_likes"] + global_stats["total_comments"]
                         + global_stats["total_shares"] + global_stats["total_saves"])
