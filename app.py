@@ -343,13 +343,15 @@ def stripe_webhook():
                 sub = stripe.Subscription.retrieve(subscription_id)
                 price_id = sub['items']['data'][0]['price']['id']
                 plan_name = get_price_plan(price_id)
-                # Stripe API 2024-09+: current_period_end moved to items.data[0]
-                # Fall back to top-level for older API versions / older subs.
-                period_end_ts = (
-                    sub['items']['data'][0].get('current_period_end')
-                    or sub.get('current_period_end')
-                    or 0
-                )
+                # Stripe API 2024-09+: current_period_end moved to items.data[0].
+                # Use 'in' check (StripeObject.get can collide with dict-style access).
+                _item = sub['items']['data'][0]
+                if 'current_period_end' in _item:
+                    period_end_ts = _item['current_period_end']
+                elif 'current_period_end' in sub:
+                    period_end_ts = sub['current_period_end']
+                else:
+                    period_end_ts = 0
                 period_end = datetime.fromtimestamp(period_end_ts).isoformat()
                 from database import get_connection, _fetchone
                 conn = get_connection()
@@ -397,13 +399,13 @@ def stripe_webhook():
             # Stripe API 2024-09+: current_period_end moved to items.data[0]
             period_end_ts = 0
             try:
-                items = sub.get('items', {}).get('data', [])
-                if items:
-                    period_end_ts = items[0].get('current_period_end') or 0
+                items_data = sub['items']['data'] if 'items' in sub else []
+                if items_data and 'current_period_end' in items_data[0]:
+                    period_end_ts = items_data[0]['current_period_end']
             except Exception:
                 pass
-            if not period_end_ts:
-                period_end_ts = sub.get('current_period_end', 0)
+            if not period_end_ts and 'current_period_end' in sub:
+                period_end_ts = sub['current_period_end']
             period_end = datetime.fromtimestamp(period_end_ts).isoformat()
             upsert_subscription(
                 db_sub['user_id'], plan_name,
