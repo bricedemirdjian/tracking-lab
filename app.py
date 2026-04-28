@@ -330,13 +330,21 @@ def stripe_webhook():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+    # StripeObject doesn't expose .get() — use bracket access with `in` check.
+    def _so_get(obj, key, default=None):
+        try:
+            return obj[key] if key in obj else default
+        except Exception:
+            return default
+
     if event.type == 'checkout.session.completed':
         session = event.data.object
-        customer_id = session.get('customer')
-        subscription_id = session.get('subscription')
+        customer_id = _so_get(session, 'customer')
+        subscription_id = _so_get(session, 'subscription')
+        details = _so_get(session, 'customer_details') or {}
         customer_email = (
-            session.get('customer_email')
-            or session.get('customer_details', {}).get('email')
+            _so_get(session, 'customer_email')
+            or _so_get(details, 'email')
         )
         if subscription_id:
             try:
@@ -388,8 +396,8 @@ def stripe_webhook():
 
     elif event.type in ('customer.subscription.updated', 'customer.subscription.deleted'):
         sub = event.data.object
-        customer_id = sub.get('customer')
-        status = sub.get('status')
+        customer_id = _so_get(sub, 'customer')
+        status = _so_get(sub, 'status')
         plan_name = 'starter'
         if status == 'active':
             price_id = sub['items']['data'][0]['price']['id']
