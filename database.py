@@ -901,8 +901,37 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
             account_usernames=account_usernames,
         )
         if deltas:
+            # total_videos = posts whose create_time falls in the period (matches
+            # /api/posts-per-day). The snapshot delta would count videos that
+            # *appeared* in our scraping, including old posts only just discovered,
+            # which is confusing for users — the KPI label says "Contenus" so it
+            # must reflect "publications postées dans la période".
+            conn = get_connection()
+            count_q = """
+                SELECT COUNT(*) AS total_videos
+                FROM videos
+                WHERE create_time IS NOT NULL
+            """
+            count_params = []
+            if user_id is not None:
+                count_q += " AND user_id = %s"
+                count_params.append(user_id)
+            if account_usernames:
+                placeholders = ', '.join(['%s'] * len(account_usernames))
+                count_q += f" AND account_username IN ({placeholders})"
+                count_params.extend(account_usernames)
+            if date_from:
+                count_q += " AND create_time >= %s"
+                count_params.append(date_from)
+            if date_to:
+                count_q += " AND create_time <= %s"
+                count_params.append(date_to + " 23:59:59")
+            posts_in_period = _fetchone(conn, count_q, count_params)
+            conn.close()
+            videos_count = (posts_in_period or {}).get('total_videos', 0) or 0
+
             return {
-                'total_videos': sum(d.get('total_videos', 0) for d in deltas),
+                'total_videos': videos_count,
                 'total_views': sum(d.get('total_views', 0) for d in deltas),
                 'total_likes': sum(d.get('total_likes', 0) for d in deltas),
                 'total_comments': sum(d.get('total_comments', 0) for d in deltas),
