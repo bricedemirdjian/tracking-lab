@@ -643,7 +643,14 @@ def save_daily_snapshot(account_username, user_id=None, platform="tiktok"):
     conn.close()
 
 
-def get_all_accounts(user_id=None, is_competitor=None):
+def get_all_accounts(user_id=None, is_competitor=None, with_last_post=False):
+    """Fetch tracked accounts, optionally enriched with the most recent post date.
+
+    `with_last_post=True` joins the `videos` table to surface MAX(create_time)
+    per (username, platform). Used by the dashboard to flag accounts that have
+    not posted recently — distinct from the per-period stats which only count
+    posts inside the current date filter.
+    """
     conn = get_connection()
     query = "SELECT * FROM accounts WHERE 1=1"
     params = []
@@ -655,6 +662,29 @@ def get_all_accounts(user_id=None, is_competitor=None):
         params.append(is_competitor)
     query += " ORDER BY username"
     results = _fetchall(conn, query, params)
+
+    if with_last_post and results:
+        # One round-trip — compute MAX(create_time) for each (username, platform)
+        # tied to the same user_id. Avoids N queries when there are many accounts.
+        usernames = list({r["username"] for r in results})
+        ph = ", ".join(["%s"] * len(usernames))
+        last_q = f"""
+            SELECT account_username AS username, platform, MAX(create_time) AS last_post_at
+            FROM videos
+            WHERE account_username IN ({ph})
+        """
+        last_params = list(usernames)
+        if user_id is not None:
+            last_q += " AND user_id = %s"
+            last_params.append(user_id)
+        last_q += " GROUP BY account_username, platform"
+        last_rows = _fetchall(conn, last_q, last_params)
+        last_map = {(r["username"], r.get("platform") or "tiktok"): r["last_post_at"] for r in last_rows}
+        for r in results:
+            key = (r["username"], r.get("platform") or "tiktok")
+            lp = last_map.get(key)
+            r["last_post_at"] = lp.isoformat() if lp else None
+
     conn.close()
     return results
 

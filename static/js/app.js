@@ -368,6 +368,10 @@ function renderActivityTableSorted() {
     // Max engagement for bar scaling
     const maxEng = Math.max(1, ...rows.map(r => r.engagement));
 
+    // Today as midnight UTC for "days since last post" math — keeps the badge
+    // stable through the day rather than ticking up by hours.
+    const nowMs = Date.now();
+
     tbody.innerHTML = rows.map(row => {
         const account = row.account;
         const s = row.stats;
@@ -381,13 +385,34 @@ function renderActivityTableSorted() {
         const engBarColor = engRate >= 5 ? "var(--success)" : engRate >= 2 ? "var(--warning)" : "var(--accent)";
         const engBarWidth = Math.min(100, (engRate / Math.min(maxEng, 15)) * 100);
 
+        // Inactivity badge: shown only when the account has 0 videos *in the
+        // current date window* but exists in the videos table with an older
+        // last_post_at. Three flavors so users can act on the right signal:
+        //   - >0 in range          → no badge (account is healthy)
+        //   - 0 in range, never posted → "Aucune publication" (could be a typo
+        //                                  in handle, scrape failure, or empty
+        //                                  account — worth investigating)
+        //   - 0 in range, posted before → "Inactif depuis Xj" (account is real
+        //                                  but dormant in the chosen window)
+        let inactivityBadge = "";
+        if (row.videos === 0) {
+            const lastPost = account.last_post_at;
+            if (lastPost) {
+                const lastMs = new Date(lastPost).getTime();
+                const days = Math.max(1, Math.floor((nowMs - lastMs) / 86400000));
+                inactivityBadge = `<span class="activity-inactive-badge" title="Dernier post: ${new Date(lastPost).toLocaleDateString('fr-FR')}">⊘ Inactif depuis ${days}j</span>`;
+            } else {
+                inactivityBadge = `<span class="activity-inactive-badge activity-inactive-badge--unknown" title="Aucune vidéo récupérée par le scraping">⊘ Aucune publication</span>`;
+            }
+        }
+
         return `<tr onclick="selectAccount('${account.username}')">
             <td>
                 <div class="activity-account">
                     <div class="activity-avatar" style="background:${color}">${initial}</div>
                     <div class="activity-account-info">
                         <div class="activity-account-name">${pIcon} ${displayName}</div>
-                        <div class="activity-account-handle">@${account.username}</div>
+                        <div class="activity-account-handle">@${account.username}${inactivityBadge}</div>
                     </div>
                 </div>
             </td>

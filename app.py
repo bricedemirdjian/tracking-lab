@@ -526,8 +526,28 @@ def api_accounts():
         # Filter by competitor flag if specified
         if is_competitor is not None:
             accounts = [a for a in accounts if a.get('is_competitor') == is_competitor]
+        # Manually merge last_post_at from a single videos query (project_accounts
+        # doesn't natively join videos). One extra round-trip — acceptable.
+        if accounts:
+            from database import get_connection, _fetchall
+            usernames = list({a["username"] for a in accounts})
+            ph = ", ".join(["%s"] * len(usernames))
+            uid = current_user.data_user_id
+            conn = get_connection()
+            rows = _fetchall(conn,
+                f"SELECT account_username AS username, platform, MAX(create_time) AS last_post_at "
+                f"FROM videos WHERE account_username IN ({ph}) AND user_id = %s "
+                f"GROUP BY account_username, platform",
+                list(usernames) + [uid])
+            conn.close()
+            last_map = {(r["username"], r.get("platform") or "tiktok"): r["last_post_at"] for r in rows}
+            for a in accounts:
+                lp = last_map.get((a["username"], a.get("platform") or "tiktok"))
+                a["last_post_at"] = lp.isoformat() if lp else None
     else:
-        accounts = get_all_accounts(user_id=current_user.data_user_id, is_competitor=is_competitor)
+        # `with_last_post=True` adds last_post_at — used by the dashboard to flag
+        # inactive accounts that fall outside the current date window.
+        accounts = get_all_accounts(user_id=current_user.data_user_id, is_competitor=is_competitor, with_last_post=True)
     return jsonify(accounts)
 
 

@@ -1145,6 +1145,35 @@ body {
     font-weight: 400;
 }
 
+/* Inactivity badge — appended to the @handle line when a tracked account has
+   zero videos in the current date window. Visual hierarchy: subtle gray pill,
+   never the brand red; we don't want it to look like an error, just a hint.
+   Two variants: "Inactif depuis Xj" (warm gray) and "Aucune publication"
+   (muted neutral, indicates "we tried, got nothing"). */
+.activity-inactive-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 8px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: #6b6b73;
+    background: rgba(120, 120, 128, 0.10);
+    border: 1px solid rgba(120, 120, 128, 0.16);
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: help;
+}
+
+.activity-inactive-badge--unknown {
+    color: #8e8e93;
+    background: rgba(142, 142, 147, 0.08);
+    border-style: dashed;
+}
+
 .activity-videos-count {
     display: inline-flex;
     align-items: center;
