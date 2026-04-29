@@ -24,5 +24,14 @@
       "dest": "/api/index.py"
     }
   ],
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/scrape-tiktok-youtube",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-instagram",
+      "schedule": "30 12 * * *"
+    }
+  ]
 }

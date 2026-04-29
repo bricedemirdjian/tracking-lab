@@ -20,6 +20,9 @@ version3.html
 v2/
 supabase/
 node_modules/
+monitor/
+scraper_healing/
+bench_scraper.py
 
 # Local tooling
 .claude/

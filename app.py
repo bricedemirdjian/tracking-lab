@@ -858,32 +858,67 @@ def _cron_scrape(platform_filter=None):
         label = ", ".join(platform_filter) if platform_filter else "all"
         return jsonify({"status": "ok", "message": "Aucun utilisateur", "platforms": label, "users": 0})
 
-    results = {}
-    for user_row in users:
-        if time.time() - started > max_duration:
-            results["_timeout"] = True
-            break
+    # Parallel scrape to fit within the 60s Vercel function budget. With
+    # `max_workers=12`, 12 accounts run simultaneously; latency = max(per-account)
+    # rather than sum(per-account). The previous serial version was scraping
+    # only 2 of 6 IG accounts before hitting the 55s ceiling.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    def scrape_one(uid_acc):
+        uid, acc = uid_acc
+        uname = acc["username"]
+        plat = acc.get("platform", "tiktok")
+        try:
+            r = scrape_single_account_for_user(uname, uid, platform=plat)
+            return uid, uname, r.get("status", "error")
+        except Exception as e:
+            return uid, uname, f"error: {str(e)[:100]}"
+
+    results = {}
+    user_account_pairs = []  # [(user_id, account), ...]
+    for user_row in users:
         uid = user_row["user_id"]
         try:
             accounts = get_all_accounts(user_id=uid)
             if platform_filter:
                 accounts = [a for a in accounts if a.get("platform", "tiktok") in platform_filter]
-            scraped = {}
+            results[str(uid)] = {"accounts": len(accounts), "scraped": 0, "by_status": {}}
             for acc in accounts:
-                if time.time() - started > max_duration:
-                    results["_timeout"] = True
-                    break
-                uname = acc["username"]
-                plat = acc.get("platform", "tiktok")
-                try:
-                    r = scrape_single_account_for_user(uname, uid, platform=plat)
-                    scraped[uname] = r.get("status", "error")
-                except Exception as e:
-                    scraped[uname] = f"error: {str(e)[:100]}"
-            results[str(uid)] = {"accounts": len(accounts), "scraped": len(scraped)}
+                user_account_pairs.append((uid, acc))
         except Exception as e:
             results[str(uid)] = {"error": str(e)[:200]}
+
+    # Stale-first ordering: scrape accounts whose `last_updated` is oldest (or
+    # never set) first. This guarantees that even if a cron call times out
+    # before finishing all accounts, the next call picks up the ones missed
+    # rather than re-scraping the same fast-completing accounts forever.
+    def _staleness_key(pair):
+        _, acc = pair
+        lu = acc.get("last_updated")
+        # NULL / never-scraped → priority 0 (most stale). Else use timestamp string
+        # which sorts lexicographically same as chronologically for ISO-8601.
+        return (1 if lu else 0, str(lu) if lu else "")
+    user_account_pairs.sort(key=_staleness_key)
+
+    if user_account_pairs:
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            futures = {executor.submit(scrape_one, pair): pair for pair in user_account_pairs}
+            for fut in as_completed(futures):
+                if time.time() - started > max_duration:
+                    results["_timeout"] = True
+                    # Cancel remaining and break — any in-flight will finish on their own
+                    for f in futures:
+                        f.cancel()
+                    break
+                try:
+                    uid, uname, status = fut.result(timeout=max(1, max_duration - (time.time() - started)))
+                    bucket = results.get(str(uid))
+                    if isinstance(bucket, dict) and "error" not in bucket:
+                        bucket["scraped"] += 1
+                        bucket["by_status"][status] = bucket["by_status"].get(status, 0) + 1
+                except Exception as e:
+                    # Future raised or timed out — record but don't crash the whole cron
+                    print(f"[cron] future error: {e}")
 
     elapsed = round(time.time() - started, 1)
     label = ", ".join(platform_filter) if platform_filter else "all"

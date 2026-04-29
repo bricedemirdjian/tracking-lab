@@ -63,27 +63,32 @@ _TIKTOK_HOSTS = [
 
 
 # ── TTL cache (in-memory) ─────────────────────────────────────────────
+# `_cache` is plain dict — safe to share across threads/loops (we always wrap
+# access in a per-loop lock). The lock and semaphore must be keyed by event
+# loop because asyncio primitives are bound to the loop that created them.
 _cache: dict[str, tuple[float, Any]] = {}
-_cache_lock: Optional[asyncio.Lock] = None
-
-# YouTube per-video detail fetch bounded semaphore (shared across all accounts).
-_yt_detail_sem: Optional[asyncio.Semaphore] = None
+_cache_locks_by_loop: dict[int, asyncio.Lock] = {}
+_yt_sems_by_loop: dict[int, asyncio.Semaphore] = {}
 
 
 def _get_yt_detail_sem() -> asyncio.Semaphore:
-    """Lazy-init the YouTube detail semaphore bound to the running loop."""
-    global _yt_detail_sem
-    if _yt_detail_sem is None:
-        _yt_detail_sem = asyncio.Semaphore(YT_DETAIL_CONCURRENCY)
-    return _yt_detail_sem
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    sem = _yt_sems_by_loop.get(loop_id)
+    if sem is None:
+        sem = asyncio.Semaphore(YT_DETAIL_CONCURRENCY)
+        _yt_sems_by_loop[loop_id] = sem
+    return sem
 
 
 def _get_cache_lock() -> asyncio.Lock:
-    """Lazy-init the lock bound to the running event loop."""
-    global _cache_lock
-    if _cache_lock is None:
-        _cache_lock = asyncio.Lock()
-    return _cache_lock
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    lock = _cache_locks_by_loop.get(loop_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _cache_locks_by_loop[loop_id] = lock
+    return lock
 
 
 async def _cache_get(key: str) -> Optional[Any]:
@@ -108,47 +113,46 @@ def cache_clear() -> None:
     _cache.clear()
 
 
-# ── aiohttp session (single shared pool) ──────────────────────────────
-_session: Optional[aiohttp.ClientSession] = None
-_session_lock: Optional[asyncio.Lock] = None
-
-
-def _get_session_lock() -> asyncio.Lock:
-    global _session_lock
-    if _session_lock is None:
-        _session_lock = asyncio.Lock()
-    return _session_lock
+# ── aiohttp session — keyed by event loop ────────────────────────────
+# A single global `_session` was racing across threads: aiohttp.ClientSession is
+# bound to the event loop that created it, but ThreadPoolExecutor + asyncio.run
+# means each worker thread has its own loop. Sharing the global produced silent
+# "no_data" results and dangling Task warnings. We now key the session by loop
+# id so each thread reuses its own session and never touches another's.
+_sessions_by_loop: dict[int, aiohttp.ClientSession] = {}
 
 
 async def _get_session() -> aiohttp.ClientSession:
-    """Reuse one session per event loop. Recreate if closed or loop changed."""
-    global _session
-    async with _get_session_lock():
-        if _session is None or _session.closed:
-            connector = aiohttp.TCPConnector(
-                limit=100,
-                limit_per_host=10,
-                ttl_dns_cache=300,
-            )
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=10)
-            _session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout,
-                headers={"User-Agent": _USER_AGENT},
-            )
-        return _session
+    """Return the aiohttp session for the current event loop, creating if needed."""
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    sess = _sessions_by_loop.get(loop_id)
+    if sess is None or sess.closed:
+        connector = aiohttp.TCPConnector(
+            limit=100,
+            limit_per_host=10,
+            ttl_dns_cache=300,
+        )
+        timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=10)
+        sess = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            headers={"User-Agent": _USER_AGENT},
+        )
+        _sessions_by_loop[loop_id] = sess
+    return sess
 
 
 async def close_session() -> None:
-    """Close the shared aiohttp session (call on shutdown)."""
-    global _session, _session_lock, _cache_lock, _yt_detail_sem
-    async with _get_session_lock():
-        if _session and not _session.closed:
-            await _session.close()
-        _session = None
-    _session_lock = None
-    _cache_lock = None
-    _yt_detail_sem = None
+    """Close the session + drop loop-bound primitives for the current loop."""
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    sess = _sessions_by_loop.pop(loop_id, None)
+    if sess is not None and not sess.closed:
+        await sess.close()
+    # Drop loop-bound asyncio primitives so they don't leak between thread runs
+    _cache_locks_by_loop.pop(loop_id, None)
+    _yt_sems_by_loop.pop(loop_id, None)
 
 
 # ── HTTP helper with retries ──────────────────────────────────────────

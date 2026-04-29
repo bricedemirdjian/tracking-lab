@@ -1,0 +1,131 @@
+# Hourly scrape cron driven by GitHub Actions.
+#
+# Why GitHub Actions and not Vercel cron? Vercel Hobby is limited to 2 daily
+# crons; we want platform-level scraping every 2-4 hours to keep dashboard data
+# fresh. GitHub Actions free tier gives 2000 minutes/month — way more than
+# enough for short HTTP triggers.
+#
+# Each call to /api/cron/scrape-* runs inside a Vercel serverless function
+# (60s budget). The cron endpoints scrape staleest accounts first, so even if
+# one call hits the 55s ceiling, the next call covers what was missed.
+#
+# Setup:
+#   1. Repo Settings → Secrets and variables → Actions → New secret
+#      Name: CRON_SECRET (same value as Vercel env var)
+#   2. (optional) Adjust cron schedule below — GitHub Actions accepts standard
+#      5-field cron, runs in UTC.
+#
+# Manual trigger: Actions tab → "Scrape cron (hourly)" → Run workflow.
+
+name: Scrape cron (hourly)
+
+on:
+  schedule:
+    # IG every 3 hours (proxy is fast — 6 accounts in ~35s)
+    - cron: '5 */3 * * *'
+    # TT/YT every 2 hours, offset by 30 min so they don't pile on the
+    # same minute and hammer Vercel concurrency limits.
+    - cron: '35 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Which crons to trigger'
+        required: false
+        default: 'all'
+        type: choice
+        options: [all, instagram, tiktok-youtube]
+
+# Cancel any older still-running invocation when a new one starts. Avoids
+# overlapping cron calls when a previous run is taking unusually long.
+concurrency:
+  group: scrape-cron
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Detect schedule trigger
+        id: which
+        run: |
+          # Decide which platforms to hit based on the cron schedule that fired,
+          # or the manual input.
+          PLATFORMS="${{ github.event.inputs.platforms || 'all' }}"
+          # If schedule fired, github.event.schedule contains the cron expression
+          if [ -n "${{ github.event.schedule }}" ]; then
+            case "${{ github.event.schedule }}" in
+              "5 */3 * * *")  PLATFORMS="instagram" ;;
+              "35 */2 * * *") PLATFORMS="tiktok-youtube" ;;
+              *)              PLATFORMS="all" ;;
+            esac
+          fi
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "→ scraping: $PLATFORMS"
+
+      - name: Trigger /api/cron/scrape-instagram
+        if: steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'instagram'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set in repo secrets"
+            exit 1
+          fi
+          echo "── /api/cron/scrape-instagram ──"
+          # Two passes back-to-back: covers cases where pass 1 timed out before
+          # finishing the staleest accounts. Pass 2 picks them up.
+          for pass in 1 2; do
+            echo "Pass $pass:"
+            HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
+                        -H "Authorization: Bearer $CRON_SECRET" \
+                        --max-time 90 \
+                        "https://app.trackinglab.online/api/cron/scrape-instagram")
+            echo "$HTTP"
+            # Exit early if pass 1 reported no timeout — pass 2 would just be wasted load.
+            if echo "$HTTP" | grep -q '"_timeout":true'; then
+              echo "→ pass $pass timed out, will retry"
+            else
+              echo "→ pass $pass clean, skipping further passes"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Trigger /api/cron/scrape-tiktok-youtube
+        if: steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'tiktok-youtube'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set in repo secrets"
+            exit 1
+          fi
+          echo "── /api/cron/scrape-tiktok-youtube ──"
+          # TT/YT have heavier yt-dlp work; we typically need 2-3 passes to cover
+          # 20+ accounts within Vercel's 60s budget per call.
+          for pass in 1 2 3; do
+            echo "Pass $pass:"
+            HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
+                        -H "Authorization: Bearer $CRON_SECRET" \
+                        --max-time 90 \
+                        "https://app.trackinglab.online/api/cron/scrape-tiktok-youtube")
+            echo "$HTTP"
+            if echo "$HTTP" | grep -q '"_timeout":true'; then
+              echo "→ pass $pass timed out, will retry"
+            else
+              echo "→ pass $pass clean, skipping further passes"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Scrape cron summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Schedule: \`${{ github.event.schedule || 'manual' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Platforms: \`${{ steps.which.outputs.platforms }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
