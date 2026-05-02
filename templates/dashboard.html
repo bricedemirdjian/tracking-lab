@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260429a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260502a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -539,6 +539,13 @@
                         Meilleures vidéos <span class="badge" id="bestVideosBadge">Top 5</span>
                     </div>
                     <div class="section-header-controls">
+                        <!-- Sort mode: pure reach (views) vs weighted engagement.
+                             Engagement surfaces IG photos/carousels which have
+                             no view count in Meta's API. -->
+                        <div class="sort-selector" id="bestVideosSort" title="Mode de classement">
+                            <button class="sort-btn active" data-sort="views" onclick="setBestVideosSort('views')">Vues</button>
+                            <button class="sort-btn" data-sort="engagement" onclick="setBestVideosSort('engagement')">Engagement</button>
+                        </div>
                         <div class="inline-date-filter">
                             <label>Du</label>
                             <input type="date" id="bestDateFrom" onchange="onBestDateFilter()">
@@ -1012,6 +1019,6 @@
     <!-- Status Bar -->
     <div class="status-bar" id="statusBar"></div>
 
-    <script src="/static/js/app.js?v=20260429a"></script>
+    <script src="/static/js/app.js?v=20260502a"></script>
 </body>
 </html>

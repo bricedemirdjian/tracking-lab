@@ -698,10 +698,18 @@ def api_best_videos():
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)
     limit = int(request.args.get("limit", 10))
+    # `sort` toggles between two ranking modes for "Meilleures vidéos":
+    #   - views (default): pure reach. Excludes IG photos/carousels which
+    #     have no view count exposed by Meta.
+    #   - engagement:      weighted score (views + likes×100 + comments×500
+    #                      + shares×200). Surfaces high-engagement carousels
+    #                      alongside viral videos.
+    sort_param = request.args.get("sort", "views")
+    sort_by = "engagement" if sort_param == "engagement" else "views"
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
-    videos = get_videos(account, date_from, date_to, sort_by="views", sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames)
+    videos = get_videos(account, date_from, date_to, sort_by=sort_by, sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(videos[:limit])
 
 

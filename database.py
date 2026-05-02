@@ -716,12 +716,28 @@ def get_videos(account_username=None, date_from=None, date_to=None, sort_by="cre
         query += f" AND create_time <= %s{_ts_cast()}"
         params.append(date_to + " 23:59:59")
 
-    allowed_sorts = {"create_time", "views", "likes", "comments", "shares", "saves"}
+    # "engagement" is a synthetic sort that combines reach (views) with active
+    # interactions (likes/comments/shares). The weights make 1 like worth ~100
+    # views, 1 comment worth ~500, 1 share worth ~200 — calibrated so that an
+    # Instagram carousel with 0 views but high likes/comments still surfaces
+    # alongside high-view videos. Without this, photos and carousels are
+    # invisible in "Top by views" because IG doesn't expose view counts for
+    # non-video media.
+    allowed_sorts = {"create_time", "views", "likes", "comments", "shares", "saves", "engagement"}
     if sort_by not in allowed_sorts:
         sort_by = "create_time"
     if sort_order not in ("ASC", "DESC"):
         sort_order = "DESC"
-    query += f" ORDER BY {sort_by} {sort_order}"
+    if sort_by == "engagement":
+        order_expr = (
+            "(COALESCE(views, 0) "
+            "+ COALESCE(likes, 0) * 100 "
+            "+ COALESCE(comments, 0) * 500 "
+            "+ COALESCE(shares, 0) * 200)"
+        )
+        query += f" ORDER BY {order_expr} {sort_order}"
+    else:
+        query += f" ORDER BY {sort_by} {sort_order}"
 
     results = _fetchall(conn, query, params)
     conn.close()

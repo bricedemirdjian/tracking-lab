@@ -1635,6 +1635,34 @@ body {
 .limit-btn:hover { color: var(--text); background: rgba(0,0,0,.04); }
 .limit-btn.active { background: var(--dark); color: #fff; }
 
+/* Sort selector — same visual language as limit-selector but with text
+   labels ("Vues" / "Engagement") instead of numbers. Used by the
+   "Meilleures vidéos" section to switch between pure-reach ranking and
+   engagement-weighted ranking that surfaces photos and carousels. */
+.sort-selector {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-alt);
+    border-radius: 12px;
+    padding: 3px;
+}
+
+.sort-btn {
+    background: none;
+    border: none;
+    color: var(--text-3);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.sort-btn:hover { color: var(--text); background: rgba(0,0,0,.04); }
+.sort-btn.active { background: var(--dark); color: #fff; }
+
 .inline-date-filter {
     display: flex;
     align-items: center;

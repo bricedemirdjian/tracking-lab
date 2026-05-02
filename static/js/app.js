@@ -35,6 +35,7 @@ let state = {
     activeTab: "overview",
     charts: {},
     bestVideosLimit: 10,
+    bestVideosSort: "views",  // "views" | "engagement"
     latestVideosLimit: 10,
     // Table state
     tableSearch: "",
@@ -185,10 +186,13 @@ async function loadDashboard() {
             fetchAPI("/api/stats", { ...params, competitor: competitorFlag }),
             // Evolution chart: filter by account + optional chart date filter
             fetchAPI("/api/evolution", { account: state.selectedAccount, project_id: state.selectedProject, date_from: state.viewsChartDateFrom, date_to: state.viewsChartDateTo, competitor: competitorFlag }),
-            // Best videos: filter by account + optional dedicated date filter
+            // Best videos: filter by account + optional dedicated date filter.
+            // `sort` toggles between pure-reach (views) and weighted-engagement
+            // — the latter surfaces high-engagement IG carousels alongside videos.
             fetchAPI("/api/best-videos", {
                 account: state.selectedAccount,
                 limit: state.bestVideosLimit,
+                sort: state.bestVideosSort,
                 date_from: state.bestDateFrom,
                 date_to: state.bestDateTo,
                 project_id: state.selectedProject,
@@ -670,6 +674,16 @@ function renderTableLatestVideos(videos) {
 function setBestVideosLimit(n) {
     state.bestVideosLimit = n;
     document.querySelectorAll("#bestVideosLimit .limit-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.limit) === n));
+    loadDashboard();
+}
+
+// Toggle ranking mode for "Meilleures vidéos". Updates the active button,
+// stores in state, and triggers a full dashboard reload — the API returns
+// already-sorted data, so we don't need a client-side re-sort.
+function setBestVideosSort(sort) {
+    if (sort !== "views" && sort !== "engagement") return;
+    state.bestVideosSort = sort;
+    document.querySelectorAll("#bestVideosSort .sort-btn").forEach(b => b.classList.toggle("active", b.dataset.sort === sort));
     loadDashboard();
 }
 
