@@ -195,6 +195,45 @@ async def _request_json(
     return None
 
 
+# ── Thumbnail mirroring ──────────────────────────────────────────────
+# TikTok and Instagram CDN thumbnail URLs are signed with short-lived tokens
+# (~7 days expiry). For "Top videos by views" we surface old viral content
+# whose URLs are long dead by the time the user browses. We solve this by
+# re-hosting each thumbnail on Supabase Storage as soon as it's scraped, and
+# storing the permanent Storage URL in the DB instead of the CDN URL.
+#
+# YouTube thumbnails (i.ytimg.com/vi/{id}/...) are NOT signed and never
+# expire, so we skip mirroring for that platform — saves bandwidth and is
+# strictly unnecessary.
+
+# Platforms that need mirroring (signed CDN URLs that expire).
+_MIRROR_PLATFORMS = {"instagram", "tiktok"}
+
+
+async def _mirror_thumbnail_async(url: str, video_id: str, platform: str) -> str:
+    """Mirror a thumbnail to Supabase Storage. Returns mirrored URL or the
+    original URL on any failure (so we never lose data — worst case the
+    dashboard renders a soon-to-expire URL like before)."""
+    if not url or not video_id or platform not in _MIRROR_PLATFORMS:
+        return url
+    try:
+        session = await _get_session()
+        async with session.post(
+            f"{_SUPABASE_PROXY}/mirror-thumbnail",
+            json={"url": url, "video_id": str(video_id), "platform": platform, "secret": _PROXY_SECRET},
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status == 200:
+                payload = await resp.json()
+                mirrored = payload.get("url")
+                if mirrored:
+                    return mirrored
+    except Exception as e:
+        # Log but don't fail — the original URL is still valid (just shorter-lived)
+        print(f"  [mirror-thumb] {platform}/{video_id}: {type(e).__name__}: {str(e)[:80]}")
+    return url
+
+
 # ── Instagram (via Supabase Edge Function proxy) ──────────────────────
 async def fetch_instagram_async(username: str) -> Optional[dict]:
     """Fetch Instagram data via Supabase proxy with cache + retries."""
@@ -399,7 +438,12 @@ def _ytdlp_tiktok_sync(username: str, host: str) -> Optional[list[dict]]:
         "skip_download": True,
         "socket_timeout": 15,
         "retries": 1,
-        "playlistend": 30,          # only fetch last 30 videos
+        # Bumped from 30 → 100 so historical viral videos surface in periodic
+        # re-scrapes. Combined with the thumbnail mirroring pipeline, this
+        # ensures top-by-views thumbnails get re-mirrored regularly instead
+        # of slowly expiring out of view. Latency cost: ~2-3s extra per
+        # account on the listing call (extract_flat is fast).
+        "playlistend": 100,
         "ignoreerrors": True,       # skip broken entries instead of aborting
         "nocheckcertificate": True,
         "geo_bypass": True,
@@ -531,6 +575,20 @@ async def _process_and_store(
     from database import upsert_account, upsert_video, save_daily_snapshot
 
     if platform == "instagram":
+        videos = data.get("videos", []) or []
+        # Mirror all thumbnails in parallel before persisting. We pre-compute
+        # the mirrored URLs so the sync DB writes only see the final value.
+        # gather() with return_exceptions=True keeps one failure from poisoning
+        # the whole batch — failed mirrors fall back to the original URL.
+        mirrored_urls = await asyncio.gather(
+            *[_mirror_thumbnail_async(v.get("thumbnail_url", ""), v.get("id", ""), "instagram") for v in videos],
+            return_exceptions=True,
+        )
+        mirrored_urls = [
+            r if isinstance(r, str) else videos[i].get("thumbnail_url", "")
+            for i, r in enumerate(mirrored_urls)
+        ]
+
         def _store():
             upsert_account(
                 username=username,
@@ -540,7 +598,7 @@ async def _process_and_store(
                 user_id=user_id,
                 platform="instagram",
             )
-            for v in data.get("videos", []):
+            for v, mirrored in zip(videos, mirrored_urls):
                 upsert_video(
                     video_id=v["id"],
                     account_username=username,
@@ -552,13 +610,13 @@ async def _process_and_store(
                     comments=v.get("comments", 0),
                     shares=0,
                     saves=0,
-                    thumbnail_url=v.get("thumbnail_url", ""),
+                    thumbnail_url=mirrored,
                     video_url=v.get("video_url", ""),
                     user_id=user_id,
                     platform="instagram",
                 )
             save_daily_snapshot(username, user_id=user_id, platform="instagram")
-            return len(data.get("videos", []))
+            return len(videos)
         return await asyncio.to_thread(_store)
 
     if platform == "linkedin":
@@ -593,21 +651,54 @@ async def _process_and_store(
             return len(data.get("posts", []))
         return await asyncio.to_thread(_store)
 
-    # TikTok / YouTube — data is list of yt-dlp video dicts
+    # TikTok / YouTube — data is list of yt-dlp video dicts.
+    # Pre-extract thumbnail URLs and video_ids so we can parallel-mirror them
+    # before the sync DB write phase. TikTok URLs are signed (expire ~7d), so
+    # we mirror them. YouTube i.ytimg.com URLs never expire — skip mirroring.
+
+    def _pick_thumbnail(vdata: dict) -> str:
+        thumbnail = vdata.get("thumbnail")
+        if not thumbnail:
+            tl = vdata.get("thumbnails", []) or []
+            for t in tl:
+                if t.get("id") == "originCover":
+                    return t.get("url") or ""
+            for t in tl:
+                if t.get("id") == "cover":
+                    return t.get("url") or ""
+            if tl:
+                return tl[0].get("url") or ""
+        return thumbnail or ""
+
+    pre_extracted = []
+    for vdata in data:
+        vid = str(vdata.get("id", vdata.get("display_id", "")))
+        if not vid:
+            continue
+        pre_extracted.append({"vid": vid, "thumb": _pick_thumbnail(vdata), "vdata": vdata})
+
+    # Mirror TikTok thumbs in parallel; YouTube falls through unchanged.
+    mirrored_urls = await asyncio.gather(
+        *[_mirror_thumbnail_async(item["thumb"], item["vid"], platform) for item in pre_extracted],
+        return_exceptions=True,
+    )
+    mirrored_urls = [
+        r if isinstance(r, str) else pre_extracted[i]["thumb"]
+        for i, r in enumerate(mirrored_urls)
+    ]
+
     def _store():
         followers = 0
         display_name = username
-        for vdata in data:
-            video_id = str(vdata.get("id", vdata.get("display_id", "")))
-            if not video_id:
-                continue
+        for item, mirrored_thumb in zip(pre_extracted, mirrored_urls):
+            vdata = item["vdata"]
+            video_id = item["vid"]
             uploader = vdata.get("uploader", username)
             if uploader:
                 display_name = uploader
             cfc = vdata.get("channel_follower_count", 0)
             if cfc:
                 followers = cfc
-            # Prefer unix `timestamp`, fall back to `upload_date` (YYYYMMDD) for YouTube
             create_ts = vdata.get("timestamp")
             create_time = None
             if create_ts:
@@ -623,22 +714,6 @@ async def _process_and_store(
                     except ValueError:
                         pass
 
-            # Thumbnails: prefer originCover > cover > first available
-            thumbnail = vdata.get("thumbnail")
-            if not thumbnail:
-                tl = vdata.get("thumbnails", []) or []
-                for t in tl:
-                    if t.get("id") == "originCover":
-                        thumbnail = t.get("url")
-                        break
-                if not thumbnail:
-                    for t in tl:
-                        if t.get("id") == "cover":
-                            thumbnail = t.get("url")
-                            break
-                if not thumbnail and tl:
-                    thumbnail = tl[0].get("url")
-
             upsert_video(
                 video_id=video_id,
                 account_username=username,
@@ -650,7 +725,7 @@ async def _process_and_store(
                 comments=vdata.get("comment_count", 0) or 0,
                 shares=vdata.get("repost_count", 0) or 0,
                 saves=vdata.get("forward_count", 0) or 0,
-                thumbnail_url=thumbnail,
+                thumbnail_url=mirrored_thumb,
                 video_url=vdata.get("webpage_url"),
                 user_id=user_id,
                 platform=platform,
@@ -663,7 +738,7 @@ async def _process_and_store(
             platform=platform,
         )
         save_daily_snapshot(username, user_id=user_id, platform=platform)
-        return len(data)
+        return len(pre_extracted)
     return await asyncio.to_thread(_store)
 
 
