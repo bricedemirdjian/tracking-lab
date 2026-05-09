@@ -241,9 +241,57 @@ async def _mirror_thumbnail_async(url: str, video_id: str, platform: str) -> str
     return url
 
 
+# Sentinel for IG cache hits, mirrors _TT_CACHE_HIT.
+_IG_CACHE_HIT = object()
+
+
+def _get_ig_account_baseline_sync(username: str, user_id: int) -> Optional[dict]:
+    """Returns {followers, last_media_count} for cache-diff comparison, or None."""
+    try:
+        from database import get_connection, _fetchone
+        conn = get_connection()
+        row = _fetchone(
+            conn,
+            "SELECT followers, last_media_count FROM accounts "
+            "WHERE user_id = %s AND username = %s AND platform = 'instagram'",
+            (user_id, username),
+        )
+        conn.close()
+        if not row:
+            return None
+        return {
+            "followers": int(row.get("followers") or 0),
+            "last_media_count": int(row.get("last_media_count") or 0),
+        }
+    except Exception:
+        return None
+
+
+def _refresh_ig_stats_only(username: str, user_id: int, profile: dict):
+    """Cache-hit path for IG: refresh just the account stats row."""
+    from database import upsert_account, save_daily_snapshot
+    upsert_account(
+        username=username,
+        display_name=profile.get("full_name", username),
+        followers=profile.get("followers", 0),
+        following=profile.get("following", 0),
+        avatar_url=profile.get("profile_pic", ""),
+        last_media_count=profile.get("media_count", 0),
+        user_id=user_id,
+        platform="instagram",
+    )
+    save_daily_snapshot(username, user_id=user_id, platform="instagram")
+
+
 # ── Instagram (via Supabase Edge Function proxy) ──────────────────────
-async def fetch_instagram_async(username: str) -> Optional[dict]:
-    """Fetch Instagram data via Supabase proxy with cache + retries."""
+async def fetch_instagram_async(username: str, user_id: Optional[int] = None) -> Any:
+    """Fetch Instagram data via Supabase proxy with cache + retries.
+
+    Cache fast path: if user_id is provided, do a cheap `profile_only=true`
+    fetch first. If the profile's media_count AND followers both match what
+    we have stored, the heavy paginated post fetch is skipped — only stats
+    are refreshed. Returns _IG_CACHE_HIT on hit, otherwise the full payload.
+    """
     cache_key = f"ig:{username}"
     cached = await _cache_get(cache_key)
     if cached is not None:
@@ -251,6 +299,31 @@ async def fetch_instagram_async(username: str) -> Optional[dict]:
         return cached
 
     url = f"{_SUPABASE_PROXY}/instagram-proxy"
+
+    if user_id is not None:
+        # Cheap profile-only fetch (~1.5s vs ~25s with full pagination).
+        profile = await _request_json(
+            url,
+            params={"username": username, "secret": _PROXY_SECRET, "profile_only": "true"},
+            label=f"IG-profile @{username}",
+        )
+        if profile and "error" not in profile:
+            baseline = await asyncio.to_thread(_get_ig_account_baseline_sync, username, user_id)
+            new_followers = int(profile.get("followers", 0) or 0)
+            new_media_count = int(profile.get("media_count", 0) or 0)
+            if (
+                baseline
+                and new_media_count > 0
+                and baseline["last_media_count"] == new_media_count
+                and baseline["followers"] == new_followers
+            ):
+                await asyncio.to_thread(_refresh_ig_stats_only, username, user_id, profile)
+                print(
+                    f"  [Instagram] @{username}: cache hit "
+                    f"(media_count={new_media_count}, followers={new_followers}) — skipping post fetch"
+                )
+                return _IG_CACHE_HIT
+
     data = await _request_json(
         url,
         params={"username": username, "secret": _PROXY_SECRET},
@@ -279,6 +352,10 @@ async def fetch_instagram_async(username: str) -> Optional[dict]:
         "total_likes": data.get("total_likes", 0),
         "total_comments": data.get("total_comments", 0),
         "total_views": data.get("total_views", 0),
+        # IG-specific cache key — what the proxy reported for media_count this run.
+        # Stored on the account row so the next scrape can short-circuit when
+        # it hasn't changed.
+        "media_count": data.get("media_count", 0),
         "videos": videos,
     }
     await _cache_set(cache_key, result)
@@ -725,6 +802,7 @@ async def _process_and_store(
                 total_likes=data.get("total_likes", 0),
                 total_views=data.get("total_views", 0),
                 total_comments=data.get("total_comments", 0),
+                last_media_count=data.get("media_count", 0),
                 avatar_url=data.get("profile_pic", ""),
                 user_id=user_id,
                 platform="instagram",
@@ -924,7 +1002,7 @@ async def scrape_accounts_async(
 
             try:
                 if platform == "instagram":
-                    data = await fetch_instagram_async(username)
+                    data = await fetch_instagram_async(username, user_id=user_id)
                 elif platform == "linkedin":
                     data = await fetch_linkedin_async(username)
                 elif platform == "youtube":
@@ -932,12 +1010,13 @@ async def scrape_accounts_async(
                 else:  # tiktok (default)
                     data = await fetch_tiktok_async(username, user_id=user_id)
 
-                # TT cache-hit fast path: stats were already refreshed inside the
-                # fetcher — report DB count instead of "0 videos" (which would be
-                # technically true ["0 NEW"] but visually misleading).
-                if data is _TT_CACHE_HIT:
+                # Cache-hit fast path (TT or IG): stats were already refreshed
+                # inside the fetcher — report DB count instead of "0 videos"
+                # (which is technically "0 NEW" but visually misleading).
+                if data is _TT_CACHE_HIT or data is _IG_CACHE_HIT:
+                    cached_platform = "tiktok" if data is _TT_CACHE_HIT else "instagram"
                     db_count = await asyncio.to_thread(
-                        _count_videos_in_db_sync, username, user_id, "tiktok"
+                        _count_videos_in_db_sync, username, user_id, cached_platform
                     )
                     results[username] = {
                         "username": username, "status": "cached",

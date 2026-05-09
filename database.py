@@ -389,8 +389,11 @@ def _migrate_competitor_column(conn):
 
 
 def _migrate_engagement_totals_columns(conn):
-    """Add total_views + total_comments columns to accounts (idempotent)."""
-    for col in ("total_views", "total_comments"):
+    """Add total_views + total_comments + last_media_count columns to accounts.
+    last_media_count is the IG cache key — compared against the proxy's profile
+    media_count to decide whether to skip the heavy paginated post fetch.
+    Idempotent."""
+    for col in ("total_views", "total_comments", "last_media_count"):
         try:
             if DATABASE_URL:
                 exists = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name=%s", (col,))
@@ -655,25 +658,26 @@ def get_account_usernames_for_project(user_id, project_id):
 
 # ==================== Data functions (all filtered by user_id) ====================
 
-def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, bio=None, user_id=None, platform="tiktok"):
+def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, last_media_count=0, bio=None, user_id=None, platform="tiktok"):
     conn = get_connection()
     # On conflict, only overwrite numeric stats if the new value is non-zero —
     # otherwise an empty/error scrape (e.g. transient 404) wipes good data.
     # Genuine "0 followers" still gets persisted on the initial INSERT path.
     _execute(conn, """
-        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, bio, last_updated, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, bio, last_updated, user_id, platform)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT(username, user_id, platform) DO UPDATE SET
-            display_name   = COALESCE(excluded.display_name, accounts.display_name),
-            avatar_url     = COALESCE(excluded.avatar_url, accounts.avatar_url),
-            followers      = CASE WHEN excluded.followers      > 0 THEN excluded.followers      ELSE accounts.followers      END,
-            following      = CASE WHEN excluded.following      > 0 THEN excluded.following      ELSE accounts.following      END,
-            total_likes    = CASE WHEN excluded.total_likes    > 0 THEN excluded.total_likes    ELSE accounts.total_likes    END,
-            total_views    = CASE WHEN excluded.total_views    > 0 THEN excluded.total_views    ELSE accounts.total_views    END,
-            total_comments = CASE WHEN excluded.total_comments > 0 THEN excluded.total_comments ELSE accounts.total_comments END,
+            display_name     = COALESCE(excluded.display_name, accounts.display_name),
+            avatar_url       = COALESCE(excluded.avatar_url, accounts.avatar_url),
+            followers        = CASE WHEN excluded.followers        > 0 THEN excluded.followers        ELSE accounts.followers        END,
+            following        = CASE WHEN excluded.following        > 0 THEN excluded.following        ELSE accounts.following        END,
+            total_likes      = CASE WHEN excluded.total_likes      > 0 THEN excluded.total_likes      ELSE accounts.total_likes      END,
+            total_views      = CASE WHEN excluded.total_views      > 0 THEN excluded.total_views      ELSE accounts.total_views      END,
+            total_comments   = CASE WHEN excluded.total_comments   > 0 THEN excluded.total_comments   ELSE accounts.total_comments   END,
+            last_media_count = CASE WHEN excluded.last_media_count > 0 THEN excluded.last_media_count ELSE accounts.last_media_count END,
             bio = COALESCE(excluded.bio, accounts.bio),
             last_updated = excluded.last_updated
-    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, bio, datetime.now().isoformat(), user_id, platform))
+    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, bio, datetime.now().isoformat(), user_id, platform))
     conn.commit()
     conn.close()
 
