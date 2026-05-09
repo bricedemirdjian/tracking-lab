@@ -135,10 +135,66 @@ def _ts_cast():
 
 # ==================== Schema ====================
 
+# Bump this string whenever you add a CREATE TABLE / migration helper or
+# change anything the init_db() flow does. On Vercel cold start init_db()
+# does a single SELECT against schema_meta — if the stored version matches,
+# every CREATE / migration is skipped (saves ~640ms per cold start). On
+# version mismatch, full init runs once and writes the new value.
+SCHEMA_VERSION = "2026-05-09-v1"
+
+
+def _is_schema_current(conn) -> bool:
+    """Single quick lookup, swallows any error (table missing on first run).
+    Rolls the conn back on error so the failed SELECT doesn't poison the
+    surrounding transaction (Postgres aborts the whole tx on any error)."""
+    try:
+        row = _fetchone(
+            conn,
+            "SELECT value FROM schema_meta WHERE key = %s",
+            ("schema_version",),
+        )
+        return bool(row) and row.get("value") == SCHEMA_VERSION
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def _mark_schema_current(conn):
+    """Persist the version after a successful init run."""
+    try:
+        _execute(
+            conn,
+            "INSERT INTO schema_meta (key, value, updated_at) VALUES (%s, %s, %s) "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at",
+            ("schema_version", SCHEMA_VERSION, datetime.now().isoformat()),
+        )
+    except Exception as e:
+        print(f"[Schema] Could not stamp version: {e}")
+
+
 def init_db():
     conn = get_connection()
 
+    # Fast path: schema_meta says we're already at the current version.
+    # Skips ~7 CREATE TABLE IF NOT EXISTS + 8 migration helpers (~640ms).
+    if _is_schema_current(conn):
+        conn.close()
+        return
+
     auto_id = "SERIAL PRIMARY KEY" if DATABASE_URL else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    # Always-present meta table (created early so subsequent runs short-circuit
+    # in _is_schema_current). Tiny, single-row use case.
+    _execute(conn, f"""
+        CREATE TABLE IF NOT EXISTS schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     _execute(conn, f"""
         CREATE TABLE IF NOT EXISTS users (
@@ -273,6 +329,9 @@ def init_db():
     _migrate_composite_indices(conn)
     # Migration: create default project for users without projects
     _migrate_default_projects(conn)
+
+    # Stamp the version so the next cold start hits the fast-path.
+    _mark_schema_current(conn)
 
     conn.commit()
     conn.close()
@@ -1503,6 +1562,35 @@ def set_user_role(user_id, role):
     _execute(conn, "UPDATE users SET role = %s WHERE id = %s", (role, user_id))
     conn.commit()
     conn.close()
+    # Invalidate the admin cache — role change may affect the admin lookup.
+    global _admin_user_id_cache
+    _admin_user_id_cache = None
+
+
+# ── Admin user_id resolver (cached per process) ─────────────────────────
+# Managers see admin's data: data_user_id returns this value for them.
+# We look it up dynamically rather than hard-coding `user_id = 1`,
+# because the admin may have a different id in the DB.
+_admin_user_id_cache = None
+
+def get_admin_user_id():
+    """Return the user_id of the admin (role='admin'), or None if not set.
+
+    Cached for the process lifetime — Vercel function instances are short-lived
+    so this is effectively per-request.
+    """
+    global _admin_user_id_cache
+    if _admin_user_id_cache is not None:
+        return _admin_user_id_cache
+    conn = get_connection()
+    try:
+        row = _fetchone(conn, "SELECT id FROM users WHERE role = %s ORDER BY id LIMIT 1", ('admin',))
+        if row:
+            _admin_user_id_cache = row['id'] if isinstance(row, dict) else row[0]
+            return _admin_user_id_cache
+        return None
+    finally:
+        conn.close()
 
 
 def delete_user_and_data(user_id):
