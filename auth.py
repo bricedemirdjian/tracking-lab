@@ -2,7 +2,7 @@ import os
 from flask import Blueprint, redirect, url_for, session, request, render_template
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from database import create_or_update_user, get_user_by_id, seed_user_data, set_user_role
+from database import create_or_update_user, get_user_by_id, seed_user_data, set_user_role, get_admin_user_id
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -35,9 +35,16 @@ class User(UserMixin):
 
     @property
     def data_user_id(self):
-        """Managers see admin's data (user_id=1), others see their own."""
+        """Managers see the admin's data; everyone else sees their own.
+
+        The admin's user_id is looked up dynamically (role='admin' in DB)
+        rather than hard-coded, so it adapts when the admin user_id changes.
+        Falls back to self.id if no admin is set.
+        """
         if self.role == 'manager':
-            return 1  # Admin's user_id
+            admin_id = get_admin_user_id()
+            if admin_id:
+                return admin_id
         return self.id
 
 
@@ -113,8 +120,8 @@ def auth_callback():
             return render_template('blocked.html'), 403
 
         # Auto-assign admin role if email matches ADMIN_EMAIL
-        admin_email = os.environ.get('ADMIN_EMAIL', '')
-        if admin_email and userinfo['email'].lower() == admin_email.lower() and user_dict.get('role') != 'admin':
+        admin_email = os.environ.get('ADMIN_EMAIL', '').strip()
+        if admin_email and userinfo['email'].strip().lower() == admin_email.lower() and user_dict.get('role') != 'admin':
             set_user_role(user_dict['id'], 'admin')
             user_dict['role'] = 'admin'
 

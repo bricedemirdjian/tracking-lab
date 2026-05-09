@@ -184,21 +184,6 @@ button { font-family: inherit; cursor: pointer; }
 }
 .sb-item .icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
 .sb-item.active .icon { opacity: 1; color: var(--accent); }
-.sb-item.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.sb-soon {
-  margin-left: auto;
-  font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  background: var(--bg-sidebar);
-  color: var(--text-3);
-  padding: 2px 6px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-}
 
 .sb-bottom { margin-top: auto; padding: 14px 22px 4px; }
 .sb-status {
@@ -711,198 +696,6 @@ button { font-family: inherit; cursor: pointer; }
 }
 .chart-x span { flex: 1; text-align: center; }
 
-/* ═══════ VIEWS — accounts / videos / table ═══════ */
-.view-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 18px;
-}
-.view-summary {
-  font-size: 13px; color: var(--text-2); font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.view-summary span {
-  font-weight: 700; color: var(--text);
-}
-.view-empty {
-  text-align: center; padding: 60px 20px;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-lg);
-  color: var(--text-3);
-}
-
-/* Accounts grid */
-.accounts-grid {
-  display: grid; gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-.account-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 18px 20px;
-  display: flex; flex-direction: column; gap: 14px;
-  transition: border-color .15s, box-shadow .15s;
-}
-.account-card:hover { border-color: var(--text-4); box-shadow: var(--shadow); }
-.account-card-head {
-  display: flex; align-items: center; gap: 10px;
-}
-.account-card-platform {
-  width: 32px; height: 32px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-.account-card-platform[data-p="tiktok"]    { background: #000; color: #fff; }
-.account-card-platform[data-p="instagram"] { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff; }
-.account-card-platform[data-p="youtube"]   { background: #FF0000; color: #fff; }
-.account-card-platform[data-p="linkedin"]  { background: #0a66c2; color: #fff; }
-.account-card-platform svg { width: 16px; height: 16px; }
-.account-card-username {
-  font-size: 14px; font-weight: 700; color: var(--text);
-  letter-spacing: -0.2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  flex: 1; min-width: 0;
-}
-.account-card-handle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.account-card-meta {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-.account-card-stat-label {
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--text-3);
-  margin-bottom: 4px;
-}
-.account-card-stat-value {
-  font-size: 16px; font-weight: 700; color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.account-card-foot {
-  font-size: 11px; color: var(--text-3);
-  display: flex; align-items: center; gap: 6px;
-}
-.account-card-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--green); flex-shrink: 0;
-}
-.account-card-dot.stale { background: var(--red); }
-.account-card-actions {
-  display: flex; gap: 8px;
-}
-.account-card-link {
-  font-size: 12px; font-weight: 600; color: var(--text-2);
-  text-decoration: none;
-  padding: 6px 10px;
-  border: 1px solid var(--border); border-radius: var(--r-pill);
-  transition: all .15s;
-}
-.account-card-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-
-/* Videos grid */
-.videos-grid {
-  display: grid; gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
-.video-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
-  display: flex; flex-direction: column;
-}
-.video-card:hover { border-color: var(--text-4); box-shadow: var(--shadow); transform: translateY(-2px); }
-.video-thumb {
-  aspect-ratio: 9 / 16;
-  background: var(--bg-sidebar) center/cover no-repeat;
-  position: relative;
-  display: block;
-}
-.video-thumb-fallback {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24px; opacity: 0.3;
-}
-.video-thumb-platform {
-  position: absolute; top: 8px; left: 8px;
-  width: 22px; height: 22px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  backdrop-filter: blur(8px); background: rgba(0,0,0,0.55); color: #fff;
-}
-.video-thumb-platform svg { width: 12px; height: 12px; }
-.video-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.video-title {
-  font-size: 12.5px; font-weight: 600; color: var(--text);
-  line-height: 1.3;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.video-author { font-size: 11px; color: var(--text-3); }
-.video-stats {
-  display: flex; gap: 12px; font-size: 11px; color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-  padding-top: 8px; border-top: 1px solid var(--border); margin-top: auto;
-}
-.video-stats span { display: inline-flex; align-items: center; gap: 4px; }
-.video-stats svg { width: 11px; height: 11px; opacity: 0.6; }
-
-/* Table */
-.table-wrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow-x: auto;
-}
-.data-table {
-  width: 100%; border-collapse: collapse;
-  font-size: 13px;
-}
-.data-table thead th {
-  font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.6px;
-  color: var(--text-3);
-  text-align: left;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-sidebar);
-  position: sticky; top: 0;
-}
-.data-table th.num, .data-table td.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.data-table tbody td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-}
-.data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr:hover { background: rgba(255,105,180,0.04); }
-.data-table .cell-account {
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 600;
-}
-.data-table .cell-account-platform {
-  width: 22px; height: 22px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-}
-.data-table .cell-account-platform svg { width: 12px; height: 12px; }
-.data-table .platform-tag {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px;
-  font-size: 11.5px; font-weight: 600;
-  border-radius: var(--r-pill);
-  background: var(--bg-sidebar);
-  border: 1px solid var(--border);
-  color: var(--text-2);
-}
-
 /* Floating chat bubble */
 .chat-float {
   position: fixed; bottom: 26px; right: 26px;
@@ -941,6 +734,9 @@ button { font-family: inherit; cursor: pointer; }
 </head>
 <body>
 
+<div class="preview-banner">
+  ⚠ Preview design uniquement — la prod reste sur <a href="/dashboard">/dashboard</a>. Ce sera switché si tu valides.
+</div>
 
 <div class="layout">
 
@@ -986,70 +782,40 @@ button { font-family: inherit; cursor: pointer; }
       <button class="sb-import-btn" id="addAccountBtn">+ Ajouter</button>
     </div>
 
-    <!-- Analytics — your own accounts -->
     <div class="sb-section">
       <div class="sb-section-head">
         <span class="sb-section-label">Analytics</span><span class="sb-chev">▾</span>
       </div>
-      <a class="sb-item" href="/dashboard" data-nav="dashboard">
+      <a class="sb-item active" href="#">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        Tableau de bord
+        Tableau de bord global
       </a>
-      <a class="sb-item" href="/dashboard?view=accounts" data-nav="accounts">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg>
-        Comptes
+      <a class="sb-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        Comptes <span style="margin-left:auto; opacity:0.7;" id="sbAccCount">—</span>
       </a>
-      <a class="sb-item" href="/dashboard?view=videos" data-nav="videos">
+      <a class="sb-item" href="#">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
         Vidéos
       </a>
-      <a class="sb-item" href="/dashboard?view=table" data-nav="table">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-        Tableau détaillé
+      <a class="sb-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Map
       </a>
     </div>
 
-    <!-- Concurrents — competitor accounts -->
     <div class="sb-section">
       <div class="sb-section-head">
         <span class="sb-section-label">Concurrents</span><span class="sb-chev">▾</span>
       </div>
-      <a class="sb-item" href="/dashboard?scope=competitor" data-nav="competitor-dashboard">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        Tableau de bord
+      <a class="sb-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/></svg>
+        Vue d'ensemble
       </a>
-      <a class="sb-item" href="/dashboard?scope=competitor&view=accounts" data-nav="competitor-accounts">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg>
-        Comptes
+      <a class="sb-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/></svg>
+        Pipeline
       </a>
-      <a class="sb-item" href="/dashboard?scope=competitor&view=videos" data-nav="competitor-videos">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-        Vidéos
-      </a>
-      <a class="sb-item" href="/dashboard?scope=competitor&view=table" data-nav="competitor-table">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-        Tableau détaillé
-      </a>
-    </div>
-
-    <div class="sb-section">
-      <div class="sb-section-head">
-        <span class="sb-section-label">Compte</span><span class="sb-chev">▾</span>
-      </div>
-      <a class="sb-item" href="/billing">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="14" x2="10" y2="14"/></svg>
-        Facturation
-      </a>
-      {% if user.is_admin %}
-      <a class="sb-item" href="/admin">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Administration
-      </a>
-      <a class="sb-item" href="/admin/swarm">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><line x1="12" y1="12" x2="6" y2="6"/><line x1="12" y1="12" x2="18" y2="6"/><line x1="12" y1="12" x2="6" y2="18"/><line x1="12" y1="12" x2="18" y2="18"/></svg>
-        Swarm
-      </a>
-      {% endif %}
     </div>
 
     <div class="sb-bottom">
@@ -1121,11 +887,6 @@ button { font-family: inherit; cursor: pointer; }
       </div>
 
     </div>
-
-    <!-- ═══════ VIEWS — only one is visible at a time, controlled by ?view=… ═══════ -->
-
-    <!-- ─── DASHBOARD VIEW (default) — KPIs + audience + chart ─── -->
-    <section id="viewDashboard" class="view">
 
     <!-- KPI cards — 10 metrics, 5×2 grid -->
     <div class="kpis">
@@ -1272,72 +1033,10 @@ button { font-family: inherit; cursor: pointer; }
       </div>
     </div>
 
-    </section>
-    <!-- ─── END DASHBOARD VIEW ─── -->
-
-    <!-- ─── ACCOUNTS VIEW — grid of all accounts with details ─── -->
-    <section id="viewAccounts" class="view" hidden>
-      <div class="view-toolbar">
-        <div class="view-summary"><span id="acvCount">—</span> comptes</div>
-      </div>
-      <div class="accounts-grid" id="acvGrid"></div>
-      <div id="acvEmpty" class="view-empty" hidden>
-        <p>Aucun compte à afficher pour ce filtre.</p>
-      </div>
-    </section>
-
-    <!-- ─── VIDEOS VIEW — Top performers + Latest posted ─── -->
-    <section id="viewVideos" class="view" hidden>
-
-      <h2 class="section-h2">Meilleures vidéos</h2>
-      <p class="section-sub">Triées par nombre de vues décroissant</p>
-      <div class="videos-grid" id="vidGridBest"></div>
-      <div id="vidEmptyBest" class="view-empty" hidden>
-        <p>Aucune vidéo top à afficher pour ce filtre.</p>
-      </div>
-
-      <h2 class="section-h2" style="margin-top:36px">Dernières vidéos postées</h2>
-      <p class="section-sub">Triées par date de publication décroissante</p>
-      <div class="videos-grid" id="vidGridLatest"></div>
-      <div id="vidEmptyLatest" class="view-empty" hidden>
-        <p>Aucune vidéo récente à afficher pour ce filtre.</p>
-      </div>
-    </section>
-
-    <!-- ─── TABLE VIEW — audience details per account ─── -->
-    <section id="viewTable" class="view" hidden>
-      <h2 class="section-h2">Détails de l'audience</h2>
-      <p class="section-sub" id="tblPeriodSub">—</p>
-      <div class="view-toolbar">
-        <div class="view-summary"><span id="tblCount">—</span> comptes</div>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table" id="dataTable">
-          <thead>
-            <tr>
-              <th>Compte</th>
-              <th>Plateforme</th>
-              <th class="num">Followers</th>
-              <th class="num">Gain</th>
-              <th class="num">Vidéos</th>
-              <th class="num">Vues</th>
-              <th class="num">Vues / vidéo</th>
-              <th class="num">Engagement</th>
-              <th>Dernier sync</th>
-            </tr>
-          </thead>
-          <tbody id="tblBody"></tbody>
-        </table>
-      </div>
-      <div id="tblEmpty" class="view-empty" hidden>
-        <p>Aucune donnée à afficher pour ce filtre.</p>
-      </div>
-    </section>
-
   </main>
 </div>
 
-<a href="mailto:brice.demirdjian@gmail.com?subject=Support%20Tracking%20Lab" class="chat-float" title="Aide & support">💬</a>
+<a href="#" class="chat-float" title="Aide & support">💬</a>
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
@@ -1375,35 +1074,13 @@ button { font-family: inherit; cursor: pointer; }
     const toEl = $('#filterDateTo'); if (toEl) toEl.value = state.date_to;
   }
 
-  // Read URL params once (scope drives competitor filter, view drives which section is shown)
-  const urlParams = new URLSearchParams(window.location.search);
-  const navScope = urlParams.get('scope');                  // null | 'competitor'
-  const navView = urlParams.get('view');                    // null | 'accounts' | 'videos' | 'table'
-  const isCompetitorScope = navScope === 'competitor';
-
   function buildStatsURL() {
     const p = new URLSearchParams();
     if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
     if (state.account && state.account !== 'all') p.set('account', state.account);
     if (state.date_from) p.set('date_from', state.date_from);
     if (state.date_to) p.set('date_to', state.date_to);
-    p.set('competitor', isCompetitorScope ? 'true' : 'false');
-    return '/api/stats?' + p.toString();
-  }
-  function buildAccountsURL() {
-    const p = new URLSearchParams();
-    p.set('competitor', isCompetitorScope ? 'true' : 'false');
-    return '/api/accounts?' + p.toString();
-  }
-  function buildVideosURL() {
-    const p = new URLSearchParams();
-    if (state.account && state.account !== 'all') p.set('account', state.account);
-    if (state.date_from) p.set('date_from', state.date_from);
-    if (state.date_to) p.set('date_to', state.date_to);
-    p.set('competitor', isCompetitorScope ? 'true' : 'false');
-    p.set('sort_by', 'create_time');
-    p.set('sort_order', 'DESC');
-    return '/api/videos?' + p.toString();
+    return '/api/stats' + (p.toString() ? '?' + p : '');
   }
 
   function setSubtitle() {
@@ -1434,7 +1111,7 @@ button { font-family: inherit; cursor: pointer; }
     try {
       const [statsR, accR, projR] = await Promise.all([
         fetch(buildStatsURL()),
-        fetch(buildAccountsURL()),
+        fetch('/api/accounts'),
         fetch('/api/projects'),
       ]);
       const stats = await statsR.json();
@@ -1496,218 +1173,9 @@ button { font-family: inherit; cursor: pointer; }
         $('#attValue').textContent = stale.length;
         $('#attStatus').textContent = `Statut « pas de sync depuis 36h » (${stale.slice(0,3).map(a=>'@'+a.username).join(', ')}${stale.length > 3 ? '…' : ''})`;
       }
-
-      // Render per-view content if not on the default dashboard.
-      if (navView === 'accounts') renderAccountsView(accounts);
-      else if (navView === 'videos') await renderVideosView();
-      else if (navView === 'table') renderTableView(accounts, stats);
     } catch (e) {
       console.error(e);
     }
-  }
-
-  // ─── View renderers ─────────────────────────────────────────────────
-  const PLATFORM_SVG_INLINE = {
-    tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 0 1 3.183-4.51v-3.5a6.329 6.329 0 0 0-5.394 10.692 6.33 6.33 0 0 0 10.857-4.424V8.687a8.182 8.182 0 0 0 4.773 1.526V6.79a4.831 4.831 0 0 1-1.003-.104z"/></svg>',
-    instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>',
-    youtube: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
-    linkedin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
-  };
-  const PLATFORM_URL = {
-    tiktok: u => `https://www.tiktok.com/@${u}`,
-    instagram: u => `https://www.instagram.com/${u}`,
-    youtube: u => `https://www.youtube.com/@${u}`,
-    linkedin: u => `https://www.linkedin.com/in/${u}`,
-  };
-  const escapeHTML = s => String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  function timeAgo(iso) {
-    if (!iso) return 'jamais';
-    const ms = Date.now() - new Date(iso).getTime();
-    const h = ms / 3600000;
-    if (h < 1) return 'il y a < 1 h';
-    if (h < 24) return `il y a ${Math.round(h)} h`;
-    return `il y a ${Math.round(h / 24)} j`;
-  }
-
-  function renderAccountsView(accs) {
-    const grid = $('#acvGrid');
-    const empty = $('#acvEmpty');
-    $('#acvCount').textContent = accs.length;
-    if (!accs.length) {
-      grid.innerHTML = '';
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-    grid.innerHTML = accs.map(a => {
-      const p = a.platform || 'tiktok';
-      const url = PLATFORM_URL[p] ? PLATFORM_URL[p](a.username) : '#';
-      const fol = a.follower_count ?? a.followers ?? 0;
-      const vids = a.video_count ?? a.total_videos ?? 0;
-      const views = a.total_views ?? 0;
-      const stale = !a.last_updated || (Date.now() - new Date(a.last_updated).getTime()) / 3600000 > 36;
-      return `
-        <div class="account-card">
-          <div class="account-card-head">
-            <span class="account-card-platform" data-p="${p}">${PLATFORM_SVG_INLINE[p] || ''}</span>
-            <div style="flex:1; min-width:0">
-              <div class="account-card-username">@${escapeHTML(a.username)}</div>
-              <div class="account-card-handle">${escapeHTML(a.display_name || a.username)} · ${p}</div>
-            </div>
-          </div>
-          <div class="account-card-meta">
-            <div>
-              <div class="account-card-stat-label">Followers</div>
-              <div class="account-card-stat-value">${fmt(fol)}</div>
-            </div>
-            <div>
-              <div class="account-card-stat-label">Vidéos</div>
-              <div class="account-card-stat-value">${fmt(vids)}</div>
-            </div>
-            <div>
-              <div class="account-card-stat-label">Vues</div>
-              <div class="account-card-stat-value">${fmt(views)}</div>
-            </div>
-          </div>
-          <div class="account-card-foot">
-            <span class="account-card-dot ${stale ? 'stale' : ''}"></span>
-            Sync ${timeAgo(a.last_updated)}
-          </div>
-          <div class="account-card-actions">
-            <a class="account-card-link" href="${url}" target="_blank" rel="noopener">Voir le profil ↗</a>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  function buildVideoEndpointURL(endpoint, limit = 12) {
-    const p = new URLSearchParams();
-    if (state.account && state.account !== 'all') p.set('account', state.account);
-    if (state.date_from) p.set('date_from', state.date_from);
-    if (state.date_to) p.set('date_to', state.date_to);
-    if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
-    p.set('competitor', isCompetitorScope ? 'true' : 'false');
-    p.set('limit', String(limit));
-    return `/api/${endpoint}?` + p.toString();
-  }
-
-  function renderVideoCard(v) {
-    const p = v.platform || 'tiktok';
-    const thumb = v.thumbnail_url || v.cover_url || v.thumbnail || '';
-    const title = v.description || v.title || '(Sans titre)';
-    const author = v.username ? `@${v.username}` : '';
-    const url = v.url || v.video_url || '#';
-    return `
-      <a class="video-card" href="${escapeHTML(url)}" target="_blank" rel="noopener">
-        <div class="video-thumb" style="${thumb ? `background-image:url('${escapeHTML(thumb)}')` : ''}">
-          ${!thumb ? '<div class="video-thumb-fallback">▶</div>' : ''}
-          <span class="video-thumb-platform">${PLATFORM_SVG_INLINE[p] || ''}</span>
-        </div>
-        <div class="video-body">
-          <div class="video-title">${escapeHTML(title.slice(0, 120))}</div>
-          <div class="video-author">${escapeHTML(author)}</div>
-          <div class="video-stats">
-            <span title="Vues">▶ ${fmt(v.view_count || v.views || 0)}</span>
-            <span title="Likes">♥ ${fmt(v.like_count || v.likes || 0)}</span>
-            <span title="Commentaires">💬 ${fmt(v.comment_count || v.comments || 0)}</span>
-          </div>
-        </div>
-      </a>`;
-  }
-
-  async function renderVideosView() {
-    const bestGrid = $('#vidGridBest');
-    const latestGrid = $('#vidGridLatest');
-    const bestEmpty = $('#vidEmptyBest');
-    const latestEmpty = $('#vidEmptyLatest');
-
-    const loadingHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--text-3); padding:40px">Chargement…</div>';
-    bestGrid.innerHTML = loadingHTML;
-    latestGrid.innerHTML = loadingHTML;
-
-    try {
-      const [bestR, latestR] = await Promise.all([
-        fetch(buildVideoEndpointURL('best-videos', 12)),
-        fetch(buildVideoEndpointURL('latest-videos', 12)),
-      ]);
-      const bestData = await bestR.json();
-      const latestData = await latestR.json();
-      const best = Array.isArray(bestData) ? bestData : (bestData.videos || []);
-      const latest = Array.isArray(latestData) ? latestData : (latestData.videos || []);
-
-      if (best.length) {
-        bestEmpty.hidden = true;
-        bestGrid.innerHTML = best.map(renderVideoCard).join('');
-      } else {
-        bestGrid.innerHTML = '';
-        bestEmpty.hidden = false;
-      }
-
-      if (latest.length) {
-        latestEmpty.hidden = true;
-        latestGrid.innerHTML = latest.map(renderVideoCard).join('');
-      } else {
-        latestGrid.innerHTML = '';
-        latestEmpty.hidden = false;
-      }
-    } catch (e) {
-      console.error(e);
-      bestGrid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--text-3); padding:40px">Erreur de chargement.</div>';
-      latestGrid.innerHTML = '';
-    }
-  }
-
-  function renderTableView(accs, stats) {
-    const tbody = $('#tblBody');
-    const empty = $('#tblEmpty');
-    const perAccount = stats?.per_account || [];
-    const byUsername = {};
-    perAccount.forEach(s => { byUsername[s.username] = s; });
-
-    $('#tblCount').textContent = accs.length;
-    $('#tblPeriodSub').textContent = 'Période : ' + (state.range != null
-      ? (state.range === 1 ? 'Dernière 24 h' : `Derniers ${state.range} jours`)
-      : `${state.date_from || ''} → ${state.date_to || ''}`);
-
-    if (!accs.length) {
-      tbody.innerHTML = '';
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-    tbody.innerHTML = accs.map(a => {
-      const s = byUsername[a.username] || {};
-      const platform = a.platform || 'tiktok';
-      const followers = a.follower_count || a.followers || 0;
-      const gain = s.follower_gain ?? a.follower_gain ?? 0;
-      const videos = s.total_videos || 0;
-      const views = s.total_views || 0;
-      const avgPerVideo = videos > 0 ? Math.round(views / videos) : 0;
-      const eng = views > 0
-        ? (((s.total_likes || 0) + (s.total_comments || 0) + (s.total_shares || 0)) / views * 100).toFixed(2).replace('.', ',') + ' %'
-        : '—';
-      const gainColor = gain > 0 ? 'var(--green)' : gain < 0 ? 'var(--red)' : 'var(--text-3)';
-      const gainPrefix = gain > 0 ? '+' : '';
-      return `
-        <tr>
-          <td>
-            <div class="cell-account">
-              <span class="cell-account-platform" style="background:${({tiktok:'#000',instagram:'#dc2743',youtube:'#FF0000',linkedin:'#0a66c2'}[platform]||'#000')}; color:#fff">
-                ${PLATFORM_SVG_INLINE[platform] || ''}
-              </span>
-              @${escapeHTML(a.username)}
-            </div>
-          </td>
-          <td><span class="platform-tag">${platform}</span></td>
-          <td class="num">${fmt(followers)}</td>
-          <td class="num" style="color:${gainColor}; font-weight:600">${gainPrefix}${fmt(gain)}</td>
-          <td class="num">${fmt(videos)}</td>
-          <td class="num">${fmt(views)}</td>
-          <td class="num">${fmt(avgPerVideo)}</td>
-          <td class="num">${eng}</td>
-          <td>${timeAgo(a.last_updated)}</td>
-        </tr>`;
-    }).join('');
   }
 
   // ─── Wiring: range pills (4 presets + custom toggle) ───
@@ -1850,41 +1318,6 @@ button { font-family: inherit; cursor: pointer; }
       if (e.key === 'Enter') submit();
     });
   }
-
-  // ─── Sidebar nav: highlight active item, swap title, and show the right view ───
-  (function applyNav() {
-    // 1. Highlight the active sidebar entry
-    const prefix = isCompetitorScope ? 'competitor-' : '';
-    const activeKey = `${prefix}${navView || 'dashboard'}`;
-    document.querySelectorAll('.sb-item[data-nav]').forEach(link => {
-      link.classList.toggle('active', link.dataset.nav === activeKey);
-    });
-
-    // 2. Swap the H1 sub-line text based on scope (Analytics vs Concurrents)
-    const line2 = document.querySelector('.h-title-line2');
-    if (line2) {
-      line2.textContent = isCompetitorScope
-        ? 'voici l\'analyse de tes concurrents.'
-        : 'voici l\'analyse de tes réseaux sociaux.';
-    }
-
-    // 3. Update the page eyebrow + section header for clarity
-    const eyebrow = document.querySelector('.h-eyebrow');
-    if (eyebrow) {
-      const scopeLbl = isCompetitorScope ? 'Concurrents' : 'Analytics';
-      const viewLbl = { accounts: 'Comptes', videos: 'Vidéos', table: 'Tableau détaillé' }[navView] || 'Tableau de bord';
-      eyebrow.textContent = `${scopeLbl} · ${viewLbl}`;
-    }
-
-    // 4. Show ONLY the active view section
-    const views = ['Dashboard', 'Accounts', 'Videos', 'Table'];
-    const activeView = navView ? navView : 'dashboard';
-    const targetId = 'view' + activeView.charAt(0).toUpperCase() + activeView.slice(1);
-    views.forEach(v => {
-      const el = document.getElementById('view' + v);
-      if (el) el.hidden = (el.id !== targetId);
-    });
-  })();
 
   // Initial sync — set the default date inputs from the 7d preset
   syncDatesFromRange();

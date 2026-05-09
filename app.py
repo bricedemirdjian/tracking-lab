@@ -163,6 +163,19 @@ def dashboard():
     return render_template("dashboard.html", user=current_user)
 
 
+@app.route("/dashboard/preview")
+@login_required
+def dashboard_preview():
+    """Standalone preview of the Salesia-cloned redesign.
+
+    Independent route — does NOT touch /dashboard. Self-contained template
+    (own CSS+JS inline). Hits /api/stats and /api/accounts via plain fetch.
+    Once the user validates visually, dashboard-salesia.html can be promoted
+    to dashboard.html with proper wiring of the legacy app.js handlers.
+    """
+    return render_template("dashboard-salesia.html", user=current_user)
+
+
 @app.route("/admin")
 @login_required
 def admin_page():
