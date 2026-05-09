@@ -802,10 +802,34 @@ button { font-family: inherit; cursor: pointer; }
 }
 .account-card-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
-/* Videos grid */
+/* Videos grid (Latest videos — full grid, wraps to next row) */
 .videos-grid {
   display: grid; gap: 14px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* Videos swipe (Best videos — horizontal scroll, ranked left → right).
+   Cards keep their full vertical layout; the row scrolls on swipe / trackpad
+   / mouse wheel. Scroll snapping on each card so a half-card never lingers
+   in view. Custom scrollbar hidden — swipe affordance via the gradient mask
+   and the next card peeking on the right edge. */
+.videos-swipe {
+  display: flex; gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;            /* Firefox */
+  padding-bottom: 4px;
+  margin: 0 -24px; padding-left: 24px; padding-right: 24px; /* bleed to viewport edge */
+  scroll-padding-left: 24px;
+}
+.videos-swipe::-webkit-scrollbar { display: none; }
+.videos-swipe .video-card {
+  flex: 0 0 240px;
+  scroll-snap-align: start;
+}
+@media (min-width: 1024px) {
+  .videos-swipe .video-card { flex-basis: 260px; }
 }
 .video-card {
   background: var(--bg-card);
@@ -1291,14 +1315,14 @@ button { font-family: inherit; cursor: pointer; }
 
       <h2 class="section-h2">Meilleures vidéos</h2>
       <p class="section-sub">Triées par nombre de vues décroissant</p>
-      <div class="videos-grid" id="vidGridBest"></div>
+      <div class="videos-swipe" id="vidGridBest"></div>
       <div id="vidEmptyBest" class="view-empty" hidden>
         <p>Aucune vidéo top à afficher pour ce filtre.</p>
       </div>
 
       <h2 class="section-h2" style="margin-top:36px">Dernières vidéos postées</h2>
       <p class="section-sub">Triées par date de publication décroissante</p>
-      <div class="videos-grid" id="vidGridLatest"></div>
+      <div class="videos-swipe" id="vidGridLatest"></div>
       <div id="vidEmptyLatest" class="view-empty" hidden>
         <p>Aucune vidéo récente à afficher pour ce filtre.</p>
       </div>
@@ -1645,8 +1669,8 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
 
     try {
       const [bestR, latestR] = await Promise.all([
-        fetch(buildVideoEndpointURL('best-videos', 12)),
-        fetch(buildVideoEndpointURL('latest-videos', 12)),
+        fetch(buildVideoEndpointURL('best-videos', 30)),
+        fetch(buildVideoEndpointURL('latest-videos', 30)),
       ]);
       const bestData = await bestR.json();
       const latestData = await latestR.json();
