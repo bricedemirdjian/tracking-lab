@@ -825,11 +825,15 @@ button { font-family: inherit; cursor: pointer; }
 }
 .videos-swipe::-webkit-scrollbar { display: none; }
 .videos-swipe .video-card {
-  flex: 0 0 240px;
+  /* 5 cards visible side-by-side with the row's 14px gap. */
+  flex: 0 0 calc((100% - 56px) / 5);
   scroll-snap-align: start;
 }
-@media (min-width: 1024px) {
-  .videos-swipe .video-card { flex-basis: 260px; }
+/* Below tablet width, drop to 2 cards visible so they stay readable. */
+@media (max-width: 768px) {
+  .videos-swipe .video-card {
+    flex-basis: calc((100% - 14px) / 2);
+  }
 }
 
 /* Swipe row + nav arrows + scroll progress bar.
