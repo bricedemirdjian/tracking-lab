@@ -113,7 +113,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-09-charts3")
+    response.headers.setdefault("X-Build-Version", "2026-05-09-advice")
     if IS_PRODUCTION:
         response.headers.setdefault(
             "Strict-Transport-Security",
