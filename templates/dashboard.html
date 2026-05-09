@@ -1809,7 +1809,7 @@ button { font-family: inherit; cursor: pointer; }
             <div class="chart-card-head">
               <div>
                 <h3 class="chart-card-title">Composition de l'engagement</h3>
-                <p class="chart-card-sub">Likes vs commentaires vs partages vs sauvegardes, par plateforme</p>
+                <p class="chart-card-sub">Likes vs commentaires vs partages vs sauvegardes, par plateforme · <em>clique sur un libellé pour l'isoler</em></p>
               </div>
               <span class="chart-card-badge" id="adviceCompBadge">—</span>
             </div>
@@ -1870,7 +1870,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-advice2', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2919,7 +2919,28 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice2', 'color:#FF69B4;font-w
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-              legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 14, usePointStyle: true } },
+              legend: {
+                position: 'bottom',
+                // Custom click: isolate the clicked dataset (show only it, hide others).
+                // Re-clicking the same isolated dataset restores all. This makes small
+                // platforms (e.g. YouTube ~1.5k likes vs TT/IG ~200k) visible at their
+                // own auto-scaled axis instead of being crushed by the dominant series.
+                onClick: (e, legendItem, legend) => {
+                  const ci = legend.chart;
+                  const idx = legendItem.datasetIndex;
+                  const visibleIdx = ci.data.datasets
+                    .map((_, i) => i)
+                    .filter(i => ci.isDatasetVisible(i));
+                  const isolatedToThis = visibleIdx.length === 1 && visibleIdx[0] === idx;
+                  if (isolatedToThis) {
+                    ci.data.datasets.forEach((_, i) => ci.show(i));
+                  } else {
+                    ci.data.datasets.forEach((_, i) => i === idx ? ci.show(i) : ci.hide(i));
+                  }
+                  ci.update();
+                },
+                labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 14, usePointStyle: true }
+              },
               tooltip: {
                 backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8,
                 callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtCompact(ctx.parsed.y)}` }
