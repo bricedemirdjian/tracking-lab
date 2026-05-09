@@ -1431,18 +1431,32 @@ button { font-family: inherit; cursor: pointer; }
   async function load() {
     setSubtitle();
     refreshFilterChipStates();
+    let stats = null;
     try {
       const [statsR, accR, projR] = await Promise.all([
         fetch(buildStatsURL()),
         fetch(buildAccountsURL()),
         fetch('/api/projects'),
       ]);
-      const stats = await statsR.json();
+      stats = await statsR.json();
       accounts = await accR.json();
       try { projects = await projR.json(); } catch { projects = []; }
-      // Populate dropdowns once data is in
-      populateProjectFilter();
-      populateAccountFilter();
+    } catch (e) {
+      console.error('[load] fetch failed:', e);
+      return;
+    }
+
+    // Render the active view FIRST so a downstream KPI bug never blanks
+    // the actual page content again. Each render in its own try so a single
+    // throw can't cascade.
+    try { populateProjectFilter(); populateAccountFilter(); } catch (e) { console.error('[load] filters:', e); }
+    try {
+      if (navView === 'accounts') renderAccountsView(accounts);
+      else if (navView === 'videos') await renderVideosView();
+      else if (navView === 'table') renderTableView(accounts, stats);
+    } catch (e) { console.error('[load] view render:', e); }
+
+    try {
       const g = stats.global || {};
       const totalViews = g.total_views || 0;
       const totalLikes = g.total_likes || 0;
@@ -1462,12 +1476,8 @@ button { font-family: inherit; cursor: pointer; }
       $('#kpiShares').textContent = fmt(totalShares);
       $('#kpiEngagement').textContent = fmtPct(engRate);
       $('#kpiAccounts').textContent = accounts.length;
-      // #sbAccCount is referenced here but no element with that id exists
-      // in the current sidebar markup. Without the guard, $('#sbAccCount').
-      // textContent threw silently and the whole load() catch swallowed it,
-      // leaving every secondary view (Comptes / Vidéos / Tableau) blank.
-      const sbAcc = $('#sbAccCount');
-      if (sbAcc) sbAcc.textContent = accounts.length;
+      // (Previously assigned to #sbAccCount which was never added to the
+      // sidebar markup — that null setter swallowed the rest of load().)
       // Platform breakdown chips (with real logos)
       const breakdown = {};
       accounts.forEach(a => { breakdown[a.platform] = (breakdown[a.platform] || 0) + 1; });
@@ -1504,12 +1514,8 @@ button { font-family: inherit; cursor: pointer; }
         $('#attStatus').textContent = `Statut « pas de sync depuis 36h » (${stale.slice(0,3).map(a=>'@'+a.username).join(', ')}${stale.length > 3 ? '…' : ''})`;
       }
 
-      // Render per-view content if not on the default dashboard.
-      if (navView === 'accounts') renderAccountsView(accounts);
-      else if (navView === 'videos') await renderVideosView();
-      else if (navView === 'table') renderTableView(accounts, stats);
     } catch (e) {
-      console.error(e);
+      console.error('[load] kpi render:', e);
     }
   }
 
