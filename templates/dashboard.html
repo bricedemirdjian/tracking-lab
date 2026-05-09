@@ -972,19 +972,25 @@ button { font-family: inherit; cursor: pointer; }
   cursor: pointer;
   user-select: none;
   transition: color .12s, background .12s;
+  position: relative;
 }
 .data-table th.sortable:hover { color: var(--text); background: var(--border-soft); }
+/* Arrow lives outside the inline flow so the label keeps its natural
+   alignment with the cells below. Sat right above the text on .num
+   columns (right-aligned) and at the right edge on string columns. */
 .data-table th.sortable .sort-arrow {
-  display: inline-block; width: 0; height: 0; margin-left: 6px; vertical-align: middle;
+  position: absolute; top: 50%; right: 4px;
+  width: 0; height: 0;
   border-left: 4px solid transparent; border-right: 4px solid transparent;
   border-top: 4px solid currentColor;
   opacity: 0;
+  transform: translateY(-50%);
   transition: opacity .12s, transform .12s;
 }
 .data-table th.sortable:hover .sort-arrow { opacity: 0.4; }
 .data-table th.is-sorted { color: var(--accent); }
 .data-table th.is-sorted .sort-arrow { opacity: 1; border-top-color: var(--accent); }
-.data-table th.is-sorted-asc .sort-arrow { transform: rotate(180deg); }
+.data-table th.is-sorted-asc .sort-arrow { transform: translateY(-50%) rotate(180deg); }
 .data-table th.num, .data-table td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
