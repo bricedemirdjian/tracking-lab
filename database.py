@@ -1456,7 +1456,8 @@ def get_daily_evolution(account_username=None, date_from=None, date_to=None, use
             total_likes as likes,
             total_comments as comments,
             total_shares as shares,
-            total_saves as saves
+            total_saves as saves,
+            followers
         FROM daily_snapshots WHERE 1=1
     """
     params = []

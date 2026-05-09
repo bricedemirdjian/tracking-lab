@@ -1057,7 +1057,98 @@ button { font-family: inherit; cursor: pointer; }
   .toolbar { align-items: flex-start; }
   .h-title { font-size: 36px; letter-spacing: -1px; }
 }
+
+/* ─────────────────────── Audience charts (Tableau view) ─────────────────────── */
+.charts-section { margin: 0 0 28px; }
+.charts-section .section-h2 { margin-bottom: 4px; }
+.charts-section .section-sub { margin: 0 0 18px; color: var(--text-3); font-size: 14px; }
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.chart-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+.chart-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.chart-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.1px;
+  margin: 0;
+}
+.chart-card-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 2px 0 0;
+}
+.chart-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface-2, #f6f6f7);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.chart-card-body {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+}
+.chart-card-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
+  padding: 0 16px;
+}
+/* Donut center label overlay */
+.donut-wrap { position: relative; height: 100%; }
+.donut-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+.donut-center-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.4px;
+  line-height: 1;
+}
+.donut-center-label {
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .chart-card { min-height: 280px; }
+}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -1473,6 +1564,78 @@ button { font-family: inherit; cursor: pointer; }
 
     <!-- ─── TABLE VIEW — audience details per account ─── -->
     <section id="viewTable" class="view" hidden>
+
+      <!-- Audience charts block (responds to date filter) -->
+      <div class="charts-section">
+        <h2 class="section-h2">Analyse de l'audience</h2>
+        <p class="section-sub" id="chartsPeriodSub">—</p>
+        <div class="charts-grid">
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Évolution des followers</h3>
+                <p class="chart-card-sub">Une ligne par plateforme · cumul quotidien</p>
+              </div>
+              <span class="chart-card-badge" id="chartFollowersBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="chartFollowers"></canvas>
+              <div class="chart-card-empty" id="chartFollowersEmpty" hidden>Pas encore d'historique pour cette période.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Vues quotidiennes</h3>
+                <p class="chart-card-sub">Reach total cumulé jour après jour</p>
+              </div>
+              <span class="chart-card-badge" id="chartViewsBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="chartViews"></canvas>
+              <div class="chart-card-empty" id="chartViewsEmpty" hidden>Pas de vues sur cette période.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Répartition des followers</h3>
+                <p class="chart-card-sub">Part de chaque plateforme dans ton audience</p>
+              </div>
+              <span class="chart-card-badge" id="chartDonutBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <div class="donut-wrap">
+                <canvas id="chartDonut"></canvas>
+                <div class="donut-center">
+                  <div class="donut-center-value" id="donutCenterValue">—</div>
+                  <div class="donut-center-label">Followers</div>
+                </div>
+              </div>
+              <div class="chart-card-empty" id="chartDonutEmpty" hidden>Aucun follower à afficher.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Top 5 comptes par vues</h3>
+                <p class="chart-card-sub">Sur la période sélectionnée</p>
+              </div>
+              <span class="chart-card-badge" id="chartTopBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="chartTop"></canvas>
+              <div class="chart-card-empty" id="chartTopEmpty" hidden>Aucun compte avec des vues sur cette période.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <h2 class="section-h2">Détails de l'audience</h2>
       <p class="section-sub" id="tblPeriodSub">—</p>
       <div class="view-toolbar">
@@ -1508,7 +1671,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-09-charts', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -1562,6 +1725,15 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
     return '/api/stats?' + p.toString();
+  }
+  function buildEvolutionURL() {
+    const p = new URLSearchParams();
+    if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
+    if (state.account && state.account !== 'all') p.set('account', state.account);
+    if (state.date_from) p.set('date_from', state.date_from);
+    if (state.date_to) p.set('date_to', state.date_to);
+    p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    return '/api/evolution?' + p.toString();
   }
   function buildAccountsURL() {
     const p = new URLSearchParams();
@@ -1626,7 +1798,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     try {
       if (navView === 'accounts') renderAccountsView(accounts, stats);
       else if (navView === 'videos') await renderVideosView();
-      else if (navView === 'table') renderTableView(accounts, stats);
+      else if (navView === 'table') { renderTableView(accounts, stats); renderTableCharts(accounts, stats); }
     } catch (e) { console.error('[load] view render:', e); }
 
     try {
@@ -1965,6 +2137,295 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     }
   }
 
+  // ─── Audience charts (Tableau view) ────────────────────────────────
+  // Chart.js instances are kept module-scoped so we can destroy() before
+  // re-rendering — Chart.js leaks DOM if you don't tear down old charts.
+  const chartInstances = { followers: null, views: null, donut: null, top: null };
+
+  // Brand palette per platform — kept in sync with cell-account-platform CSS
+  const PLATFORM_COLOR = {
+    tiktok:    '#000000',
+    instagram: '#dc2743',
+    youtube:   '#FF0000',
+    linkedin:  '#0a66c2',
+  };
+  const PLATFORM_LABEL = {
+    tiktok:    'TikTok',
+    instagram: 'Instagram',
+    youtube:   'YouTube',
+    linkedin:  'LinkedIn',
+  };
+
+  // Compact French number formatting for axis ticks: 12k, 1.2M, 3.4Md
+  function fmtCompact(n) {
+    n = Number(n) || 0;
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(abs >= 1e10 ? 0 : 1).replace('.0', '').replace('.', ',') + 'Md';
+    if (abs >= 1e6) return (n / 1e6).toFixed(abs >= 1e7 ? 0 : 1).replace('.0', '').replace('.', ',') + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace('.0', '').replace('.', ',') + 'k';
+    return String(n);
+  }
+  function destroyChart(key) {
+    if (chartInstances[key]) {
+      try { chartInstances[key].destroy(); } catch (e) { /* noop */ }
+      chartInstances[key] = null;
+    }
+  }
+  function setEmpty(canvasId, emptyId, isEmpty) {
+    const c = document.getElementById(canvasId);
+    const e = document.getElementById(emptyId);
+    if (c) c.style.display = isEmpty ? 'none' : '';
+    if (e) e.hidden = !isEmpty;
+  }
+
+  async function renderTableCharts(accs, stats) {
+    const sub = document.getElementById('chartsPeriodSub');
+    if (sub) {
+      sub.textContent = 'Période : ' + (state.range != null
+        ? (state.range === 1 ? 'Dernière 24 h' : `Derniers ${state.range} jours`)
+        : `${state.date_from || ''} → ${state.date_to || ''}`);
+    }
+    if (typeof Chart === 'undefined') {
+      // CDN failed to load — skip silently, the table still renders.
+      console.warn('[TL] Chart.js not loaded, skipping audience charts');
+      return;
+    }
+
+    // Fetch the daily evolution for the active filter (one row per
+    // account × snapshot_date, with followers + views).
+    let evolution = [];
+    try {
+      const r = await fetch(buildEvolutionURL());
+      evolution = r.ok ? await r.json() : [];
+    } catch (e) {
+      console.warn('[TL] /api/evolution failed:', e);
+    }
+
+    // ── Chart 1: Évolution des followers (multi-line, one per platform) ──
+    {
+      const byDatePlatform = {};
+      const dates = new Set();
+      evolution.forEach(row => {
+        const d = row.date;
+        const plat = row.platform || 'tiktok';
+        if (!d) return;
+        dates.add(d);
+        const k = `${d}|${plat}`;
+        // Sum followers across accounts of the same platform on that date.
+        byDatePlatform[k] = (byDatePlatform[k] || 0) + (row.followers || 0);
+      });
+      const sortedDates = [...dates].sort();
+      const platforms = ['tiktok', 'instagram', 'youtube', 'linkedin'];
+      const datasets = platforms.map(plat => {
+        const data = sortedDates.map(d => byDatePlatform[`${d}|${plat}`] || null);
+        const hasAny = data.some(v => v != null && v > 0);
+        return hasAny ? {
+          label: PLATFORM_LABEL[plat],
+          data,
+          borderColor: PLATFORM_COLOR[plat],
+          backgroundColor: PLATFORM_COLOR[plat] + '22',
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          spanGaps: true,
+        } : null;
+      }).filter(Boolean);
+
+      const isEmpty = sortedDates.length === 0 || datasets.length === 0;
+      setEmpty('chartFollowers', 'chartFollowersEmpty', isEmpty);
+      const badge = document.getElementById('chartFollowersBadge');
+      if (badge) badge.textContent = isEmpty ? '—' : `${sortedDates.length} jour${sortedDates.length > 1 ? 's' : ''}`;
+      destroyChart('followers');
+      if (!isEmpty) {
+        chartInstances.followers = new Chart(document.getElementById('chartFollowers'), {
+          type: 'line',
+          data: { labels: sortedDates, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 14, usePointStyle: true } },
+              tooltip: {
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4,
+                callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtCompact(ctx.parsed.y)} followers` }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
+              y: { grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
+            }
+          }
+        });
+      }
+    }
+
+    // ── Chart 2: Vues quotidiennes (area, summed across all accounts) ──
+    {
+      const byDate = {};
+      evolution.forEach(row => {
+        if (!row.date) return;
+        byDate[row.date] = (byDate[row.date] || 0) + (row.views || 0);
+      });
+      const sortedDates = Object.keys(byDate).sort();
+      const data = sortedDates.map(d => byDate[d]);
+      const total = data.reduce((s, v) => s + v, 0);
+      const isEmpty = sortedDates.length === 0 || total === 0;
+      setEmpty('chartViews', 'chartViewsEmpty', isEmpty);
+      const badge = document.getElementById('chartViewsBadge');
+      if (badge) badge.textContent = isEmpty ? '—' : `${fmtCompact(total)} vues totales`;
+      destroyChart('views');
+      if (!isEmpty) {
+        chartInstances.views = new Chart(document.getElementById('chartViews'), {
+          type: 'line',
+          data: {
+            labels: sortedDates,
+            datasets: [{
+              label: 'Vues',
+              data,
+              borderColor: '#FF69B4',
+              backgroundColor: (ctx) => {
+                const chart = ctx.chart;
+                const { ctx: c, chartArea } = chart;
+                if (!chartArea) return 'rgba(255,105,180,0.15)';
+                const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                g.addColorStop(0, 'rgba(255,105,180,0.30)');
+                g.addColorStop(1, 'rgba(255,105,180,0.00)');
+                return g;
+              },
+              fill: true,
+              borderWidth: 2,
+              tension: 0.35,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 10, cornerRadius: 8,
+                callbacks: { label: ctx => `${fmtCompact(ctx.parsed.y)} vues` }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
+              y: { grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
+            }
+          }
+        });
+      }
+    }
+
+    // ── Chart 3: Donut — followers répartis par plateforme ──
+    {
+      const byPlat = { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
+      (accs || []).forEach(a => {
+        const p = a.platform || 'tiktok';
+        byPlat[p] = (byPlat[p] || 0) + (a.follower_count || a.followers || 0);
+      });
+      const platforms = Object.keys(byPlat).filter(p => byPlat[p] > 0);
+      const data = platforms.map(p => byPlat[p]);
+      const total = data.reduce((s, v) => s + v, 0);
+      const isEmpty = total === 0;
+      setEmpty('chartDonut', 'chartDonutEmpty', isEmpty);
+      const center = document.getElementById('donutCenterValue');
+      if (center) center.textContent = isEmpty ? '—' : fmtCompact(total);
+      const badge = document.getElementById('chartDonutBadge');
+      if (badge) badge.textContent = isEmpty ? '—' : `${platforms.length} plateforme${platforms.length > 1 ? 's' : ''}`;
+      destroyChart('donut');
+      if (!isEmpty) {
+        chartInstances.donut = new Chart(document.getElementById('chartDonut'), {
+          type: 'doughnut',
+          data: {
+            labels: platforms.map(p => PLATFORM_LABEL[p]),
+            datasets: [{
+              data,
+              backgroundColor: platforms.map(p => PLATFORM_COLOR[p]),
+              borderWidth: 0,
+              hoverOffset: 8,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 14, usePointStyle: true } },
+              tooltip: {
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 10, cornerRadius: 8,
+                callbacks: {
+                  label: ctx => {
+                    const v = ctx.parsed;
+                    const pct = total > 0 ? (v / total * 100).toFixed(1).replace('.', ',') : '0';
+                    return `${ctx.label}: ${fmtCompact(v)} (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // ── Chart 4: Top 5 comptes par vues (horizontal bar) ──
+    {
+      const perAccount = (stats?.per_account || []).slice();
+      // Sort DESC by total_views, take top 5.
+      perAccount.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
+      const top5 = perAccount.slice(0, 5).filter(r => (r.total_views || 0) > 0);
+      const labels = top5.map(r => '@' + (r.account_username || '?'));
+      const data = top5.map(r => r.total_views || 0);
+      const colors = top5.map(r => PLATFORM_COLOR[r.platform] || '#FF69B4');
+
+      const isEmpty = top5.length === 0;
+      setEmpty('chartTop', 'chartTopEmpty', isEmpty);
+      const badge = document.getElementById('chartTopBadge');
+      if (badge) badge.textContent = isEmpty ? '—' : `Top ${top5.length}`;
+      destroyChart('top');
+      if (!isEmpty) {
+        chartInstances.top = new Chart(document.getElementById('chartTop'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Vues',
+              data,
+              backgroundColor: colors,
+              borderRadius: 6,
+              borderSkipped: false,
+              barThickness: 18,
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 10, cornerRadius: 8,
+                callbacks: { label: ctx => `${fmtCompact(ctx.parsed.x)} vues` }
+              }
+            },
+            scales: {
+              x: { grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } },
+              y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11 }, color: '#33373d' } }
+            }
+          }
+        });
+      }
+    }
+  }
+
   // Persistent sort state for the table view. Default: views DESC.
   state.tblSort = { col: 'views', dir: 'desc' };
 
@@ -2268,7 +2729,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     // visible on Dashboard + Comptes (cards reflect the date window).
     // Hidden on Vidéos / Tableau where the filter would not affect output
     // in the way the user expects.
-    const showFilterBar = !navView || navView === 'accounts';
+    const showFilterBar = !navView || navView === 'accounts' || navView === 'table';
     const filterBar = document.querySelector('.filter-bar');
     if (filterBar) filterBar.hidden = !showFilterBar;
     // Export CSV stays Dashboard-only — the secondary views export an
