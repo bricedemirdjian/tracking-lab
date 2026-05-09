@@ -19,6 +19,7 @@ PLANS = {
         'import_csv': False,
         'competitor_access': False,
         'analytics_full': False,
+        'scrape_cadence_hours': 6,
     },
     'pro': {
         'name': 'Pro',
@@ -37,6 +38,7 @@ PLANS = {
         'import_csv': False,
         'competitor_access': False,
         'analytics_full': False,
+        'scrape_cadence_hours': 4,
     },
     'agency': {
         'name': 'Entreprises',
@@ -55,8 +57,29 @@ PLANS = {
         'import_csv': True,
         'competitor_access': True,
         'analytics_full': True,
+        'scrape_cadence_hours': 1,
     },
 }
+
+
+# Admin role bypasses tier-based scrape throttling. The owner of the SaaS
+# (role='admin' in users table) always gets the most aggressive cadence
+# regardless of their plan. Solo testers shouldn't be slowed by their own
+# starter plan.
+ADMIN_SCRAPE_CADENCE_HOURS = 1
+
+
+def get_scrape_cadence_hours(plan_name, is_admin=False):
+    """Return the scrape cadence (in hours) for a given plan.
+
+    Admin role overrides plan and always returns the most aggressive cadence.
+    Unknown plans fall back to starter (6h) — safest assumption: don't burn
+    compute on accounts with no clear billing relationship.
+    """
+    if is_admin:
+        return ADMIN_SCRAPE_CADENCE_HOURS
+    plan = PLANS.get(plan_name) or PLANS['starter']
+    return plan.get('scrape_cadence_hours', 6)
 
 
 def get_plan(plan_name):

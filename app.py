@@ -113,7 +113,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-09-advice3")
+    response.headers.setdefault("X-Build-Version", "2026-05-09-tier-cadence")
     if IS_PRODUCTION:
         response.headers.setdefault(
             "Strict-Transport-Security",
@@ -911,8 +911,15 @@ def _cron_scrape(platform_filter=None):
     Shared cron scrape logic.
     platform_filter: list of platforms to scrape, e.g. ["tiktok", "youtube"].
                      None = all platforms.
+
+    Tier-based throttling (added 2026-05-09): each account is skipped if its
+    user's plan cadence hasn't elapsed since `last_updated`. Cadence comes from
+    PLANS[plan_name].scrape_cadence_hours (starter 6h / pro 4h / agency 1h).
+    Admins (role='admin') always get 1h regardless of plan. Accounts with
+    last_updated NULL are always due (first-time scrape).
     """
     from database import get_connection, _fetchall
+    from stripe_billing import get_scrape_cadence_hours
 
     started = time.time()
     max_duration = 55  # leave 5s margin before Vercel timeout
@@ -948,17 +955,67 @@ def _cron_scrape(platform_filter=None):
         except Exception as e:
             return uid, uname, f"error: {str(e)[:100]}"
 
+    # Resolve each user's plan + admin status once. Cron runs without an
+    # authenticated user, so we look it up from the DB. The cadence below
+    # determines which of their accounts are "due" for re-scrape.
+    conn = get_connection()
+    user_meta = {}  # uid -> { plan, role, cadence_h }
+    for u in users:
+        uid = u["user_id"]
+        row = _fetchall(conn, "SELECT plan, role FROM users WHERE id = %s", (uid,))
+        plan = (row[0]["plan"] if row else None) or "starter"
+        role = (row[0]["role"] if row else None) or "user"
+        user_meta[uid] = {
+            "plan": plan,
+            "role": role,
+            "cadence_h": get_scrape_cadence_hours(plan, is_admin=(role == "admin")),
+        }
+    conn.close()
+
+    from datetime import datetime, timedelta
+
+    def _is_due(acc, cadence_h):
+        """Return True if this account hasn't been scraped within its cadence."""
+        lu = acc.get("last_updated")
+        if not lu:
+            return True  # never scraped → always due
+        try:
+            # last_updated is stored as ISO string. Use fromisoformat for both
+            # postgres timestamp and sqlite text formats; handle naive datetimes
+            # as UTC since cron compares against datetime.utcnow().
+            if isinstance(lu, str):
+                lu_dt = datetime.fromisoformat(lu.replace("Z", "+00:00").split("+")[0])
+            else:
+                lu_dt = lu
+            age = datetime.utcnow() - lu_dt
+            return age >= timedelta(hours=cadence_h)
+        except (ValueError, TypeError):
+            return True  # parse failure → be safe, scrape it
+
     results = {}
     user_account_pairs = []  # [(user_id, account), ...]
+    skipped_not_due = 0
     for user_row in users:
         uid = user_row["user_id"]
+        meta = user_meta.get(uid, {"plan": "starter", "role": "user", "cadence_h": 6})
         try:
             accounts = get_all_accounts(user_id=uid)
             if platform_filter:
                 accounts = [a for a in accounts if a.get("platform", "tiktok") in platform_filter]
-            results[str(uid)] = {"accounts": len(accounts), "scraped": 0, "by_status": {}}
+            results[str(uid)] = {
+                "accounts": len(accounts),
+                "scraped": 0,
+                "skipped_not_due": 0,
+                "by_status": {},
+                "plan": meta["plan"],
+                "cadence_h": meta["cadence_h"],
+            }
             for acc in accounts:
-                user_account_pairs.append((uid, acc))
+                if _is_due(acc, meta["cadence_h"]):
+                    user_account_pairs.append((uid, acc))
+                else:
+                    results[str(uid)]["skipped_not_due"] += 1
+                    skipped_not_due += 1
         except Exception as e:
             results[str(uid)] = {"error": str(e)[:200]}
 
@@ -1001,6 +1058,7 @@ def _cron_scrape(platform_filter=None):
         "platforms": label,
         "users": len(users),
         "results": results,
+        "skipped_not_due_total": skipped_not_due,
         "elapsed_s": elapsed,
     })
 
