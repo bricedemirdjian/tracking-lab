@@ -869,12 +869,16 @@ def get_all_accounts(user_id=None, is_competitor=None, with_last_post=False):
     results = _fetchall(conn, query, params)
 
     if with_last_post and results:
-        # One round-trip — compute MAX(create_time) for each (username, platform)
-        # tied to the same user_id. Avoids N queries when there are many accounts.
+        # One round-trip — compute MAX(create_time) AND COUNT(*) for each
+        # (username, platform) tied to the same user_id. Avoids N queries
+        # when there are many accounts. video_count is what the dashboard's
+        # account cards display in the "Vidéos" column.
         usernames = list({r["username"] for r in results})
         ph = ", ".join(["%s"] * len(usernames))
         last_q = f"""
-            SELECT account_username AS username, platform, MAX(create_time) AS last_post_at
+            SELECT account_username AS username, platform,
+                   MAX(create_time) AS last_post_at,
+                   COUNT(*)         AS video_count
             FROM videos
             WHERE account_username IN ({ph})
         """
@@ -884,11 +888,16 @@ def get_all_accounts(user_id=None, is_competitor=None, with_last_post=False):
             last_params.append(user_id)
         last_q += " GROUP BY account_username, platform"
         last_rows = _fetchall(conn, last_q, last_params)
-        last_map = {(r["username"], r.get("platform") or "tiktok"): r["last_post_at"] for r in last_rows}
+        last_map = {
+            (r["username"], r.get("platform") or "tiktok"): r
+            for r in last_rows
+        }
         for r in results:
             key = (r["username"], r.get("platform") or "tiktok")
-            lp = last_map.get(key)
+            row = last_map.get(key) or {}
+            lp = row.get("last_post_at")
             r["last_post_at"] = lp.isoformat() if lp else None
+            r["video_count"]  = int(row.get("video_count") or 0)
 
     conn.close()
     return results

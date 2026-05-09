@@ -1073,7 +1073,7 @@ button { font-family: inherit; cursor: pointer; }
       </h1>
       <div class="h-subtitle-row">
         <div class="h-subtitle" id="subtitle">Chargement…</div>
-        <a class="btn-export" href="/api/export-csv">
+        <a class="btn-export" id="btnExportCsv" href="/api/export-csv">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Exporter CSV</span>
         </a>
@@ -1907,11 +1907,13 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     });
 
     // 5. Filter bar (period pills + custom dates + project + account chips)
-    // is only meaningful on the main Dashboard view. On Comptes / Vidéos /
-    // Tableau it adds visual clutter without adding value — those pages
+    // and Export CSV button are only meaningful on the main Dashboard view.
+    // On Comptes / Vidéos / Tableau they add visual clutter — those pages
     // already filter via their own controls or render the full dataset.
     const filterBar = document.querySelector('.filter-bar');
     if (filterBar) filterBar.hidden = !!navView;
+    const exportBtn = document.getElementById('btnExportCsv');
+    if (exportBtn) exportBtn.hidden = !!navView;
   })();
 
   // Initial sync — set the default date inputs from the 7d preset
