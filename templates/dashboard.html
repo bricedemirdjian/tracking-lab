@@ -1677,7 +1677,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-charts2', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-09-charts3', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2148,12 +2148,15 @@ console.log('%c[TL] dashboard build v=2026-05-09-charts2', 'color:#FF69B4;font-w
   // re-rendering — Chart.js leaks DOM if you don't tear down old charts.
   const chartInstances = { followers: null, views: null, donut: null, top: null };
 
-  // Brand palette per platform — kept in sync with cell-account-platform CSS
+  // Brand palette per platform — single solid color per platform, picked
+  // for legibility in line/donut/bar charts. Instagram uses its iconic pink
+  // (#E1306C) instead of red so it doesn't blur with YouTube. The full IG
+  // sunset gradient is reserved for the account card pills.
   const PLATFORM_COLOR = {
-    tiktok:    '#000000',
-    instagram: '#dc2743',
-    youtube:   '#FF0000',
-    linkedin:  '#0a66c2',
+    tiktok:    '#000000', // TikTok primary mark color
+    instagram: '#E1306C', // Instagram iconic pink (Pantone 213 C)
+    youtube:   '#FF0000', // YouTube pure red
+    linkedin:  '#0A66C2', // LinkedIn blue
   };
   const PLATFORM_LABEL = {
     tiktok:    'TikTok',
@@ -2521,7 +2524,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-charts2', 'color:#FF69B4;font-w
         <tr>
           <td>
             <div class="cell-account">
-              <span class="cell-account-platform" style="background:${({tiktok:'#000',instagram:'#dc2743',youtube:'#FF0000',linkedin:'#0a66c2'}[r.platform]||'#000')}; color:#fff">
+              <span class="cell-account-platform" style="background:${({tiktok:'#000',instagram:'#E1306C',youtube:'#FF0000',linkedin:'#0A66C2'}[r.platform]||'#000')}; color:#fff">
                 ${PLATFORM_SVG_INLINE[r.platform] || ''}
               </span>
               @${escapeHTML(r.a.username)}
