@@ -306,7 +306,7 @@ function renderActivityTableSorted() {
     });
 
     if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#86868b">Aucun compte suivi. Ajoutez des comptes pour commencer.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#86868b">Aucun compte suivi. Ajoutez des comptes pour commencer.</td></tr>';
         return;
     }
 
@@ -324,6 +324,11 @@ function renderActivityTableSorted() {
             views: s.total_views || 0,
             likes: s.total_likes || 0,
             engagement: engRate,
+            // Followers come from accounts.followers (current DB value).
+            // Source: api/stats → get_aggregated_stats → enriched via followers_map.
+            followers: s.followers || account.followers || 0,
+            // follower_gain only set when a date range is applied. 0 otherwise — preserve sign.
+            follower_gain: typeof s.follower_gain === "number" ? s.follower_gain : 0,
             avg_views: avgViews,
         };
     });
@@ -370,6 +375,14 @@ function renderActivityTableSorted() {
         const engBarColor = engRate >= 5 ? "var(--success)" : engRate >= 2 ? "var(--warning)" : "var(--accent)";
         const engBarWidth = Math.min(100, (engRate / Math.min(maxEng, 15)) * 100);
 
+        // Format follower_gain with sign + tinted color so it's readable at a glance.
+        const gain = row.follower_gain;
+        const gainStr = gain > 0 ? `+${formatCompact(gain)}` : gain < 0 ? `${formatCompact(gain)}` : "—";
+        const gainColor = gain > 0 ? "var(--success)" : gain < 0 ? "var(--error)" : "var(--text-muted)";
+        // Show "—" instead of 0 when followers truly absent (typical of yt-dlp TikTok
+        // payloads which don't expose follower counts). Avoids showing a misleading 0.
+        const followersStr = row.followers > 0 ? formatCompact(row.followers) : "—";
+
         return `<tr onclick="selectAccount('${account.username}')">
             <td>
                 <div class="activity-account">
@@ -389,6 +402,8 @@ function renderActivityTableSorted() {
                     <div class="activity-eng-bar"><div class="activity-eng-bar-fill" style="width:${engBarWidth}%;background:${engBarColor}"></div></div>
                 </div>
             </td>
+            <td class="text-right"><span class="activity-metric">${followersStr}</span></td>
+            <td class="text-right"><span class="activity-metric" style="color:${gainColor}">${gainStr}</span></td>
             <td class="text-right"><span class="activity-metric">${formatCompact(row.avg_views) || "0"}</span></td>
         </tr>`;
     }).join("");

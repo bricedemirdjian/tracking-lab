@@ -1,0 +1,19 @@
+{
+  "name": "trackinglab-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-healing Playwright monitor + scraper for app.trackinglab.online",
+  "main": "src/scraper.js",
+  "scripts": {
+    "scrape": "node src/scraper.js",
+    "validate": "node src/validate.js",
+    "auth:save": "node src/save-auth.js",
+    "test": "node --test src/"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

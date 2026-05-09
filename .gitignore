@@ -54,3 +54,5 @@ v2/
 
 # Supabase edge function source (deployed separately)
 supabase/
+.env*.local
+.gstack/

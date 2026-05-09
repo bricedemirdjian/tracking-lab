@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "endpoints": {
+    "instagram": {
+      "ig_web_profile_info": {
+        "success": 1,
+        "fail": 0,
+        "last_success": "2026-04-28T16:13:40Z",
+        "last_fail": null,
+        "p95_ms": 3756
+      }
+    },
+    "tiktok": {
+      "tt_ytdlp_default": {
+        "success": 2,
+        "fail": 0,
+        "last_success": "2026-05-08T21:15:35Z",
+        "last_fail": null,
+        "p95_ms": 8168
+      }
+    }
+  },
+  "learned_paths": {}
+}

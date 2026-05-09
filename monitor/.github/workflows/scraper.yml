@@ -1,0 +1,95 @@
+name: Dashboard Monitor
+
+on:
+  schedule:
+    - cron: "0 * * * *"          # hourly
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'monitor/**'
+      - '.github/workflows/scraper.yml'
+
+# Allow committing learning state back to repo
+permissions:
+  contents: write
+
+concurrency:
+  group: dashboard-monitor
+  cancel-in-progress: false        # let scheduled runs queue, don't drop them
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: monitor
+    env:
+      TARGET_URL: https://app.trackinglab.online/dashboard
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+      ALERT_MIN_SEVERITY: warning
+      RUN_ID: ${{ github.run_id }}
+      DEBUG: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: monitor/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore auth state from secret
+        run: |
+          mkdir -p data
+          if [ -z "${{ secrets.AUTH_STATE_JSON }}" ]; then
+            echo "AUTH_STATE_JSON secret missing — failing fast"; exit 1
+          fi
+          printf '%s' '${{ secrets.AUTH_STATE_JSON }}' > data/auth.json
+
+      - name: Run monitor
+        id: scrape
+        run: node src/scraper.js
+        continue-on-error: true   # still upload artifacts even on soft failure
+
+      - name: Validate latest result
+        id: validate
+        if: steps.scrape.outcome != 'failure'
+        run: node src/validate.js
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-run-${{ github.run_id }}
+          path: |
+            monitor/data/results/
+            monitor/data/logs/
+            monitor/data/dom-snapshots/
+          retention-days: 14
+
+      - name: Commit learning state
+        if: success()
+        run: |
+          git config user.name 'monitor-bot'
+          git config user.email 'monitor-bot@trackinglab.online'
+          if [ -n "$(git status --porcelain monitor/data/selector-stats.json)" ]; then
+            git add monitor/data/selector-stats.json
+            git commit -m "chore(monitor): update selector reliability stats [skip ci]"
+            git push
+          else
+            echo "No selector-stats changes."
+          fi
+
+      - name: Fail job if scrape or validate failed
+        if: steps.scrape.outcome == 'failure' || steps.validate.outcome == 'failure'
+        run: |
+          echo "scrape=${{ steps.scrape.outcome }}, validate=${{ steps.validate.outcome }}"
+          exit 1

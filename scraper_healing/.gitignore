@@ -1,0 +1,4 @@
+data/snapshots/*.json
+data/logs/*.jsonl
+__pycache__/
+*.pyc

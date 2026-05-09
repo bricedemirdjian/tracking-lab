@@ -43,6 +43,10 @@ BASE_BACKOFF    = float(os.environ.get("SCRAPER_BASE_BACKOFF", "0.5"))
 # How many parallel per-video metadata fetches for YouTube (pass 2).
 # Conservative default to avoid saturating the default ThreadPoolExecutor.
 YT_DETAIL_CONCURRENCY = int(os.environ.get("SCRAPER_YT_DETAIL_CONCURRENCY", "8"))
+# Per-platform listing caps. Defaults match Vercel's 60s budget for the cron.
+# For one-off historical backfills, raise via env (e.g. SCRAPER_TIKTOK_LIMIT=9999).
+TIKTOK_LIMIT  = int(os.environ.get("SCRAPER_TIKTOK_LIMIT", "100"))
+YOUTUBE_LIMIT = int(os.environ.get("SCRAPER_YOUTUBE_LIMIT", "30"))
 
 _SUPABASE_PROXY = "https://vpirlefqxnvmxbmndhmn.supabase.co/functions/v1"
 _PROXY_SECRET   = os.environ.get("SCRAPER_PROXY_SECRET", "tracking-lab-2026")
@@ -268,6 +272,10 @@ async def fetch_instagram_async(username: str) -> Optional[dict]:
         "following": data.get("following", 0),
         "biography": data.get("biography", ""),
         "profile_pic": data.get("profile_pic", ""),
+        # Engagement totals computed by the edge function across all posts.
+        "total_likes": data.get("total_likes", 0),
+        "total_comments": data.get("total_comments", 0),
+        "total_views": data.get("total_views", 0),
         "videos": videos,
     }
     await _cache_set(cache_key, result)
@@ -314,6 +322,36 @@ async def fetch_linkedin_async(username: str) -> Optional[dict]:
     return result
 
 
+# ── TikTok profile stats (followers/following/likes) ─────────────────
+# yt-dlp's TikTok extractor doesn't expose channel-level stats. We delegate
+# to the tiktok-proxy Supabase edge function which fetches the profile HTML
+# from a more diverse IP pool (Supabase's). Hitting tiktok.com directly from
+# Vercel/local IPs gets rate-limited under parallel load.
+
+
+async def _fetch_tiktok_profile_stats(username: str) -> dict:
+    """Best-effort: returns {followers, following, total_likes} or {} on failure.
+
+    Failure is non-fatal — followers fall back to 0 and the video listing
+    (yt-dlp + 4-host race) still succeeds independently.
+    """
+    url = f"{_SUPABASE_PROXY}/tiktok-proxy"
+    data = await _request_json(
+        url,
+        params={"username": username, "secret": _PROXY_SECRET},
+        label=f"TT-profile @{username}",
+    )
+    if not data or "error" in data:
+        if data and "error" in data:
+            print(f"  [TT-profile] @{username}: {data['error']}")
+        return {}
+    return {
+        "followers": int(data.get("followers", 0) or 0),
+        "following": int(data.get("following", 0) or 0),
+        "total_likes": int(data.get("total_likes", 0) or 0),
+    }
+
+
 # ── TikTok (yt-dlp wrapped + parallel hostname race) ──────────────────
 async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
     """
@@ -323,6 +361,10 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
       → worst case 180s (all 4 fail) before fallback.
     New code: all 4 in parallel via asyncio.gather, return as soon as one wins
       → worst case ~45s, typical case ~5-15s.
+
+    Followers/following/heart_count are fetched in parallel from the public
+    web profile page (yt-dlp's TT extractor doesn't expose them) and stamped
+    onto each video entry so the existing _store() picks them up.
     """
     cache_key = f"tt:{username}"
     cached = await _cache_get(cache_key)
@@ -335,6 +377,9 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
 
     tasks = [asyncio.create_task(try_host(h)) for h in _TIKTOK_HOSTS]
     winner: Optional[list[dict]] = None
+
+    # Fetch profile stats concurrently with the video listing race.
+    profile_task = asyncio.create_task(_fetch_tiktok_profile_stats(username))
 
     try:
         # First-completed: if it succeeds, keep it. Otherwise keep waiting.
@@ -351,8 +396,21 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
             if not t.done():
                 t.cancel()
 
+    profile_stats = await profile_task
+
     if winner:
-        print(f"  [TikTok] @{username}: {len(winner)} videos")
+        followers = profile_stats.get("followers", 0)
+        following = profile_stats.get("following", 0)
+        total_likes = profile_stats.get("total_likes", 0)
+        if followers or following or total_likes:
+            for v in winner:
+                v.setdefault("channel_follower_count", followers)
+                v.setdefault("channel_following_count", following)
+                v.setdefault("channel_total_likes", total_likes)
+        print(
+            f"  [TikTok] @{username}: {len(winner)} videos, "
+            f"{followers} followers, {total_likes} likes"
+        )
         await _cache_set(cache_key, winner)
     else:
         print(f"  [TikTok] @{username}: no data (all hostnames failed)")
@@ -438,12 +496,7 @@ def _ytdlp_tiktok_sync(username: str, host: str) -> Optional[list[dict]]:
         "skip_download": True,
         "socket_timeout": 15,
         "retries": 1,
-        # Bumped from 30 → 100 so historical viral videos surface in periodic
-        # re-scrapes. Combined with the thumbnail mirroring pipeline, this
-        # ensures top-by-views thumbnails get re-mirrored regularly instead
-        # of slowly expiring out of view. Latency cost: ~2-3s extra per
-        # account on the listing call (extract_flat is fast).
-        "playlistend": 100,
+        "playlistend": TIKTOK_LIMIT,
         "ignoreerrors": True,       # skip broken entries instead of aborting
         "nocheckcertificate": True,
         "geo_bypass": True,
@@ -469,13 +522,23 @@ def _ytdlp_tiktok_sync(username: str, host: str) -> Optional[list[dict]]:
         return None
     entries = info.get("entries", [info])
     videos = [e for e in entries if e]
+    # extract_flat=True omits channel_follower_count from per-video entries.
+    # The top-level info dict still carries it — copy it onto each entry so
+    # the downstream _store() picks it up via vdata.get("channel_follower_count").
+    follower_count = info.get("channel_follower_count") or info.get("uploader_count") or 0
+    if follower_count:
+        for v in videos:
+            v.setdefault("channel_follower_count", follower_count)
     return videos or None
 
 
 def _ytdlp_youtube_list_sync(username: str) -> Optional[list[dict]]:
     """
-    YouTube pass 1: fast listing of last 30 shorts via extract_flat.
+    YouTube pass 1: list channel uploads via extract_flat.
     Returns list of dicts with id + view_count + url (but no likes/comments/timestamp).
+
+    Probes BOTH /@user/videos (long-form) and /@user/shorts and merges by ID,
+    so channels that post only Shorts (or only long-form) are fully covered.
     """
     try:
         import yt_dlp
@@ -483,8 +546,7 @@ def _ytdlp_youtube_list_sync(username: str) -> Optional[list[dict]]:
         print("  [yt-dlp] not installed")
         return None
 
-    url = f"https://www.youtube.com/@{username}/shorts"
-    ydl_opts = {
+    base_opts = {
         "quiet": True,
         "no_warnings": True,
         # "in_playlist" lists videos with basic metadata (incl. view_count on YT)
@@ -494,7 +556,7 @@ def _ytdlp_youtube_list_sync(username: str) -> Optional[list[dict]]:
         "skip_download": True,
         "socket_timeout": 20,
         "retries": 1,
-        "playlistend": 30,          # only fetch last 30 shorts
+        "playlistend": YOUTUBE_LIMIT,
         "ignoreerrors": True,       # skip broken entries instead of aborting
         "nocheckcertificate": True,
         "geo_bypass": True,
@@ -505,22 +567,36 @@ def _ytdlp_youtube_list_sync(username: str) -> Optional[list[dict]]:
         },
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-    except Exception as e:
-        err = str(e).lower()
-        if any(p in err for p in ("unavailable", "private", "not found", "does not exist", "404")):
-            print(f"  [yt-dlp/yt-list] permanent error @{username}: {e}")
-        else:
-            print(f"  [yt-dlp/yt-list] error @{username}: {str(e)[:150]}")
-        return None
+    def _list_tab(tab: str) -> list[dict]:
+        url = f"https://www.youtube.com/@{username}/{tab}"
+        try:
+            with yt_dlp.YoutubeDL(base_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception as e:
+            err = str(e).lower()
+            if any(p in err for p in ("unavailable", "private", "not found", "does not exist", "404")):
+                print(f"  [yt-dlp/yt-{tab}] permanent error @{username}: {e}")
+            else:
+                print(f"  [yt-dlp/yt-{tab}] error @{username}: {str(e)[:150]}")
+            return []
+        if not info:
+            return []
+        entries = info.get("entries", [info])
+        return [e for e in entries if e]
 
-    if not info:
-        return None
-    entries = info.get("entries", [info])
-    videos = [e for e in entries if e]
-    return videos or None
+    videos_tab = _list_tab("videos")
+    shorts_tab = _list_tab("shorts")
+
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for entry in videos_tab + shorts_tab:
+        vid_id = entry.get("id")
+        if not vid_id or vid_id in seen:
+            continue
+        seen.add(vid_id)
+        merged.append(entry)
+
+    return merged or None
 
 
 def _ytdlp_youtube_video_detail_sync(video_url: str) -> Optional[dict]:
@@ -594,6 +670,10 @@ async def _process_and_store(
                 username=username,
                 display_name=data.get("full_name", username),
                 followers=data.get("followers", 0),
+                following=data.get("following", 0),
+                total_likes=data.get("total_likes", 0),
+                total_views=data.get("total_views", 0),
+                total_comments=data.get("total_comments", 0),
                 avatar_url=data.get("profile_pic", ""),
                 user_id=user_id,
                 platform="instagram",
@@ -689,6 +769,11 @@ async def _process_and_store(
 
     def _store():
         followers = 0
+        following = 0
+        total_likes_channel = 0  # heartCount from TT web profile (channel-level)
+        total_views_sum = 0
+        total_comments_sum = 0
+        total_likes_sum = 0
         display_name = username
         for item, mirrored_thumb in zip(pre_extracted, mirrored_urls):
             vdata = item["vdata"]
@@ -699,6 +784,15 @@ async def _process_and_store(
             cfc = vdata.get("channel_follower_count", 0)
             if cfc:
                 followers = cfc
+            cfg = vdata.get("channel_following_count", 0)
+            if cfg:
+                following = cfg
+            ctl = vdata.get("channel_total_likes", 0)
+            if ctl:
+                total_likes_channel = ctl
+            total_views_sum    += int(vdata.get("view_count", 0) or 0)
+            total_comments_sum += int(vdata.get("comment_count", 0) or 0)
+            total_likes_sum    += int(vdata.get("like_count", 0) or 0)
             create_ts = vdata.get("timestamp")
             create_time = None
             if create_ts:
@@ -730,10 +824,17 @@ async def _process_and_store(
                 user_id=user_id,
                 platform=platform,
             )
+        # For TikTok, prefer the channel-level heartCount (authoritative);
+        # for YouTube, the per-video sum is the only signal we have at scrape time.
+        total_likes = total_likes_channel if total_likes_channel else total_likes_sum
         upsert_account(
             username=username,
             display_name=display_name,
             followers=followers,
+            following=following,
+            total_likes=total_likes,
+            total_views=total_views_sum,
+            total_comments=total_comments_sum,
             user_id=user_id,
             platform=platform,
         )

@@ -170,6 +170,43 @@ def admin_page():
     return render_template("admin.html", user=current_user)
 
 
+# ── Swarm Health (admin-only ops dashboard) ───────────────────────────
+@app.route("/admin/swarm")
+@login_required
+def swarm_page():
+    """Multi-agent swarm observability — admin only.
+
+    Renders the shell; the metrics + history are loaded via AJAX from
+    the JSON endpoint below so the page stays snappy even if the swarm
+    history file grows large.
+    """
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    return render_template("swarm.html", user=current_user)
+
+
+@app.route("/api/admin/swarm/metrics")
+@admin_required
+def api_admin_swarm_metrics():
+    """Returns the 5 L7 scores + recent cycles + endpoint stats.
+
+    Lazy-import keeps the startup path clean if the swarm module ever
+    fails to import (e.g. missing optional dep).
+    """
+    try:
+        from scraper_healing.swarm.scoring import metric_summary_for_dashboard
+        from scraper_healing import core as healing_core
+        summary = metric_summary_for_dashboard(history_limit=200)
+        # Surface raw endpoint stats for the per-platform reliability table.
+        stats = healing_core._load_stats()  # noqa: SLF001 — internal helper, single-process
+        summary["endpoint_stats"] = stats.get("endpoints", {})
+        summary["learned_paths"] = stats.get("learned_paths", {})
+        return jsonify(summary)
+    except Exception as e:
+        app.logger.exception("swarm_metrics_failed")
+        return jsonify({"error": str(e)[:200]}), 500
+
+
 @app.route("/api/admin/users")
 @admin_required
 def api_admin_users():

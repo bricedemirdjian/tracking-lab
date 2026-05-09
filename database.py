@@ -221,6 +221,8 @@ def init_db():
     _migrate_user_plan_columns(conn)
     # Migration: add is_competitor column to accounts if missing
     _migrate_competitor_column(conn)
+    # Migration: add total_views/total_comments aggregated stats columns
+    _migrate_engagement_totals_columns(conn)
     # Migration: create default project for users without projects
     _migrate_default_projects(conn)
 
@@ -336,6 +338,25 @@ def _migrate_competitor_column(conn):
                 print("[Migration] Added is_competitor column to accounts (SQLite)")
     except Exception as e:
         print(f"[Migration] is_competitor column: {e}")
+
+
+def _migrate_engagement_totals_columns(conn):
+    """Add total_views + total_comments columns to accounts (idempotent)."""
+    for col in ("total_views", "total_comments"):
+        try:
+            if DATABASE_URL:
+                exists = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name=%s", (col,))
+                if not exists:
+                    _execute(conn, f"ALTER TABLE accounts ADD COLUMN {col} BIGINT DEFAULT 0")
+                    print(f"[Migration] Added {col} column to accounts (PostgreSQL)")
+            else:
+                cur = conn.cursor()
+                columns = [c[1] for c in cur.execute("PRAGMA table_info(accounts)").fetchall()]
+                if col not in columns:
+                    cur.execute(f"ALTER TABLE accounts ADD COLUMN {col} INTEGER DEFAULT 0")
+                    print(f"[Migration] Added {col} column to accounts (SQLite)")
+        except Exception as e:
+            print(f"[Migration] {col} column: {e}")
 
 
 def _migrate_default_projects(conn):
@@ -558,20 +579,25 @@ def get_account_usernames_for_project(user_id, project_id):
 
 # ==================== Data functions (all filtered by user_id) ====================
 
-def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, bio=None, user_id=None, platform="tiktok"):
+def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, bio=None, user_id=None, platform="tiktok"):
     conn = get_connection()
+    # On conflict, only overwrite numeric stats if the new value is non-zero —
+    # otherwise an empty/error scrape (e.g. transient 404) wipes good data.
+    # Genuine "0 followers" still gets persisted on the initial INSERT path.
     _execute(conn, """
-        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, bio, last_updated, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, bio, last_updated, user_id, platform)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT(username, user_id, platform) DO UPDATE SET
-            display_name = COALESCE(excluded.display_name, accounts.display_name),
-            avatar_url = COALESCE(excluded.avatar_url, accounts.avatar_url),
-            followers = excluded.followers,
-            following = excluded.following,
-            total_likes = excluded.total_likes,
+            display_name   = COALESCE(excluded.display_name, accounts.display_name),
+            avatar_url     = COALESCE(excluded.avatar_url, accounts.avatar_url),
+            followers      = CASE WHEN excluded.followers      > 0 THEN excluded.followers      ELSE accounts.followers      END,
+            following      = CASE WHEN excluded.following      > 0 THEN excluded.following      ELSE accounts.following      END,
+            total_likes    = CASE WHEN excluded.total_likes    > 0 THEN excluded.total_likes    ELSE accounts.total_likes    END,
+            total_views    = CASE WHEN excluded.total_views    > 0 THEN excluded.total_views    ELSE accounts.total_views    END,
+            total_comments = CASE WHEN excluded.total_comments > 0 THEN excluded.total_comments ELSE accounts.total_comments END,
             bio = COALESCE(excluded.bio, accounts.bio),
             last_updated = excluded.last_updated
-    """, (username, display_name, avatar_url, followers, following, total_likes, bio, datetime.now().isoformat(), user_id, platform))
+    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, bio, datetime.now().isoformat(), user_id, platform))
     conn.commit()
     conn.close()
 
@@ -583,7 +609,10 @@ def upsert_video(video_id, account_username, description="", create_time=None, d
         INSERT INTO videos (video_id, account_username, description, create_time, duration,
                            views, likes, comments, shares, saves, thumbnail_url, video_url, last_updated, user_id, platform)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT(video_id, user_id, platform) DO UPDATE SET
+        ON CONFLICT(video_id, user_id) DO UPDATE SET
+            -- DB constraint is (user_id, video_id) without platform. We rely on
+            -- the fact that platform-specific video IDs don't collide in practice
+            -- (TikTok IDs ≠ YouTube IDs ≠ Instagram IDs by construction).
             description = COALESCE(excluded.description, videos.description),
             views = excluded.views,
             likes = excluded.likes,
@@ -1136,7 +1165,7 @@ def seed_user_data(user_id):
             INSERT INTO videos (video_id, account_username, description, create_time, duration,
                                          views, likes, comments, shares, saves, thumbnail_url, video_url, last_updated, user_id, platform)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (video_id, user_id, platform) DO NOTHING
+            ON CONFLICT (video_id, user_id) DO NOTHING
         """, (vid["video_id"], vid["account_username"], vid.get("description", ""),
               vid.get("create_time"), vid.get("duration", 0), vid.get("views", 0),
               vid.get("likes", 0), vid.get("comments", 0), vid.get("shares", 0),

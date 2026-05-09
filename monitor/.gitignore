@@ -1,0 +1,7 @@
+node_modules/
+data/auth.json
+data/dom-snapshots/*.html
+data/results/*.json
+data/logs/*.jsonl
+*.png
+.DS_Store
