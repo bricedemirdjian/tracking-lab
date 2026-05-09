@@ -967,6 +967,23 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--bg-sidebar);
   position: sticky; top: 0;
 }
+.data-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color .12s, background .12s;
+}
+.data-table th.sortable:hover { color: var(--text); background: var(--border-soft); }
+.data-table th.sortable .sort-arrow {
+  display: inline-block; width: 0; height: 0; margin-left: 6px; vertical-align: middle;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0;
+  transition: opacity .12s, transform .12s;
+}
+.data-table th.sortable:hover .sort-arrow { opacity: 0.4; }
+.data-table th.is-sorted { color: var(--accent); }
+.data-table th.is-sorted .sort-arrow { opacity: 1; border-top-color: var(--accent); }
+.data-table th.is-sorted-asc .sort-arrow { transform: rotate(180deg); }
 .data-table th.num, .data-table td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1457,15 +1474,15 @@ button { font-family: inherit; cursor: pointer; }
         <table class="data-table" id="dataTable">
           <thead>
             <tr>
-              <th>Compte</th>
-              <th>Plateforme</th>
-              <th class="num">Followers</th>
-              <th class="num">Gain</th>
-              <th class="num">Vidéos</th>
-              <th class="num">Vues</th>
-              <th class="num">Vues / vidéo</th>
-              <th class="num">Engagement</th>
-              <th>Dernier sync</th>
+              <th class="sortable"           data-sort="username">Compte<span class="sort-arrow"></span></th>
+              <th class="sortable"           data-sort="platform">Plateforme<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="followers">Followers<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="gain">Gain<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="videos">Vidéos<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="views">Vues<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="avg">Vues / vidéo<span class="sort-arrow"></span></th>
+              <th class="sortable num"       data-sort="engagement">Engagement<span class="sort-arrow"></span></th>
+              <th class="sortable"           data-sort="last_updated" title="Date du dernier scrape">Dernier sync<span class="sort-arrow"></span></th>
             </tr>
           </thead>
           <tbody id="tblBody"></tbody>
@@ -1940,14 +1957,14 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     }
   }
 
+  // Persistent sort state for the table view. Default: views DESC.
+  state.tblSort = { col: 'views', dir: 'desc' };
+
   function renderTableView(accs, stats) {
     const tbody = $('#tblBody');
     const empty = $('#tblEmpty');
     const perAccount = stats?.per_account || [];
     const byUsername = {};
-    // /api/stats per_account rows are keyed by account_username (the videos
-    // table column name), not username. Indexing by the wrong field gave a
-    // {undefined: lastRow} map and every table cell rendered 0.
     perAccount.forEach(s => { byUsername[s.account_username] = s; });
 
     $('#tblCount').textContent = accs.length;
@@ -1961,40 +1978,93 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
       return;
     }
     empty.hidden = true;
-    tbody.innerHTML = accs.map(a => {
+
+    // Pre-compute every column value once per row so the sort comparator
+    // and the cell renderer share the same source — no double calculation,
+    // no risk of sort ≠ display.
+    const rows = accs.map(a => {
       const s = byUsername[a.username] || {};
       const platform = a.platform || 'tiktok';
       const followers = a.follower_count || a.followers || 0;
       const gain = s.follower_gain ?? a.follower_gain ?? 0;
       const videos = s.total_videos || 0;
       const views = s.total_views || 0;
-      const avgPerVideo = videos > 0 ? Math.round(views / videos) : 0;
-      const eng = views > 0
-        ? (((s.total_likes || 0) + (s.total_comments || 0) + (s.total_shares || 0)) / views * 100).toFixed(2).replace('.', ',') + ' %'
+      const avg = videos > 0 ? Math.round(views / videos) : 0;
+      const interactions = (s.total_likes || 0) + (s.total_comments || 0) + (s.total_shares || 0);
+      const engagement = views > 0 ? (interactions / views) * 100 : 0;
+      return {
+        a, s, platform, followers, gain, videos, views, avg, engagement,
+        lastTs: a.last_updated ? new Date(a.last_updated).getTime() : 0,
+        username: a.username || '',
+      };
+    });
+
+    // Apply the active sort. Numeric columns sort numerically, string
+    // columns lexicographically. Direction toggles via the header click
+    // handler below.
+    const sort = state.tblSort;
+    rows.sort((x, y) => {
+      const a = x[sort.col];
+      const b = y[sort.col];
+      let cmp;
+      if (typeof a === 'number' && typeof b === 'number') cmp = a - b;
+      else cmp = String(a ?? '').localeCompare(String(b ?? ''));
+      return sort.dir === 'asc' ? cmp : -cmp;
+    });
+
+    // Reflect active sort in the header arrows.
+    document.querySelectorAll('#dataTable th.sortable').forEach(th => {
+      const isActive = th.dataset.sort === sort.col;
+      th.classList.toggle('is-sorted', isActive);
+      th.classList.toggle('is-sorted-asc', isActive && sort.dir === 'asc');
+      th.classList.toggle('is-sorted-desc', isActive && sort.dir === 'desc');
+    });
+
+    tbody.innerHTML = rows.map(r => {
+      const eng = r.views > 0
+        ? r.engagement.toFixed(2).replace('.', ',') + ' %'
         : '—';
-      const gainColor = gain > 0 ? 'var(--green)' : gain < 0 ? 'var(--red)' : 'var(--text-3)';
-      const gainPrefix = gain > 0 ? '+' : '';
+      const gainColor = r.gain > 0 ? 'var(--green)' : r.gain < 0 ? 'var(--red)' : 'var(--text-3)';
+      const gainPrefix = r.gain > 0 ? '+' : '';
       return `
         <tr>
           <td>
             <div class="cell-account">
-              <span class="cell-account-platform" style="background:${({tiktok:'#000',instagram:'#dc2743',youtube:'#FF0000',linkedin:'#0a66c2'}[platform]||'#000')}; color:#fff">
-                ${PLATFORM_SVG_INLINE[platform] || ''}
+              <span class="cell-account-platform" style="background:${({tiktok:'#000',instagram:'#dc2743',youtube:'#FF0000',linkedin:'#0a66c2'}[r.platform]||'#000')}; color:#fff">
+                ${PLATFORM_SVG_INLINE[r.platform] || ''}
               </span>
-              @${escapeHTML(a.username)}
+              @${escapeHTML(r.a.username)}
             </div>
           </td>
-          <td><span class="platform-tag">${platform}</span></td>
-          <td class="num">${fmt(followers)}</td>
-          <td class="num" style="color:${gainColor}; font-weight:600">${gainPrefix}${fmt(gain)}</td>
-          <td class="num">${fmt(videos)}</td>
-          <td class="num">${fmt(views)}</td>
-          <td class="num">${fmt(avgPerVideo)}</td>
+          <td><span class="platform-tag">${r.platform}</span></td>
+          <td class="num">${fmt(r.followers)}</td>
+          <td class="num" style="color:${gainColor}; font-weight:600">${gainPrefix}${fmt(r.gain)}</td>
+          <td class="num">${fmt(r.videos)}</td>
+          <td class="num">${fmt(r.views)}</td>
+          <td class="num">${fmt(r.avg)}</td>
           <td class="num">${eng}</td>
-          <td>${timeAgo(a.last_updated)}</td>
+          <td>${timeAgo(r.a.last_updated)}</td>
         </tr>`;
     }).join('');
   }
+
+  // Wire header clicks once. Toggles direction on same column, switches
+  // and defaults to DESC on a different column.
+  document.querySelectorAll('#dataTable th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (state.tblSort.col === col) {
+        state.tblSort.dir = state.tblSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.tblSort.col = col;
+        // String columns default ASC, numeric columns default DESC.
+        state.tblSort.dir = (col === 'username' || col === 'platform') ? 'asc' : 'desc';
+      }
+      // Re-render the table view with the cached accounts + stats payload.
+      // Cheap because no fetch is involved — pure re-sort of in-memory rows.
+      load();
+    });
+  });
 
   // ─── Wiring: range pills (4 presets + custom toggle) ───
   function setActivePill(rangeKey) {
