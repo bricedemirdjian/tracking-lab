@@ -831,6 +831,45 @@ button { font-family: inherit; cursor: pointer; }
 @media (min-width: 1024px) {
   .videos-swipe .video-card { flex-basis: 260px; }
 }
+
+/* Swipe row + nav arrows + scroll progress bar.
+   Wrap a .videos-swipe in this so the absolutely-positioned arrows
+   sit at the row's mid-height instead of the page's. */
+.videos-swipe-wrap { position: relative; }
+.swipe-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.92); color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: opacity .15s, transform .15s;
+  z-index: 2;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.swipe-arrow:hover { transform: translateY(-50%) scale(1.06); }
+.swipe-arrow svg { width: 16px; height: 16px; }
+.swipe-arrow.prev { left: -2px; }
+.swipe-arrow.next { right: -2px; }
+.swipe-arrow.is-disabled { opacity: 0; pointer-events: none; }
+
+/* Slim scroll progress bar under the row — animates as the user swipes,
+   so they get a clear "where am I in the list" cue without a visible
+   scrollbar. */
+.swipe-progress {
+  height: 3px; margin-top: 10px;
+  background: var(--border-soft); border-radius: 2px; overflow: hidden;
+}
+.swipe-progress-fill {
+  height: 100%;
+  width: 30%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width .12s linear, transform .12s linear;
+  transform-origin: left center;
+}
 .video-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -867,6 +906,7 @@ button { font-family: inherit; cursor: pointer; }
   overflow: hidden;
 }
 .video-author { font-size: 11px; color: var(--text-3); }
+.video-date { font-size: 11px; color: var(--text-4); margin-top: 2px; }
 .video-stats {
   display: flex; gap: 12px; font-size: 11px; color: var(--text-2);
   font-variant-numeric: tabular-nums;
@@ -1315,14 +1355,32 @@ button { font-family: inherit; cursor: pointer; }
 
       <h2 class="section-h2">Meilleures vidéos</h2>
       <p class="section-sub">Triées par nombre de vues décroissant</p>
-      <div class="videos-swipe" id="vidGridBest"></div>
+      <div class="videos-swipe-wrap">
+        <button class="swipe-arrow prev is-disabled" data-target="vidGridBest" type="button" aria-label="Précédent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="videos-swipe" id="vidGridBest"></div>
+        <button class="swipe-arrow next" data-target="vidGridBest" type="button" aria-label="Suivant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="swipe-progress" data-target="vidGridBest"><div class="swipe-progress-fill"></div></div>
       <div id="vidEmptyBest" class="view-empty" hidden>
         <p>Aucune vidéo top à afficher pour ce filtre.</p>
       </div>
 
       <h2 class="section-h2" style="margin-top:36px">Dernières vidéos postées</h2>
       <p class="section-sub">Triées par date de publication décroissante</p>
-      <div class="videos-swipe" id="vidGridLatest"></div>
+      <div class="videos-swipe-wrap">
+        <button class="swipe-arrow prev is-disabled" data-target="vidGridLatest" type="button" aria-label="Précédent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="videos-swipe" id="vidGridLatest"></div>
+        <button class="swipe-arrow next" data-target="vidGridLatest" type="button" aria-label="Suivant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="swipe-progress" data-target="vidGridLatest"><div class="swipe-progress-fill"></div></div>
       <div id="vidEmptyLatest" class="view-empty" hidden>
         <p>Aucune vidéo récente à afficher pour ce filtre.</p>
       </div>
@@ -1629,7 +1687,59 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     return `/api/${endpoint}?` + p.toString();
   }
 
-  function renderVideoCard(v) {
+  // Wire prev/next arrows and progress bar to a .videos-swipe row.
+  // Idempotent — safe to call every render; clicks/scroll listeners are
+  // attached only once per row via a data-flag.
+  function wireSwipeControls(swipeEl) {
+    if (!swipeEl) return;
+    const id = swipeEl.id;
+    const wrap = swipeEl.closest('.videos-swipe-wrap');
+    const prev = wrap?.querySelector('.swipe-arrow.prev');
+    const next = wrap?.querySelector('.swipe-arrow.next');
+    const fill = document.querySelector(`.swipe-progress[data-target="${id}"] .swipe-progress-fill`);
+
+    const update = () => {
+      const max = Math.max(0, swipeEl.scrollWidth - swipeEl.clientWidth);
+      const pct = max > 0 ? swipeEl.scrollLeft / max : 0;
+      if (fill) {
+        // Width grows from 30% → 100% as the user scrolls.
+        const minW = 30;
+        const w = minW + pct * (100 - minW);
+        fill.style.width = w + '%';
+      }
+      if (prev) prev.classList.toggle('is-disabled', swipeEl.scrollLeft <= 2);
+      if (next) next.classList.toggle('is-disabled', swipeEl.scrollLeft >= max - 2);
+    };
+
+    if (!swipeEl.dataset.swipeWired) {
+      swipeEl.dataset.swipeWired = '1';
+      swipeEl.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      const step = () => Math.max(240, Math.round(swipeEl.clientWidth * 0.7));
+      prev?.addEventListener('click', () => swipeEl.scrollBy({ left: -step(), behavior: 'smooth' }));
+      next?.addEventListener('click', () => swipeEl.scrollBy({ left:  step(), behavior: 'smooth' }));
+    }
+    // Run once after render so the progress + arrow states reflect the
+    // freshly-injected card count.
+    requestAnimationFrame(update);
+  }
+
+  // Format a video's create_time for display.
+  //   withTime=false → "9 mai 2026"            (Best videos card)
+  //   withTime=true  → "9 mai 2026 · 14:32"    (Latest videos card)
+  // Returns "" if create_time is missing/invalid so the chip is omitted.
+  function fmtPostDate(iso, withTime) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const date = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (!withTime) return date;
+    const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `${date} · ${time}`;
+  }
+
+  function renderVideoCard(v, opts) {
+    opts = opts || {};
     const p = v.platform || 'tiktok';
     const thumb = v.thumbnail_url || v.cover_url || v.thumbnail || '';
     const title = v.description || v.title || '(Sans titre)';
@@ -1639,6 +1749,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     const handle = v.account_username || v.username || '';
     const author = handle ? `@${handle}` : '';
     const url = v.url || v.video_url || '#';
+    const postedAt = fmtPostDate(v.create_time, !!opts.withTime);
     return `
       <a class="video-card" href="${escapeHTML(url)}" target="_blank" rel="noopener">
         <div class="video-thumb" style="${thumb ? `background-image:url('${escapeHTML(thumb)}')` : ''}">
@@ -1648,6 +1759,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
         <div class="video-body">
           <div class="video-title">${escapeHTML(title.slice(0, 120))}</div>
           <div class="video-author">${escapeHTML(author)}</div>
+          ${postedAt ? `<div class="video-date">${escapeHTML(postedAt)}</div>` : ''}
           <div class="video-stats">
             <span title="Vues">▶ ${fmt(v.view_count || v.views || 0)}</span>
             <span title="Likes">♥ ${fmt(v.like_count || v.likes || 0)}</span>
@@ -1679,7 +1791,9 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
 
       if (best.length) {
         bestEmpty.hidden = true;
-        bestGrid.innerHTML = best.map(renderVideoCard).join('');
+        // Best videos card: date only ("9 mai 2026")
+        bestGrid.innerHTML = best.map(v => renderVideoCard(v, { withTime: false })).join('');
+        wireSwipeControls(bestGrid);
       } else {
         bestGrid.innerHTML = '';
         bestEmpty.hidden = false;
@@ -1687,7 +1801,9 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
 
       if (latest.length) {
         latestEmpty.hidden = true;
-        latestGrid.innerHTML = latest.map(renderVideoCard).join('');
+        // Latest videos card: date + time ("9 mai 2026 · 14:32")
+        latestGrid.innerHTML = latest.map(v => renderVideoCard(v, { withTime: true })).join('');
+        wireSwipeControls(latestGrid);
       } else {
         latestGrid.innerHTML = '';
         latestEmpty.hidden = false;
