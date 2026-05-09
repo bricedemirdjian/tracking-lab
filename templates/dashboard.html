@@ -651,6 +651,17 @@ button { font-family: inherit; cursor: pointer; }
 .section-sub {
   font-size: 13.5px; color: var(--text-3); margin-bottom: 16px;
 }
+/* Header row: title block on the left, count picker (or other action)
+   on the right. Wraps under the title on narrow screens. */
+.section-head-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.section-head-row .section-sub { margin-bottom: 0; }
+.count-picker .pill {
+  font-size: 12px; padding: 5px 10px;
+}
 
 /* Attention card */
 .attention {
@@ -1382,8 +1393,18 @@ button { font-family: inherit; cursor: pointer; }
     <!-- ─── VIDEOS VIEW — Top performers + Latest posted ─── -->
     <section id="viewVideos" class="view" hidden>
 
-      <h2 class="section-h2">Meilleures vidéos</h2>
-      <p class="section-sub">Triées par nombre de vues décroissant</p>
+      <div class="section-head-row">
+        <div>
+          <h2 class="section-h2">Meilleures vidéos</h2>
+          <p class="section-sub">Triées par nombre de vues décroissant</p>
+        </div>
+        <div class="count-picker pill-group" data-target="vidGridBest" aria-label="Nombre de vidéos">
+          <span class="pill" data-count="10">10</span>
+          <span class="pill active" data-count="20">20</span>
+          <span class="pill" data-count="50">50</span>
+          <span class="pill" data-count="all">All</span>
+        </div>
+      </div>
       <div class="videos-swipe-wrap">
         <button class="swipe-arrow prev is-disabled" data-target="vidGridBest" type="button" aria-label="Précédent">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1398,8 +1419,18 @@ button { font-family: inherit; cursor: pointer; }
         <p>Aucune vidéo top à afficher pour ce filtre.</p>
       </div>
 
-      <h2 class="section-h2" style="margin-top:36px">Dernières vidéos postées</h2>
-      <p class="section-sub">Triées par date de publication décroissante</p>
+      <div class="section-head-row" style="margin-top:36px">
+        <div>
+          <h2 class="section-h2">Dernières vidéos postées</h2>
+          <p class="section-sub">Triées par date de publication décroissante</p>
+        </div>
+        <div class="count-picker pill-group" data-target="vidGridLatest" aria-label="Nombre de vidéos">
+          <span class="pill" data-count="10">10</span>
+          <span class="pill active" data-count="20">20</span>
+          <span class="pill" data-count="50">50</span>
+          <span class="pill" data-count="all">All</span>
+        </div>
+      </div>
       <div class="videos-swipe-wrap">
         <button class="swipe-arrow prev is-disabled" data-target="vidGridLatest" type="button" aria-label="Précédent">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1472,7 +1503,12 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     account: 'all',
     date_from: null,    // ISO date string YYYY-MM-DD or null
     date_to: null,
+    // Per-carousel video count. 'all' → high cap (9999) so the SQL LIMIT
+    // becomes effectively unbounded for the user's video table size.
+    bestCount: 20,
+    latestCount: 20,
   };
+  const COUNT_LIMIT = (v) => v === 'all' ? 9999 : Number(v) || 20;
   let accounts = [];
   let projects = [];
 
@@ -1870,8 +1906,8 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
 
     try {
       const [bestR, latestR] = await Promise.all([
-        fetch(buildVideoEndpointURL('best-videos', 30)),
-        fetch(buildVideoEndpointURL('latest-videos', 30)),
+        fetch(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount))),
+        fetch(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount))),
       ]);
       const bestData = await bestR.json();
       const latestData = await latestR.json();
@@ -1971,6 +2007,21 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     const wrap = document.getElementById('customDates');
     if (wrap) wrap.hidden = !show;
   }
+  // Per-carousel count picker (10 / 20 / 50 / All) — wires the pills next
+  // to each section h2 on the Videos page. Only re-fetches that view.
+  document.querySelectorAll('.count-picker').forEach(picker => {
+    const target = picker.dataset.target;
+    const stateKey = target === 'vidGridBest' ? 'bestCount' : 'latestCount';
+    picker.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        state[stateKey] = pill.dataset.count;
+        picker.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+        pill.classList.add('active');
+        renderVideosView();
+      });
+    });
+  });
+
   document.querySelectorAll('#rangePicker .pill').forEach(p => {
     p.addEventListener('click', () => {
       const r = p.dataset.range;
