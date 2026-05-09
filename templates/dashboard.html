@@ -1462,7 +1462,12 @@ button { font-family: inherit; cursor: pointer; }
       $('#kpiShares').textContent = fmt(totalShares);
       $('#kpiEngagement').textContent = fmtPct(engRate);
       $('#kpiAccounts').textContent = accounts.length;
-      $('#sbAccCount').textContent = accounts.length;
+      // #sbAccCount is referenced here but no element with that id exists
+      // in the current sidebar markup. Without the guard, $('#sbAccCount').
+      // textContent threw silently and the whole load() catch swallowed it,
+      // leaving every secondary view (Comptes / Vidéos / Tableau) blank.
+      const sbAcc = $('#sbAccCount');
+      if (sbAcc) sbAcc.textContent = accounts.length;
       // Platform breakdown chips (with real logos)
       const breakdown = {};
       accounts.forEach(a => { breakdown[a.platform] = (breakdown[a.platform] || 0) + 1; });
@@ -1482,8 +1487,10 @@ button { font-family: inherit; cursor: pointer; }
       $('#kpiAvg').textContent = fmt(avgPerVideo);
       $('#kpiFollowers').textContent = fmt(totalFollowers);
       const gainEl = $('#kpiFollowerGain');
-      gainEl.textContent = (followerGain > 0 ? '+' : '') + fmt(followerGain);
-      gainEl.style.color = followerGain > 0 ? 'var(--green)' : followerGain < 0 ? 'var(--red)' : '';
+      if (gainEl) {
+        gainEl.textContent = (followerGain > 0 ? '+' : '') + fmt(followerGain);
+        gainEl.style.color = followerGain > 0 ? 'var(--green)' : followerGain < 0 ? 'var(--red)' : '';
+      }
 
       // Attention card (stale > 36h)
       const stale = accounts.filter(a => {
@@ -1595,7 +1602,11 @@ button { font-family: inherit; cursor: pointer; }
     const p = v.platform || 'tiktok';
     const thumb = v.thumbnail_url || v.cover_url || v.thumbnail || '';
     const title = v.description || v.title || '(Sans titre)';
-    const author = v.username ? `@${v.username}` : '';
+    // /api/best-videos and /api/latest-videos return account_username
+    // (matches the videos table). v.username is undefined and we used to
+    // render an empty author chip under every card.
+    const handle = v.account_username || v.username || '';
+    const author = handle ? `@${handle}` : '';
     const url = v.url || v.video_url || '#';
     return `
       <a class="video-card" href="${escapeHTML(url)}" target="_blank" rel="noopener">
@@ -1662,7 +1673,10 @@ button { font-family: inherit; cursor: pointer; }
     const empty = $('#tblEmpty');
     const perAccount = stats?.per_account || [];
     const byUsername = {};
-    perAccount.forEach(s => { byUsername[s.username] = s; });
+    // /api/stats per_account rows are keyed by account_username (the videos
+    // table column name), not username. Indexing by the wrong field gave a
+    // {undefined: lastRow} map and every table cell rendered 0.
+    perAccount.forEach(s => { byUsername[s.account_username] = s; });
 
     $('#tblCount').textContent = accs.length;
     $('#tblPeriodSub').textContent = 'Période : ' + (state.range != null
@@ -1884,6 +1898,13 @@ button { font-family: inherit; cursor: pointer; }
       const el = document.getElementById('view' + v);
       if (el) el.hidden = (el.id !== targetId);
     });
+
+    // 5. Filter bar (period pills + custom dates + project + account chips)
+    // is only meaningful on the main Dashboard view. On Comptes / Vidéos /
+    // Tableau it adds visual clutter without adding value — those pages
+    // already filter via their own controls or render the full dataset.
+    const filterBar = document.querySelector('.filter-bar');
+    if (filterBar) filterBar.hidden = !!navView;
   })();
 
   // Initial sync — set the default date inputs from the 7d preset
