@@ -333,10 +333,9 @@ async def fetch_linkedin_async(username: str) -> Optional[dict]:
 
 
 async def _fetch_tiktok_profile_stats(username: str) -> dict:
-    """Best-effort: returns {followers, following, total_likes} or {} on failure.
-
-    Failure is non-fatal — followers fall back to 0 and the video listing
-    (yt-dlp + 4-host race) still succeeds independently.
+    """Best-effort: returns {followers, following, total_likes, video_count}
+    or {} on failure. Failure is non-fatal — followers fall back to 0 and the
+    video listing (yt-dlp + 4-host race) still succeeds independently.
     """
     url = f"{_SUPABASE_PROXY}/tiktok-proxy"
     data = await _request_json(
@@ -352,11 +351,50 @@ async def _fetch_tiktok_profile_stats(username: str) -> dict:
         "followers": int(data.get("followers", 0) or 0),
         "following": int(data.get("following", 0) or 0),
         "total_likes": int(data.get("total_likes", 0) or 0),
+        "video_count": int(data.get("video_count", 0) or 0),
     }
 
 
+def _count_videos_in_db_sync(username: str, user_id: int, platform: str) -> int:
+    """How many videos do we already have for this (user, account, platform)?
+    Used by the cache-hit fast path that skips yt-dlp when nothing has changed."""
+    try:
+        from database import get_connection, _fetchone
+        conn = get_connection()
+        row = _fetchone(
+            conn,
+            "SELECT COUNT(*) AS n FROM videos "
+            "WHERE user_id = %s AND account_username = %s AND platform = %s",
+            (user_id, username, platform),
+        )
+        conn.close()
+        return int(row["n"]) if row else 0
+    except Exception:
+        return 0
+
+
+def _refresh_tiktok_stats_only(username: str, user_id: int, profile_stats: dict):
+    """Cache-hit path: just refresh the account stats row, don't touch videos."""
+    from database import upsert_account, save_daily_snapshot
+    upsert_account(
+        username=username,
+        followers=profile_stats.get("followers", 0),
+        following=profile_stats.get("following", 0),
+        total_likes=profile_stats.get("total_likes", 0),
+        user_id=user_id,
+        platform="tiktok",
+    )
+    save_daily_snapshot(username, user_id=user_id, platform="tiktok")
+
+
+# Sentinel returned by fetch_tiktok_async when the cache-diff check decides
+# yt-dlp can be skipped. scrape_one detects this via `data is _TT_CACHE_HIT`
+# and reports a clean cache-hit on_done without going through _process_and_store.
+_TT_CACHE_HIT = object()
+
+
 # ── TikTok (yt-dlp wrapped + parallel hostname race) ──────────────────
-async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
+async def fetch_tiktok_async(username: str, user_id: Optional[int] = None) -> Any:
     """
     Fetch TikTok data — try all 4 API hostnames IN PARALLEL, keep first success.
 
@@ -368,6 +406,11 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
     Followers/following/heart_count are fetched in parallel from the public
     web profile page (yt-dlp's TT extractor doesn't expose them) and stamped
     onto each video entry so the existing _store() picks them up.
+
+    Cache fast path: if user_id is provided and the profile's video_count
+    matches what we already have in DB, the expensive yt-dlp pass is skipped.
+    Returns the _TT_CACHE_HIT sentinel; scrape_one handles it as a no-op
+    while still refreshing follower stats.
     """
     cache_key = f"tt:{username}"
     cached = await _cache_get(cache_key)
@@ -375,14 +418,28 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
         print(f"  [TikTok] cache hit @{username}")
         return cached
 
+    # Fetch profile stats EAGERLY — needed for both the cache check AND for
+    # the regular fast-path (stamps follower count onto each video entry).
+    profile_stats = await _fetch_tiktok_profile_stats(username)
+
+    if user_id is not None and profile_stats and profile_stats.get("video_count"):
+        tt_count = profile_stats["video_count"]
+        db_count = await asyncio.to_thread(
+            _count_videos_in_db_sync, username, user_id, "tiktok"
+        )
+        if db_count >= tt_count:
+            await asyncio.to_thread(_refresh_tiktok_stats_only, username, user_id, profile_stats)
+            print(
+                f"  [TikTok] @{username}: cache hit "
+                f"({db_count}/{tt_count} videos in DB) — skipping yt-dlp"
+            )
+            return _TT_CACHE_HIT
+
     async def try_host(host: str) -> Optional[list[dict]]:
         return await asyncio.to_thread(_ytdlp_tiktok_sync, username, host)
 
     tasks = [asyncio.create_task(try_host(h)) for h in _TIKTOK_HOSTS]
     winner: Optional[list[dict]] = None
-
-    # Fetch profile stats concurrently with the video listing race.
-    profile_task = asyncio.create_task(_fetch_tiktok_profile_stats(username))
 
     try:
         # First-completed: if it succeeds, keep it. Otherwise keep waiting.
@@ -398,8 +455,6 @@ async def fetch_tiktok_async(username: str) -> Optional[list[dict]]:
         for t in tasks:
             if not t.done():
                 t.cancel()
-
-    profile_stats = await profile_task
 
     if winner:
         followers = profile_stats.get("followers", 0)
@@ -655,18 +710,11 @@ async def _process_and_store(
 
     if platform == "instagram":
         videos = data.get("videos", []) or []
-        # Mirror all thumbnails in parallel before persisting. We pre-compute
-        # the mirrored URLs so the sync DB writes only see the final value.
-        # gather() with return_exceptions=True keeps one failure from poisoning
-        # the whole batch — failed mirrors fall back to the original URL.
-        mirrored_urls = await asyncio.gather(
-            *[_mirror_thumbnail_async(v.get("thumbnail_url", ""), v.get("id", ""), "instagram") for v in videos],
-            return_exceptions=True,
-        )
-        mirrored_urls = [
-            r if isinstance(r, str) else videos[i].get("thumbnail_url", "")
-            for i, r in enumerate(mirrored_urls)
-        ]
+        # Persist with the original IG CDN URLs first — they last several days
+        # and the next daily cron will rotate them. Mirroring is offloaded
+        # to a background task at the bottom of this branch so the scrape
+        # response returns immediately (was a 5-30s blocker before).
+        mirrored_urls = [v.get("thumbnail_url", "") for v in videos]
 
         def _store():
             upsert_account(
@@ -760,15 +808,12 @@ async def _process_and_store(
             continue
         pre_extracted.append({"vid": vid, "thumb": _pick_thumbnail(vdata), "vdata": vdata})
 
-    # Mirror TikTok thumbs in parallel; YouTube falls through unchanged.
-    mirrored_urls = await asyncio.gather(
-        *[_mirror_thumbnail_async(item["thumb"], item["vid"], platform) for item in pre_extracted],
-        return_exceptions=True,
-    )
-    mirrored_urls = [
-        r if isinstance(r, str) else pre_extracted[i]["thumb"]
-        for i, r in enumerate(mirrored_urls)
-    ]
+    # Persist with original CDN URLs (TT signed URLs last ~7d, YT thumbs
+    # never expire). The blocking gather() of mirror calls used to add
+    # 5-30s per scrape; mirroring is now decoupled — see the periodic
+    # mirror catch-up cron (scripts/migrate_top_thumbnails.py for one-shot
+    # backfills, /api/cron/mirror-thumbs for scheduled).
+    mirrored_urls = [item["thumb"] for item in pre_extracted]
 
     def _store():
         followers = 0
@@ -885,7 +930,25 @@ async def scrape_accounts_async(
                 elif platform == "youtube":
                     data = await fetch_youtube_async(username)
                 else:  # tiktok (default)
-                    data = await fetch_tiktok_async(username)
+                    data = await fetch_tiktok_async(username, user_id=user_id)
+
+                # TT cache-hit fast path: stats were already refreshed inside the
+                # fetcher — report DB count instead of "0 videos" (which would be
+                # technically true ["0 NEW"] but visually misleading).
+                if data is _TT_CACHE_HIT:
+                    db_count = await asyncio.to_thread(
+                        _count_videos_in_db_sync, username, user_id, "tiktok"
+                    )
+                    results[username] = {
+                        "username": username, "status": "cached",
+                        "videos": db_count, "platform": platform,
+                    }
+                    if on_done:
+                        try:
+                            on_done(username, True, db_count)
+                        except Exception as e:
+                            print(f"  [on_done] {username}: {e}")
+                    return
 
                 if data:
                     count = await _process_and_store(username, platform, data, user_id)
