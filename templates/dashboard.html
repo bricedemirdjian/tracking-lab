@@ -766,8 +766,14 @@ button { font-family: inherit; cursor: pointer; }
   flex: 1; min-width: 0;
 }
 .account-card-handle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.account-card-period {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-3);
+  padding: 8px 0 0 0;
+}
 .account-card-meta {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
@@ -780,6 +786,11 @@ button { font-family: inherit; cursor: pointer; }
 .account-card-stat-value {
   font-size: 16px; font-weight: 700; color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+.account-card-stat-delta {
+  font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
 }
 .account-card-foot {
   font-size: 11px; color: var(--text-3);
@@ -1538,7 +1549,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     // throw can't cascade.
     try { populateProjectFilter(); populateAccountFilter(); } catch (e) { console.error('[load] filters:', e); }
     try {
-      if (navView === 'accounts') renderAccountsView(accounts);
+      if (navView === 'accounts') renderAccountsView(accounts, stats);
       else if (navView === 'videos') await renderVideosView();
       else if (navView === 'table') renderTableView(accounts, stats);
     } catch (e) { console.error('[load] view render:', e); }
@@ -1629,7 +1640,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     return `il y a ${Math.round(h / 24)} j`;
   }
 
-  function renderAccountsView(accs) {
+  function renderAccountsView(accs, stats) {
     const grid = $('#acvGrid');
     const empty = $('#acvEmpty');
     $('#acvCount').textContent = accs.length;
@@ -1639,13 +1650,41 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
       return;
     }
     empty.hidden = true;
+
+    // Index per_account stats by (account_username, platform) so each card
+    // can pull its date-filtered metrics. Keyed both ways because some old
+    // rows may carry only one of the fields.
+    const perAcc = {};
+    (stats?.per_account || []).forEach(s => {
+      const u = s.account_username || s.username;
+      const p = s.platform || 'tiktok';
+      if (u) perAcc[`${u}::${p}`] = s;
+    });
+
+    // Pretty label for the active period (matches the filter pill).
+    const periodLbl = state.range != null
+      ? (state.range === 1 ? '24h' : `${state.range}j`)
+      : 'période';
+
     grid.innerHTML = accs.map(a => {
       const p = a.platform || 'tiktok';
       const url = PLATFORM_URL[p] ? PLATFORM_URL[p](a.username) : '#';
-      const fol = a.follower_count ?? a.followers ?? 0;
-      const vids = a.video_count ?? a.total_videos ?? 0;
-      const views = a.total_views ?? 0;
+      const s = perAcc[`${a.username}::${p}`] || {};
+      // Followers: current snapshot from accounts table; gain is the
+      // delta over the active period (set on the per_account row when a
+      // date filter is active).
+      const fol  = a.followers ?? 0;
+      const gain = s.follower_gain ?? 0;
+      // Videos / Views / Likes for the period (per_account totals are
+      // computed against the date filter — see _compute_period_deltas).
+      // Falls back to the cumulative totals on /api/accounts when no
+      // stats row matches (e.g. account never scraped in this period).
+      const vids  = s.total_videos  ?? a.video_count ?? 0;
+      const views = s.total_views   ?? a.total_views ?? 0;
+      const likes = s.total_likes   ?? a.total_likes ?? 0;
       const stale = !a.last_updated || (Date.now() - new Date(a.last_updated).getTime()) / 3600000 > 36;
+      const gainStr = gain > 0 ? `+${fmt(gain)}` : gain < 0 ? `${fmt(gain)}` : '';
+      const gainColor = gain > 0 ? 'var(--green)' : gain < 0 ? 'var(--red)' : 'var(--text-3)';
       return `
         <div class="account-card">
           <div class="account-card-head">
@@ -1655,10 +1694,12 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
               <div class="account-card-handle">${escapeHTML(a.display_name || a.username)} · ${p}</div>
             </div>
           </div>
+          <div class="account-card-period">Période · ${escapeHTML(periodLbl)}</div>
           <div class="account-card-meta">
             <div>
               <div class="account-card-stat-label">Followers</div>
               <div class="account-card-stat-value">${fmt(fol)}</div>
+              ${gainStr ? `<div class="account-card-stat-delta" style="color:${gainColor}">${gainStr}</div>` : ''}
             </div>
             <div>
               <div class="account-card-stat-label">Vidéos</div>
@@ -1667,6 +1708,10 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
             <div>
               <div class="account-card-stat-label">Vues</div>
               <div class="account-card-stat-value">${fmt(views)}</div>
+            </div>
+            <div>
+              <div class="account-card-stat-label">Likes</div>
+              <div class="account-card-stat-value">${fmt(likes)}</div>
             </div>
           </div>
           <div class="account-card-foot">
@@ -2051,11 +2096,14 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
     });
 
     // 5. Filter bar (period pills + custom dates + project + account chips)
-    // and Export CSV button are only meaningful on the main Dashboard view.
-    // On Comptes / Vidéos / Tableau they add visual clutter — those pages
-    // already filter via their own controls or render the full dataset.
+    // visible on Dashboard + Comptes (cards reflect the date window).
+    // Hidden on Vidéos / Tableau where the filter would not affect output
+    // in the way the user expects.
+    const showFilterBar = !navView || navView === 'accounts';
     const filterBar = document.querySelector('.filter-bar');
-    if (filterBar) filterBar.hidden = !!navView;
+    if (filterBar) filterBar.hidden = !showFilterBar;
+    // Export CSV stays Dashboard-only — the secondary views export an
+    // unrelated cut.
     const exportBtn = document.getElementById('btnExportCsv');
     if (exportBtn) exportBtn.hidden = !!navView;
   })();
