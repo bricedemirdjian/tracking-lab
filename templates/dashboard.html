@@ -1119,7 +1119,13 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 13px;
   text-align: center;
   padding: 0 16px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 12px;
 }
+/* The display:flex above wins over the UA [hidden] { display:none } rule, so
+   we re-assert the hide explicitly. Without this, the empty state overlays
+   the chart even when isEmpty=false. */
+.chart-card-empty[hidden] { display: none !important; }
 /* Donut center label overlay */
 .donut-wrap { position: relative; height: 100%; }
 .donut-center {
@@ -1589,7 +1595,7 @@ button { font-family: inherit; cursor: pointer; }
             <div class="chart-card-head">
               <div>
                 <h3 class="chart-card-title">Vues quotidiennes</h3>
-                <p class="chart-card-sub">Reach total cumulé jour après jour</p>
+                <p class="chart-card-sub">Vues gagnées chaque jour, toutes plateformes</p>
               </div>
               <span class="chart-card-badge" id="chartViewsBadge">—</span>
             </div>
@@ -1671,7 +1677,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-charts', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-09-charts2', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2263,14 +2269,30 @@ console.log('%c[TL] dashboard build v=2026-05-09-charts', 'color:#FF69B4;font-we
     }
 
     // ── Chart 2: Vues quotidiennes (area, summed across all accounts) ──
+    // daily_snapshots stores cumulative totals (running sum of all videos).
+    // To show real daily reach we compute deltas per (account, platform)
+    // sorted by date, then sum those deltas across accounts on each day.
+    // Negative deltas (rare — usually a refresh quirk) are clamped to 0.
     {
-      const byDate = {};
+      const byAccountSeries = {};
       evolution.forEach(row => {
         if (!row.date) return;
-        byDate[row.date] = (byDate[row.date] || 0) + (row.views || 0);
+        const k = `${row.account_username}|${row.platform || 'tiktok'}`;
+        (byAccountSeries[k] = byAccountSeries[k] || []).push({
+          date: row.date, views: row.views || 0,
+        });
       });
-      const sortedDates = Object.keys(byDate).sort();
-      const data = sortedDates.map(d => byDate[d]);
+      const dailyDelta = {};
+      Object.values(byAccountSeries).forEach(series => {
+        series.sort((a, b) => a.date.localeCompare(b.date));
+        for (let i = 1; i < series.length; i++) {
+          const d = series[i].date;
+          const delta = Math.max(0, series[i].views - series[i - 1].views);
+          dailyDelta[d] = (dailyDelta[d] || 0) + delta;
+        }
+      });
+      const sortedDates = Object.keys(dailyDelta).sort();
+      const data = sortedDates.map(d => dailyDelta[d]);
       const total = data.reduce((s, v) => s + v, 0);
       const isEmpty = sortedDates.length === 0 || total === 0;
       setEmpty('chartViews', 'chartViewsEmpty', isEmpty);
