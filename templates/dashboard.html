@@ -1529,12 +1529,10 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
   async function load() {
     setSubtitle();
     refreshFilterChipStates();
-    const statsURL = buildStatsURL();
-    console.log('%c[TL] load() →', 'color:#FF69B4', statsURL);
     let stats = null;
     try {
       const [statsR, accR, projR] = await Promise.all([
-        fetch(statsURL),
+        fetch(buildStatsURL()),
         fetch(buildAccountsURL()),
         fetch('/api/projects'),
       ]);
@@ -1936,7 +1934,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
   document.querySelectorAll('#rangePicker .pill').forEach(p => {
     p.addEventListener('click', () => {
       const r = p.dataset.range;
-      console.log('%c[TL] pill click', 'color:#FF69B4', { range: r, navView: navView });
       if (r === 'custom') {
         // Activate the custom pill, reveal date inputs.
         setActivePill('custom');
@@ -1949,7 +1946,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
         setActivePill(days);
         syncDatesFromRange();
         showCustomDates(false);
-        console.log('%c[TL] state after pill', 'color:#FF69B4', { range: state.range, date_from: state.date_from, date_to: state.date_to });
         load();
       }
     });

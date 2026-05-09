@@ -1165,6 +1165,15 @@ def _compute_period_deltas(date_from, date_to, user_id=None, account_username=No
         if end_snap is None:
             continue
 
+        # If we have no snapshot strictly before date_from, the delta would
+        # collapse to (end_snap - 0) = full cumulative — which makes the
+        # value identical for every date range and breaks the date filter
+        # in the UI. Skip the row instead so the caller falls through to
+        # the create_time-based per-video aggregation, which IS responsive
+        # to the date filter.
+        if date_from and not start_snap:
+            continue
+
         delta = {'account_username': acc, 'platform': plat}
         for m in metrics:
             end_val = end_snap.get(m, 0) or 0
@@ -1218,7 +1227,13 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
             _enrich_with_account_fields(deltas, user_id)
             return deltas
 
-    # No date filter (or no snapshot data available): use cumulative totals from videos table
+    # No date filter, OR snapshots are too thin to compute period deltas
+    # (typical for accounts with only a few days of cron history). When
+    # dates ARE given we still respect them by filtering videos on
+    # create_time — the per-account row then represents "engagement on
+    # videos POSTED in the window" instead of "engagement gained during
+    # the window". Different semantic, but it's at least responsive to
+    # the filter so the UI behaves predictably.
     conn = get_connection()
     query = """
         SELECT
@@ -1248,6 +1263,12 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
     elif account_username and account_username != "all":
         query += " AND account_username = %s"
         params.append(account_username)
+    if date_from:
+        query += f" AND create_time >= %s{_ts_cast()}"
+        params.append(date_from)
+    if date_to:
+        query += f" AND create_time <= %s{_ts_cast()}"
+        params.append(date_to + " 23:59:59")
     query += " GROUP BY account_username, platform"
 
     results = _fetchall(conn, query, params)
@@ -1374,6 +1395,15 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
         placeholders = ', '.join(['%s'] * len(account_usernames))
         query += f" AND account_username IN ({placeholders})"
         params.extend(account_usernames)
+    # Mirror the per-account fallback: when dates are given but the
+    # snapshot deltas branch fell through (insufficient history), filter
+    # videos by create_time so the totals respond to the date filter.
+    if date_from:
+        query += f" AND create_time >= %s{_ts_cast()}"
+        params.append(date_from)
+    if date_to:
+        query += f" AND create_time <= %s{_ts_cast()}"
+        params.append(date_to + " 23:59:59")
 
     result = _fetchone(conn, query, params) or {}
 
