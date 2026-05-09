@@ -111,6 +111,9 @@ def _security_headers(response):
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=(), payment=()",
     )
+    # Build identifier for ops debugging — bump when shipping fixes that
+    # need to be confirmed visible at the edge. Curl-able without auth.
+    response.headers.setdefault("X-Build-Version", "2026-05-09-fix3")
     if IS_PRODUCTION:
         response.headers.setdefault(
             "Strict-Transport-Security",
