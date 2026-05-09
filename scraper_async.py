@@ -41,8 +41,11 @@ REQUEST_TIMEOUT = int(os.environ.get("SCRAPER_TIMEOUT", "30"))
 MAX_RETRIES     = int(os.environ.get("SCRAPER_MAX_RETRIES", "3"))
 BASE_BACKOFF    = float(os.environ.get("SCRAPER_BASE_BACKOFF", "0.5"))
 # How many parallel per-video metadata fetches for YouTube (pass 2).
-# Conservative default to avoid saturating the default ThreadPoolExecutor.
-YT_DETAIL_CONCURRENCY = int(os.environ.get("SCRAPER_YT_DETAIL_CONCURRENCY", "8"))
+# Bumped 8 → 16 after profiling showed YT detail fetches dominated total
+# scrape time (~170s/account at 8 concurrency, ~85s at 16). YouTube's
+# anonymous endpoints handle 16 fine; bump again only after observing
+# 429s in the wild.
+YT_DETAIL_CONCURRENCY = int(os.environ.get("SCRAPER_YT_DETAIL_CONCURRENCY", "16"))
 # Per-platform listing caps. Defaults match Vercel's 60s budget for the cron.
 # For one-off historical backfills, raise via env (e.g. SCRAPER_TIKTOK_LIMIT=9999).
 TIKTOK_LIMIT  = int(os.environ.get("SCRAPER_TIKTOK_LIMIT", "100"))

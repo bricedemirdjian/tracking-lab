@@ -12,7 +12,8 @@ from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from database import (
     init_db, get_all_accounts, get_videos, get_aggregated_stats,
-    get_global_stats, get_daily_evolution, upsert_video, upsert_account,
+    get_global_stats, get_daily_evolution, get_posts_per_day_aggregated,
+    upsert_video, upsert_account,
     save_daily_snapshot, add_tracked_account, remove_tracked_account,
     create_project, rename_project, delete_project, get_projects,
     get_project_accounts, set_project_accounts, get_account_usernames_for_project,
@@ -746,8 +747,8 @@ def api_best_videos():
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
-    videos = get_videos(account, date_from, date_to, sort_by=sort_by, sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames)
-    return jsonify(videos[:limit])
+    videos = get_videos(account, date_from, date_to, sort_by=sort_by, sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames, limit=limit)
+    return jsonify(videos)
 
 
 @app.route("/api/latest-videos")
@@ -760,8 +761,8 @@ def api_latest_videos():
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
-    videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames, exclude_no_date=True)
-    return jsonify(videos[:limit])
+    videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="DESC", user_id=current_user.data_user_id, account_usernames=project_usernames, exclude_no_date=True, limit=limit)
+    return jsonify(videos)
 
 
 @app.route("/api/posts-per-day")
@@ -772,19 +773,11 @@ def api_posts_per_day():
     date_to = request.args.get("date_to", None)
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
-    videos = get_videos(account, date_from, date_to, sort_by="create_time", sort_order="ASC", user_id=current_user.data_user_id, account_usernames=project_usernames, exclude_no_date=True)
-
-    # Group by date and account+platform
-    day_map = {}
-    for v in videos:
-        if not v.get("create_time"):
-            continue
-        date_str = str(v["create_time"])[:10]
-        key = v["account_username"] + ":" + (v.get("platform") or "tiktok")
-        if date_str not in day_map:
-            day_map[date_str] = {}
-        day_map[date_str][key] = day_map[date_str].get(key, 0) + 1
-
+    day_map = get_posts_per_day_aggregated(
+        account, date_from, date_to,
+        user_id=current_user.data_user_id,
+        account_usernames=project_usernames,
+    )
     return jsonify(day_map)
 
 
