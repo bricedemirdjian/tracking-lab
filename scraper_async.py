@@ -553,8 +553,12 @@ async def fetch_tiktok_async(username: str, user_id: Optional[int] = None) -> An
     return winner
 
 
+# Sentinel for YT cache hits, mirrors _TT_CACHE_HIT and _IG_CACHE_HIT.
+_YT_CACHE_HIT = object()
+
+
 # ── YouTube (yt-dlp wrapped, 2-pass: listing + parallel details) ─────
-async def fetch_youtube_async(username: str) -> Optional[list[dict]]:
+async def fetch_youtube_async(username: str, user_id: Optional[int] = None) -> Any:
     """
     YouTube fetch in 2 passes:
       1. Fast listing (extract_flat="in_playlist") → video IDs + views.
@@ -563,6 +567,12 @@ async def fetch_youtube_async(username: str) -> Optional[list[dict]]:
 
     Pass 2 is best-effort: if any detail fetch fails, we keep the listing
     record for that video — never regresses below v1 data quality.
+
+    Cache fast path: if user_id is provided and the pass-1 listing returns
+    the same number of videos we already have in DB for this account, the
+    expensive pass-2 detail fetch is skipped. View counts in DB stay current
+    (pass 1 is rerun on next cycle), but per-video like/comment freshness
+    falls behind by one cycle — acceptable for daily-cron use.
     """
     cache_key = f"yt:{username}"
     cached = await _cache_get(cache_key)
@@ -575,6 +585,18 @@ async def fetch_youtube_async(username: str) -> Optional[list[dict]]:
     if not listing:
         print(f"  [YouTube] @{username}: no data (listing empty)")
         return None
+
+    # Cache check: skip pass-2 enrichment if listing count matches DB.
+    if user_id is not None:
+        db_count = await asyncio.to_thread(
+            _count_videos_in_db_sync, username, user_id, "youtube"
+        )
+        if db_count >= len(listing):
+            print(
+                f"  [YouTube] @{username}: cache hit "
+                f"({db_count}/{len(listing)} videos in DB) — skipping pass 2"
+            )
+            return _YT_CACHE_HIT
 
     # Pass 2: per-video detail fetches, bounded by a global semaphore
     sem = _get_yt_detail_sem()
@@ -1006,15 +1028,19 @@ async def scrape_accounts_async(
                 elif platform == "linkedin":
                     data = await fetch_linkedin_async(username)
                 elif platform == "youtube":
-                    data = await fetch_youtube_async(username)
+                    data = await fetch_youtube_async(username, user_id=user_id)
                 else:  # tiktok (default)
                     data = await fetch_tiktok_async(username, user_id=user_id)
 
-                # Cache-hit fast path (TT or IG): stats were already refreshed
-                # inside the fetcher — report DB count instead of "0 videos"
-                # (which is technically "0 NEW" but visually misleading).
-                if data is _TT_CACHE_HIT or data is _IG_CACHE_HIT:
-                    cached_platform = "tiktok" if data is _TT_CACHE_HIT else "instagram"
+                # Cache-hit fast path (any platform): stats were already
+                # refreshed inside the fetcher — report DB count instead of
+                # "0 videos" (technically "0 NEW" but visually misleading).
+                if data is _TT_CACHE_HIT or data is _IG_CACHE_HIT or data is _YT_CACHE_HIT:
+                    cached_platform = (
+                        "tiktok" if data is _TT_CACHE_HIT
+                        else "instagram" if data is _IG_CACHE_HIT
+                        else "youtube"
+                    )
                     db_count = await asyncio.to_thread(
                         _count_videos_in_db_sync, username, user_id, cached_platform
                     )
