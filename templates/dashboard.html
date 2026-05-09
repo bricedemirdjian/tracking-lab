@@ -1682,7 +1682,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
       const vids  = s.total_videos  ?? a.video_count ?? 0;
       const views = s.total_views   ?? a.total_views ?? 0;
       const likes = s.total_likes   ?? a.total_likes ?? 0;
-      const stale = !a.last_updated || (Date.now() - new Date(a.last_updated).getTime()) / 3600000 > 36;
       const gainStr = gain > 0 ? `+${fmt(gain)}` : gain < 0 ? `${fmt(gain)}` : '';
       const gainColor = gain > 0 ? 'var(--green)' : gain < 0 ? 'var(--red)' : 'var(--text-3)';
       return `
@@ -1691,7 +1690,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
             <span class="account-card-platform" data-p="${p}">${PLATFORM_SVG_INLINE[p] || ''}</span>
             <div style="flex:1; min-width:0">
               <div class="account-card-username">@${escapeHTML(a.username)}</div>
-              <div class="account-card-handle">${escapeHTML(a.display_name || a.username)} · ${p}</div>
             </div>
           </div>
           <div class="account-card-period">Période · ${escapeHTML(periodLbl)}</div>
@@ -1713,10 +1711,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
               <div class="account-card-stat-label">Likes</div>
               <div class="account-card-stat-value">${fmt(likes)}</div>
             </div>
-          </div>
-          <div class="account-card-foot">
-            <span class="account-card-dot ${stale ? 'stale' : ''}"></span>
-            Sync ${timeAgo(a.last_updated)}
           </div>
           <div class="account-card-actions">
             <a class="account-card-link" href="${url}" target="_blank" rel="noopener">Voir le profil ↗</a>
