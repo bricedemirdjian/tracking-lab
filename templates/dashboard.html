@@ -578,6 +578,11 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1.05; color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.kpi-detail {
+  font-size: 11px; color: var(--text-3); margin-top: 8px;
+  letter-spacing: 0.2px;
+  min-height: 14px;
+}
 .kpi-foot {
   font-size: 11px; color: var(--text-3); margin-top: 8px;
   letter-spacing: 0.2px;
@@ -1217,6 +1222,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiContentsTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiContents">—</div>
+        <div class="kpi-detail" id="kpiContentsDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1227,6 +1233,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiViewsTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiViews">—</div>
+        <div class="kpi-detail" id="kpiViewsDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1237,6 +1244,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiLikesTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiLikes">—</div>
+        <div class="kpi-detail" id="kpiLikesDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1247,6 +1255,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiCommentsTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiComments">—</div>
+        <div class="kpi-detail" id="kpiCommentsDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1257,6 +1266,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiSharesTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiShares">—</div>
+        <div class="kpi-detail" id="kpiSharesDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1267,6 +1277,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiEngTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiEngagement">—</div>
+        <div class="kpi-detail" id="kpiEngagementDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1288,6 +1299,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiAvgTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiAvg">—</div>
+        <div class="kpi-detail" id="kpiAvgDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1298,6 +1310,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiFollowersTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiFollowers">—</div>
+        <div class="kpi-detail" id="kpiFollowersDetail">—</div>
       </div>
       <div class="kpi">
         <div class="kpi-head">
@@ -1308,6 +1321,7 @@ button { font-family: inherit; cursor: pointer; }
           <span class="kpi-trend zero" id="kpiFollowerGainTrend">+0%</span>
         </div>
         <div class="kpi-value" id="kpiFollowerGain">—</div>
+        <div class="kpi-detail" id="kpiFollowerGainDetail">—</div>
       </div>
     </div>
 
@@ -1566,16 +1580,39 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
       const engRate = g.engagement_rate || 0;
       const avgPerVideo = totalVideos ? Math.round(totalViews / totalVideos) : 0;
 
-      // 10 KPIs
+      // 10 KPIs — value + a 'detail' line under each so the user can read
+      // the number in context (rate, average, period, breakdown, etc.).
+      const periodLbl = state.range != null
+        ? (state.range === 1 ? '24 h' : `${state.range} jours`)
+        : 'période sélectionnée';
+      const setDetail = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = txt;
+      };
+      const pctOf = (n, d) => d > 0 ? ((n / d) * 100).toFixed(2).replace('.', ',') + ' %' : '—';
+      const perVideo = (n) => totalVideos > 0 ? `${fmtFull(Math.round(n / totalVideos))} / vidéo` : '— / vidéo';
+
       $('#kpiContents').textContent = fmt(totalVideos);
+      setDetail('kpiContentsDetail', `Sur ${periodLbl}`);
+
       $('#kpiViews').textContent = fmt(totalViews);
+      setDetail('kpiViewsDetail', `${perVideo(totalViews)}`);
+
       $('#kpiLikes').textContent = fmt(totalLikes);
+      setDetail('kpiLikesDetail', `${pctOf(totalLikes, totalViews)} des vues`);
+
       $('#kpiComments').textContent = fmt(totalComments);
+      setDetail('kpiCommentsDetail', `${pctOf(totalComments, totalViews)} des vues`);
+
       $('#kpiShares').textContent = fmt(totalShares);
+      setDetail('kpiSharesDetail', `${pctOf(totalShares, totalViews)} des vues`);
+
       $('#kpiEngagement').textContent = fmtPct(engRate);
+      setDetail('kpiEngagementDetail', '(likes + commentaires + partages) / vues');
+
       $('#kpiAccounts').textContent = accounts.length;
-      // (Previously assigned to #sbAccCount which was never added to the
-      // sidebar markup — that null setter swallowed the rest of load().)
+      // No detail line under Comptes actifs — the platform chips below
+      // already serve as the breakdown.
       // Platform breakdown chips (with real logos)
       const breakdown = {};
       accounts.forEach(a => { breakdown[a.platform] = (breakdown[a.platform] || 0) + 1; });
@@ -1592,13 +1629,20 @@ console.log('%c[TL] dashboard build v=2026-05-09-fix3', 'color:#FF69B4;font-weig
         .map(p => `<span class="platform-chip" data-p="${p}" title="${PLATFORM_LABEL[p]}">${PLATFORM_SVG[p] || ''}<span class="platform-chip-count">${breakdown[p]}</span></span>`)
         .join('');
       $('#kpiAccPlatforms').innerHTML = chipsHTML || '<span style="font-size:12px;color:var(--text-3)">Aucun compte</span>';
+
       $('#kpiAvg').textContent = fmt(avgPerVideo);
+      setDetail('kpiAvgDetail', `Sur ${fmtFull(totalVideos)} vidéo${totalVideos > 1 ? 's' : ''}`);
+
       $('#kpiFollowers').textContent = fmt(totalFollowers);
+      const followersPerAccount = accounts.length > 0 ? Math.round(totalFollowers / accounts.length) : 0;
+      setDetail('kpiFollowersDetail', `Moy. ${fmtFull(followersPerAccount)} / compte`);
+
       const gainEl = $('#kpiFollowerGain');
       if (gainEl) {
         gainEl.textContent = (followerGain > 0 ? '+' : '') + fmt(followerGain);
         gainEl.style.color = followerGain > 0 ? 'var(--green)' : followerGain < 0 ? 'var(--red)' : '';
       }
+      setDetail('kpiFollowerGainDetail', `Sur ${periodLbl}`);
 
       // Attention card (stale > 36h)
       const stale = accounts.filter(a => {
