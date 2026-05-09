@@ -410,7 +410,7 @@ async def fetch_linkedin_async(username: str) -> Optional[dict]:
 
 
 async def _fetch_tiktok_profile_stats(username: str) -> dict:
-    """Best-effort: returns {followers, following, total_likes, video_count}
+    """Best-effort: returns the full TT profile (counts + verified/region/etc.)
     or {} on failure. Failure is non-fatal — followers fall back to 0 and the
     video listing (yt-dlp + 4-host race) still succeeds independently.
     """
@@ -425,10 +425,17 @@ async def _fetch_tiktok_profile_stats(username: str) -> dict:
             print(f"  [TT-profile] @{username}: {data['error']}")
         return {}
     return {
-        "followers": int(data.get("followers", 0) or 0),
-        "following": int(data.get("following", 0) or 0),
-        "total_likes": int(data.get("total_likes", 0) or 0),
-        "video_count": int(data.get("video_count", 0) or 0),
+        "followers":       int(data.get("followers", 0) or 0),
+        "following":       int(data.get("following", 0) or 0),
+        "total_likes":     int(data.get("total_likes", 0) or 0),
+        "video_count":     int(data.get("video_count", 0) or 0),
+        "friend_count":    int(data.get("friend_count", 0) or 0),
+        "verified":        bool(data.get("verified")),
+        "private_account": bool(data.get("private_account")),
+        "region":          data.get("region") or None,
+        "full_name":       data.get("full_name") or username,
+        "biography":       data.get("biography") or "",
+        "profile_pic":     data.get("profile_pic") or "",
     }
 
 
@@ -455,9 +462,16 @@ def _refresh_tiktok_stats_only(username: str, user_id: int, profile_stats: dict)
     from database import upsert_account, save_daily_snapshot
     upsert_account(
         username=username,
+        display_name=profile_stats.get("full_name", username),
         followers=profile_stats.get("followers", 0),
         following=profile_stats.get("following", 0),
         total_likes=profile_stats.get("total_likes", 0),
+        friend_count=profile_stats.get("friend_count", 0),
+        verified=profile_stats.get("verified"),
+        private_account=profile_stats.get("private_account"),
+        region=profile_stats.get("region"),
+        avatar_url=profile_stats.get("profile_pic", ""),
+        bio=profile_stats.get("biography", ""),
         user_id=user_id,
         platform="tiktok",
     )
@@ -537,11 +551,20 @@ async def fetch_tiktok_async(username: str, user_id: Optional[int] = None) -> An
         followers = profile_stats.get("followers", 0)
         following = profile_stats.get("following", 0)
         total_likes = profile_stats.get("total_likes", 0)
-        if followers or following or total_likes:
+        if followers or following or total_likes or profile_stats.get("verified") is not None:
             for v in winner:
                 v.setdefault("channel_follower_count", followers)
                 v.setdefault("channel_following_count", following)
                 v.setdefault("channel_total_likes", total_likes)
+                # Extra TT-only profile metadata — picked up by _store()
+                # so even non-cache-hit scrapes persist verified/region/etc.
+                v.setdefault("_tt_friend_count",     profile_stats.get("friend_count", 0))
+                v.setdefault("_tt_verified",         profile_stats.get("verified"))
+                v.setdefault("_tt_private_account", profile_stats.get("private_account"))
+                v.setdefault("_tt_region",           profile_stats.get("region"))
+                v.setdefault("_tt_full_name",        profile_stats.get("full_name"))
+                v.setdefault("_tt_biography",        profile_stats.get("biography"))
+                v.setdefault("_tt_profile_pic",      profile_stats.get("profile_pic"))
         print(
             f"  [TikTok] @{username}: {len(winner)} videos, "
             f"{followers} followers, {total_likes} likes"
@@ -923,6 +946,13 @@ async def _process_and_store(
         total_comments_sum = 0
         total_likes_sum = 0
         display_name = username
+        # TT-only profile metadata (None == not provided this run = preserve old)
+        tt_friend_count = 0
+        tt_verified = None
+        tt_private_account = None
+        tt_region = None
+        tt_biography = None
+        tt_profile_pic = None
         for item, mirrored_thumb in zip(pre_extracted, mirrored_urls):
             vdata = item["vdata"]
             video_id = item["vid"]
@@ -938,6 +968,16 @@ async def _process_and_store(
             ctl = vdata.get("channel_total_likes", 0)
             if ctl:
                 total_likes_channel = ctl
+            # First TT-stamped video carries the profile metadata for everyone
+            if "_tt_friend_count" in vdata and not tt_friend_count:
+                tt_friend_count = vdata.get("_tt_friend_count") or 0
+                tt_verified = vdata.get("_tt_verified")
+                tt_private_account = vdata.get("_tt_private_account")
+                tt_region = vdata.get("_tt_region")
+                tt_biography = vdata.get("_tt_biography")
+                tt_profile_pic = vdata.get("_tt_profile_pic")
+                if vdata.get("_tt_full_name"):
+                    display_name = vdata["_tt_full_name"]
             total_views_sum    += int(vdata.get("view_count", 0) or 0)
             total_comments_sum += int(vdata.get("comment_count", 0) or 0)
             total_likes_sum    += int(vdata.get("like_count", 0) or 0)
@@ -983,6 +1023,12 @@ async def _process_and_store(
             total_likes=total_likes,
             total_views=total_views_sum,
             total_comments=total_comments_sum,
+            friend_count=tt_friend_count,
+            verified=tt_verified,
+            private_account=tt_private_account,
+            region=tt_region,
+            avatar_url=tt_profile_pic,
+            bio=tt_biography,
             user_id=user_id,
             platform=platform,
         )

@@ -389,11 +389,12 @@ def _migrate_competitor_column(conn):
 
 
 def _migrate_engagement_totals_columns(conn):
-    """Add total_views + total_comments + last_media_count columns to accounts.
-    last_media_count is the IG cache key — compared against the proxy's profile
-    media_count to decide whether to skip the heavy paginated post fetch.
-    Idempotent."""
-    for col in ("total_views", "total_comments", "last_media_count"):
+    """Add aggregated stats columns to accounts (idempotent).
+    BIGINT for counters, BOOLEAN/TEXT for the platform-extra metadata."""
+    bigint_cols = ("total_views", "total_comments", "last_media_count", "friend_count")
+    bool_cols   = ("verified", "private_account")
+    text_cols   = ("region",)
+    for col in bigint_cols:
         try:
             if DATABASE_URL:
                 exists = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name=%s", (col,))
@@ -405,6 +406,36 @@ def _migrate_engagement_totals_columns(conn):
                 columns = [c[1] for c in cur.execute("PRAGMA table_info(accounts)").fetchall()]
                 if col not in columns:
                     cur.execute(f"ALTER TABLE accounts ADD COLUMN {col} INTEGER DEFAULT 0")
+                    print(f"[Migration] Added {col} column to accounts (SQLite)")
+        except Exception as e:
+            print(f"[Migration] {col} column: {e}")
+    for col in bool_cols:
+        try:
+            if DATABASE_URL:
+                exists = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name=%s", (col,))
+                if not exists:
+                    _execute(conn, f"ALTER TABLE accounts ADD COLUMN {col} BOOLEAN DEFAULT FALSE")
+                    print(f"[Migration] Added {col} column to accounts (PostgreSQL)")
+            else:
+                cur = conn.cursor()
+                columns = [c[1] for c in cur.execute("PRAGMA table_info(accounts)").fetchall()]
+                if col not in columns:
+                    cur.execute(f"ALTER TABLE accounts ADD COLUMN {col} BOOLEAN DEFAULT 0")
+                    print(f"[Migration] Added {col} column to accounts (SQLite)")
+        except Exception as e:
+            print(f"[Migration] {col} column: {e}")
+    for col in text_cols:
+        try:
+            if DATABASE_URL:
+                exists = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name=%s", (col,))
+                if not exists:
+                    _execute(conn, f"ALTER TABLE accounts ADD COLUMN {col} TEXT")
+                    print(f"[Migration] Added {col} column to accounts (PostgreSQL)")
+            else:
+                cur = conn.cursor()
+                columns = [c[1] for c in cur.execute("PRAGMA table_info(accounts)").fetchall()]
+                if col not in columns:
+                    cur.execute(f"ALTER TABLE accounts ADD COLUMN {col} TEXT")
                     print(f"[Migration] Added {col} column to accounts (SQLite)")
         except Exception as e:
             print(f"[Migration] {col} column: {e}")
@@ -658,14 +689,16 @@ def get_account_usernames_for_project(user_id, project_id):
 
 # ==================== Data functions (all filtered by user_id) ====================
 
-def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, last_media_count=0, bio=None, user_id=None, platform="tiktok"):
+def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, last_media_count=0, friend_count=0, verified=None, private_account=None, region=None, bio=None, user_id=None, platform="tiktok"):
     conn = get_connection()
     # On conflict, only overwrite numeric stats if the new value is non-zero —
     # otherwise an empty/error scrape (e.g. transient 404) wipes good data.
     # Genuine "0 followers" still gets persisted on the initial INSERT path.
+    # Booleans (verified, private_account) and TEXT (region) only overwrite
+    # when the new value is provided (None == "no signal" = preserve old).
     _execute(conn, """
-        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, bio, last_updated, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, friend_count, verified, private_account, region, bio, last_updated, user_id, platform)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT(username, user_id, platform) DO UPDATE SET
             display_name     = COALESCE(excluded.display_name, accounts.display_name),
             avatar_url       = COALESCE(excluded.avatar_url, accounts.avatar_url),
@@ -675,9 +708,13 @@ def upsert_account(username, display_name=None, avatar_url=None, followers=0, fo
             total_views      = CASE WHEN excluded.total_views      > 0 THEN excluded.total_views      ELSE accounts.total_views      END,
             total_comments   = CASE WHEN excluded.total_comments   > 0 THEN excluded.total_comments   ELSE accounts.total_comments   END,
             last_media_count = CASE WHEN excluded.last_media_count > 0 THEN excluded.last_media_count ELSE accounts.last_media_count END,
+            friend_count     = CASE WHEN excluded.friend_count     > 0 THEN excluded.friend_count     ELSE accounts.friend_count     END,
+            verified         = COALESCE(excluded.verified, accounts.verified),
+            private_account  = COALESCE(excluded.private_account, accounts.private_account),
+            region           = COALESCE(excluded.region, accounts.region),
             bio = COALESCE(excluded.bio, accounts.bio),
             last_updated = excluded.last_updated
-    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, bio, datetime.now().isoformat(), user_id, platform))
+    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, friend_count, verified, private_account, region, bio, datetime.now().isoformat(), user_id, platform))
     conn.commit()
     conn.close()
 
@@ -907,6 +944,59 @@ def get_posts_per_day_aggregated(account_username=None, date_from=None, date_to=
     return out
 
 
+def _enrich_with_account_fields(results, user_id):
+    """Add account-level fields (display_name, avatar_url, bio, account totals,
+    is_competitor, etc.) onto a list of per-(account, platform) dicts in place.
+    One IN-clause query — no N+1. Called by both code paths in get_aggregated_stats
+    so the API contract is identical regardless of date filter.
+    """
+    if not results:
+        return
+    usernames_in = list({r['account_username'] for r in results})
+    if not usernames_in:
+        return
+    conn = get_connection()
+    ph = ', '.join(['%s'] * len(usernames_in))
+    accounts_q = f"""
+        SELECT username, platform, display_name, avatar_url, bio,
+               followers, following,
+               total_likes      AS account_total_likes,
+               total_views      AS account_total_views,
+               total_comments   AS account_total_comments,
+               last_media_count, friend_count, verified, private_account,
+               region, is_competitor, last_updated
+        FROM accounts
+        WHERE username IN ({ph})
+    """
+    aparams = list(usernames_in)
+    if user_id is not None:
+        accounts_q += " AND user_id = %s"
+        aparams.append(user_id)
+    rows = _fetchall(conn, accounts_q, aparams)
+    conn.close()
+    accounts_map = {(r['username'], r.get('platform') or 'tiktok'): r for r in rows}
+    for r in results:
+        key = (r['account_username'], r.get('platform') or 'tiktok')
+        acc = accounts_map.get(key) or {}
+        # followers may already be set by the deltas path — only fill if missing.
+        r.setdefault('followers', acc.get('followers') or 0)
+        r.setdefault('follower_gain', 0)
+        r['following']              = acc.get('following') or 0
+        r['display_name']           = acc.get('display_name')
+        r['avatar_url']             = acc.get('avatar_url')
+        r['bio']                    = acc.get('bio')
+        r['is_competitor']          = bool(acc.get('is_competitor'))
+        r['last_updated']           = acc.get('last_updated')
+        r['account_total_likes']    = acc.get('account_total_likes') or 0
+        r['account_total_views']    = acc.get('account_total_views') or 0
+        r['account_total_comments'] = acc.get('account_total_comments') or 0
+        r['media_count']            = acc.get('last_media_count') or 0
+        r['friend_count']           = acc.get('friend_count') or 0
+        r['verified']               = bool(acc.get('verified'))
+        r['private_account']        = bool(acc.get('private_account'))
+        r['region']                 = acc.get('region')
+
+
 def _compute_period_deltas(date_from, date_to, user_id=None, account_username=None, account_usernames=None):
     """Compute engagement deltas per (account, platform) using daily_snapshots.
 
@@ -1057,6 +1147,7 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
         )
         # If no snapshot data available, fall through to videos-table fallback below
         if deltas:
+            _enrich_with_account_fields(deltas, user_id)
             return deltas
 
     # No date filter (or no snapshot data available): use cumulative totals from videos table
@@ -1093,27 +1184,12 @@ def get_aggregated_stats(account_username=None, date_from=None, date_to=None, us
 
     results = _fetchall(conn, query, params)
 
-    # Enrich with current followers from accounts table (no date range = no gain)
-    if results:
-        usernames_in = list({r['account_username'] for r in results})
-        ph = ', '.join(['%s'] * len(usernames_in))
-        followers_q = f"""
-            SELECT username, platform, followers
-            FROM accounts
-            WHERE username IN ({ph})
-        """
-        fparams = list(usernames_in)
-        if user_id is not None:
-            followers_q += " AND user_id = %s"
-            fparams.append(user_id)
-        rows = _fetchall(conn, followers_q, fparams)
-        followers_map = {(r['username'], r.get('platform') or 'tiktok'): (r.get('followers') or 0) for r in rows}
-        for r in results:
-            key = (r['account_username'], r.get('platform') or 'tiktok')
-            r['followers'] = followers_map.get(key, 0)
-            r['follower_gain'] = 0  # no period set
-
     conn.close()
+
+    # Enrich every per-(account, platform) row with the full account record.
+    # Frontends consume per_account directly; without this enrichment they'd
+    # need a second /api/accounts call and a manual join.
+    _enrich_with_account_fields(results, user_id)
     return results
 
 
@@ -1167,14 +1243,45 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
             conn.close()
             videos_count = (posts_in_period or {}).get('total_videos', 0) or 0
 
+            # Pull current account-level cumulatives (followers, account totals)
+            # so the response is shape-equivalent to the no-date path.
+            conn = get_connection()
+            acc_q = """
+                SELECT
+                    COALESCE(SUM(followers), 0)        AS total_followers,
+                    COALESCE(SUM(following), 0)        AS total_following,
+                    COALESCE(SUM(total_likes), 0)      AS account_total_likes,
+                    COALESCE(SUM(total_views), 0)      AS account_total_views,
+                    COALESCE(SUM(total_comments), 0)   AS account_total_comments,
+                    COUNT(*)                            AS accounts_count
+                FROM accounts WHERE 1=1
+            """
+            acc_params = []
+            if user_id is not None:
+                acc_q += " AND user_id = %s"
+                acc_params.append(user_id)
+            if account_usernames:
+                placeholders = ', '.join(['%s'] * len(account_usernames))
+                acc_q += f" AND username IN ({placeholders})"
+                acc_params.extend(account_usernames)
+            acc_row = _fetchone(conn, acc_q, acc_params) or {}
+            conn.close()
+
             return {
                 'total_videos': videos_count,
-                'total_views': sum(d.get('total_views', 0) for d in deltas),
-                'total_likes': sum(d.get('total_likes', 0) for d in deltas),
+                'total_views':    sum(d.get('total_views', 0) for d in deltas),
+                'total_likes':    sum(d.get('total_likes', 0) for d in deltas),
                 'total_comments': sum(d.get('total_comments', 0) for d in deltas),
-                'total_shares': sum(d.get('total_shares', 0) for d in deltas),
-                'total_saves': sum(d.get('total_saves', 0) for d in deltas),
-                'total_followers': sum(d.get('followers', 0) for d in deltas),
+                'total_shares':   sum(d.get('total_shares', 0) for d in deltas),
+                'total_saves':    sum(d.get('total_saves', 0) for d in deltas),
+                # Account-level cumulatives (current snapshot, not period-delta)
+                'total_followers':        acc_row.get('total_followers') or sum(d.get('followers', 0) for d in deltas),
+                'total_following':        acc_row.get('total_following') or 0,
+                'account_total_likes':    acc_row.get('account_total_likes') or 0,
+                'account_total_views':    acc_row.get('account_total_views') or 0,
+                'account_total_comments': acc_row.get('account_total_comments') or 0,
+                'accounts_count':         acc_row.get('accounts_count') or 0,
+                # follower_gain stays a true period delta
                 'follower_gain': sum(d.get('follower_gain', 0) for d in deltas),
             }
         # Fall through if no snapshot data available (e.g. very fresh accounts)
@@ -1202,9 +1309,19 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
 
     result = _fetchone(conn, query, params) or {}
 
-    # Followers: SUM from accounts table (current snapshot, not historical).
-    # No "gain" without a date range — leave at 0.
-    fq = "SELECT COALESCE(SUM(followers), 0) AS total_followers FROM accounts WHERE 1=1"
+    # Account-level totals (followers + heart counts that are richer than the
+    # per-video sums above — TT heartCount, IG aggregated reels, etc.). Same
+    # filter as the video query so global numbers stay consistent.
+    fq = """
+        SELECT
+            COALESCE(SUM(followers), 0)         AS total_followers,
+            COALESCE(SUM(following), 0)         AS total_following,
+            COALESCE(SUM(total_likes), 0)       AS account_total_likes,
+            COALESCE(SUM(total_views), 0)       AS account_total_views,
+            COALESCE(SUM(total_comments), 0)    AS account_total_comments,
+            COUNT(*)                             AS accounts_count
+        FROM accounts WHERE 1=1
+    """
     fparams = []
     if user_id is not None:
         fq += " AND user_id = %s"
@@ -1216,8 +1333,13 @@ def get_global_stats(date_from=None, date_to=None, user_id=None, account_usernam
     fresult = _fetchone(conn, fq, fparams) or {}
     conn.close()
 
-    result['total_followers'] = fresult.get('total_followers', 0) or 0
-    result['follower_gain'] = 0
+    result['total_followers']        = fresult.get('total_followers') or 0
+    result['total_following']        = fresult.get('total_following') or 0
+    result['account_total_likes']    = fresult.get('account_total_likes') or 0
+    result['account_total_views']    = fresult.get('account_total_views') or 0
+    result['account_total_comments'] = fresult.get('account_total_comments') or 0
+    result['accounts_count']         = fresult.get('accounts_count') or 0
+    result['follower_gain']          = 0
     return result
 
 
