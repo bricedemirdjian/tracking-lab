@@ -1766,20 +1766,6 @@ button { font-family: inherit; cursor: pointer; }
             </div>
           </div>
 
-          <div class="chart-card" style="grid-column: 1 / -1;">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Cadence de publication</h3>
-                <p class="chart-card-sub">Nombre de vidéos publiées par jour</p>
-              </div>
-              <span class="chart-card-badge" id="adviceCadenceBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceCadence"></canvas>
-              <div class="chart-card-empty" id="adviceCadenceEmpty" hidden>Pas de publications sur cette période.</div>
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -1884,7 +1870,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-advice', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-09-advice2', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2356,7 +2342,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice', 'color:#FF69B4;font-we
   // re-rendering — Chart.js leaks DOM if you don't tear down old charts.
   const chartInstances = {
     followers: null, views: null, donut: null, top: null,
-    adviceCadence: null, adviceRadar: null, adviceEngEvo: null,
+    adviceRadar: null, adviceEngEvo: null,
     adviceComp: null, adviceDist: null, adviceAvg: null,
   };
 
@@ -2670,15 +2656,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice', 'color:#FF69B4;font-we
   // over time). All four fetched in parallel.
   const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  function buildPostsPerDayURL() {
-    const p = new URLSearchParams();
-    if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
-    if (state.account && state.account !== 'all') p.set('account', state.account);
-    if (state.date_from) p.set('date_from', state.date_from);
-    if (state.date_to) p.set('date_to', state.date_to);
-    p.set('competitor', isCompetitorScope ? 'true' : 'false');
-    return '/api/posts-per-day?' + p.toString();
-  }
   function buildVideosAllURL() {
     const p = new URLSearchParams();
     if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
@@ -2700,19 +2677,18 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice', 'color:#FF69B4;font-we
     }
     if (typeof Chart === 'undefined') { console.warn('[TL] Chart.js missing'); return; }
 
-    const [videos, ppd, evolution] = await Promise.all([
+    const [videos, evolution] = await Promise.all([
       fetch(buildVideosAllURL()).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(buildPostsPerDayURL()).then(r => r.ok ? r.json() : {}).catch(() => ({})),
       fetch(buildEvolutionURL()).then(r => r.ok ? r.json() : []).catch(() => []),
     ]);
 
-    renderAdviceWhen(videos, ppd);
+    renderAdviceWhen(videos);
     renderAdviceQuality(stats, evolution);
     renderAdviceContent(videos, evolution);
   }
 
-  // ── Axis 1: when to post ── (charts A heatmap + B cadence) ──
-  function renderAdviceWhen(videos, ppd) {
+  // ── Axis 1: when to post ── (chart A heatmap only) ──
+  function renderAdviceWhen(videos) {
     // ── Chart A: heatmap day×hour with avg views per cell ──
     const buckets = {};
     (videos || []).forEach(v => {
@@ -2779,43 +2755,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice', 'color:#FF69B4;font-we
       if (root) root.innerHTML = cells.join('');
     }
 
-    // ── Chart B: cadence — posts per day ──
-    const dates = Object.keys(ppd || {}).sort();
-    const data = dates.map(d => ppd[d]);
-    const totalCadence = data.reduce((s, v) => s + v, 0);
-    const isEmptyCadence = dates.length === 0 || totalCadence === 0;
-    const cadBadge = document.getElementById('adviceCadenceBadge');
-    if (cadBadge) cadBadge.textContent = isEmptyCadence ? '—' : `${totalCadence} post${totalCadence > 1 ? 's' : ''}`;
-    setEmpty('adviceCadence', 'adviceCadenceEmpty', isEmptyCadence);
-    destroyChart('adviceCadence');
-    if (!isEmptyCadence) {
-      chartInstances.adviceCadence = new Chart(document.getElementById('adviceCadence'), {
-        type: 'bar',
-        data: {
-          labels: dates,
-          datasets: [{
-            label: 'Posts', data,
-            backgroundColor: '#FF69B4',
-            borderRadius: 4, borderSkipped: false,
-            barPercentage: 0.9, categoryPercentage: 0.85,
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8,
-              callbacks: { label: ctx => `${ctx.parsed.y} post${ctx.parsed.y > 1 ? 's' : ''}` }
-            }
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 14 } },
-            y: { beginAtZero: true, grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { stepSize: 1, font: { size: 10 }, color: '#9aa0a6' } }
-          }
-        }
-      });
-    }
   }
 
   // ── Axis 2: quality ── (charts C radar + D engagement evolution + E composition) ──
