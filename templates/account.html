@@ -59,7 +59,7 @@
     }
     .badge-starter { background: #f0f0f0; color: #555; }
     .badge-pro     { background: #e6f0ff; color: var(--accent); }
-    .badge-agency  { background: #fcf2dc; color: var(--gold); }
+    .badge-agency  { background: #fcf2dc; color: #8a6816; }
     .since { color: var(--muted); font-size: 13px; }
 
     /* Plan card */
@@ -161,9 +161,9 @@
 
     <!-- 1. Profile header -->
     <section class="profile">
-      {% set initials = (user.name or user.email).split(' ') | map('first') | join('') | upper %}
+      {% set initials = (user.name or user.email or '?').split(' ') | map('first') | join('') | upper %}
       {% set hue = (user.email | length * 37) % 360 if user.email else 200 %}
-      <div class="avatar" style="background: hsl({{ hue }}, 60%, 50%);">
+      <div class="avatar" style="background: hsl({{ hue }}, 55%, 42%);">
         {{ initials[:2] }}
       </div>
       <div class="profile-info">

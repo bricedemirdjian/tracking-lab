@@ -24,6 +24,7 @@ class User(UserMixin):
         self.avatar_url = user_dict['avatar_url']
         self.role = user_dict.get('role', 'user')
         self.blocked = user_dict.get('blocked', False)
+        self.created_at = user_dict.get('created_at')
 
     @property
     def is_admin(self):
