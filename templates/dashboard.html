@@ -531,7 +531,8 @@ button { font-family: inherit; cursor: pointer; }
 /* KPI cards — 5×2 grid (10 metrics total) */
 .kpis {
   display: grid; grid-template-columns: repeat(5, 1fr);
-  gap: 14px; margin-bottom: 36px;
+  gap: 14px;
+  /* No bottom margin — the next .section-h2 has margin-top:56px (uniform spacing) */
 }
 @media (max-width: 1400px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
@@ -645,10 +646,14 @@ button { font-family: inherit; cursor: pointer; }
 .platform-chip[data-p="youtube"] svg { color: #cc0000; }
 .platform-chip[data-p="linkedin"] svg { color: #0a66c2; }
 
-/* Section header */
+/* Section header — uniform 56px top gap from previous block, regardless of
+   what was above (KPI grid, chart-card, table…). First-of-section override
+   below removes the gap for the first header of a view. */
 .section-h2 {
   font-size: 22px; font-weight: 700; letter-spacing: -0.4px;
-  color: var(--text); margin-bottom: 4px;
+  color: var(--text);
+  margin-top: 56px;
+  margin-bottom: 4px;
 }
 .section-sub {
   font-size: 13.5px; color: var(--text-3); margin-bottom: 16px;
@@ -658,9 +663,17 @@ button { font-family: inherit; cursor: pointer; }
 .section-head-row {
   display: flex; align-items: flex-end; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
+  margin-top: 56px;
   margin-bottom: 12px;
 }
+.section-head-row .section-h2 { margin-top: 0; } /* avoid double-margin inside the row */
 .section-head-row .section-sub { margin-bottom: 0; }
+/* First section header in a view sits at the top — no preceding block to space from */
+.view > .section-h2:first-child,
+.view > .section-head-row:first-child,
+.view > .charts-section:first-child .section-h2 { margin-top: 0; }
+/* Stacked views (all-in-one dashboard) get the same 56px between sections */
+.view:not([hidden]) ~ .view:not([hidden]) { margin-top: 56px; }
 .count-picker .pill {
   font-size: 12px; padding: 5px 10px;
 }
@@ -1625,7 +1638,7 @@ button { font-family: inherit; cursor: pointer; }
         <p>Aucune vidéo récente à afficher pour ce filtre.</p>
       </div>
 
-      <div class="section-head-row" style="margin-top:36px">
+      <div class="section-head-row">
         <div>
           <h2 class="section-h2">Meilleures vidéos</h2>
           <p class="section-sub">Triées par nombre de vues décroissant</p>
@@ -1872,7 +1885,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-allinone-dashboard', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-uniform-spacing', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
