@@ -1,0 +1,75 @@
+# Keep-warm cron — pings /healthz every 5 min during Paris business hours
+# (8h-22h) to prevent Vercel function cold starts.
+#
+# Why: Vercel Hobby kills idle functions after ~5 min of inactivity. The next
+# request then pays a 1-3s cold-start penalty (Python import + DB init). For
+# a single user, this hits the morning visit, the after-lunch visit, and any
+# demo. Pinging /healthz on a 5-min cadence keeps the function warm so every
+# real visit feels instant.
+#
+# Cost math:
+#   - 12 pings/h × 14 active hours × 30 days = 5040 runs/month
+#   - Each run = ~5-10s of GH Actions = ~10 min/day = ~300 min/month
+#   - GH Actions free tier: 2000 min/month → 15% used
+#   - Outside the 8-22h window: gate exits in ~3s without pinging Vercel,
+#     consuming ~1 GH Actions minute total per day for the gate checks.
+#
+# Note: GitHub Actions cron is best-effort — runs are delayed during peak
+# load, sometimes by 10-30 min. Worst case = an extra cold start. Better
+# precision would need an external pinger (UptimeRobot, cron-job.org).
+
+name: Keep Vercel warm
+
+on:
+  schedule:
+    # Every 5 min UTC. The Paris-hour gate below filters to 8-22h local.
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+# If a previous ping is still running (rare — a ping is <30s), don't pile on.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Paris business-hours gate
+        id: gate
+        run: |
+          # Skip outside 8h-22h Paris time (function can sleep overnight; user
+          # isn't visiting). Manual workflow_dispatch always proceeds.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "→ manual trigger, gate bypassed"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PARIS_HOUR=$(TZ='Europe/Paris' date +%H | sed 's/^0//')
+          PARIS_HOUR=${PARIS_HOUR:-0}
+          echo "→ Paris hour: ${PARIS_HOUR}h"
+          if [ "$PARIS_HOUR" -ge 8 ] && [ "$PARIS_HOUR" -le 22 ]; then
+            echo "→ inside warm window (8-22h), pinging"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          else
+            echo "→ outside warm window (function may sleep), skipping"
+            echo "proceed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ping /healthz
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          # /healthz returns 200 OK after a SELECT 1 against Postgres.
+          # Hitting it warms (a) the Vercel function, (b) the psycopg2 pool,
+          # (c) the schema-cache short-circuit so init_db() is a no-op.
+          OUT=$(curl -sS -o /tmp/body -w "%{http_code} %{time_total}s" \
+                     --max-time 30 \
+                     "https://app.trackinglab.online/healthz")
+          BODY=$(cat /tmp/body | head -c 200)
+          echo "status: $OUT"
+          echo "body:   $BODY"
+          # Don't fail the workflow on transient blips — keep-warm is best-effort.
+          # The next run (5 min later) will retry. We exit 0 unconditionally so
+          # the gate keeps running on schedule.
+          exit 0
