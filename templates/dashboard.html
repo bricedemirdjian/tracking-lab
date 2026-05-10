@@ -1545,28 +1545,18 @@ button { font-family: inherit; cursor: pointer; }
       <div class="attention-arrow">→</div>
     </div>
 
-    <!-- Chart -->
-    <div class="chart-card">
-      <h2 class="section-h2" style="font-size:18px">Vues hebdomadaires</h2>
-      <p class="section-sub">12 dernières semaines</p>
-      <div class="chart-bars">
-        <div class="chart-y"><span>120k</span><span>80k</span><span>40k</span><span>0</span></div>
-        <div class="chart-bar dim" style="height: 32%"></div>
-        <div class="chart-bar dim" style="height: 41%"></div>
-        <div class="chart-bar dim" style="height: 55%"></div>
-        <div class="chart-bar dim" style="height: 48%"></div>
-        <div class="chart-bar dim" style="height: 67%"></div>
-        <div class="chart-bar dim" style="height: 60%"></div>
-        <div class="chart-bar dim" style="height: 72%"></div>
-        <div class="chart-bar dim" style="height: 65%"></div>
-        <div class="chart-bar" style="height: 78%"></div>
-        <div class="chart-bar" style="height: 70%"></div>
-        <div class="chart-bar" style="height: 85%"></div>
-        <div class="chart-bar" style="height: 92%"></div>
+    <!-- Weekly views chart — real data, last 12 ISO weeks -->
+    <div class="chart-card" style="min-height: 340px;">
+      <div class="chart-card-head">
+        <div>
+          <h3 class="chart-card-title">Vues hebdomadaires</h3>
+          <p class="chart-card-sub">12 dernières semaines · vues gagnées par semaine</p>
+        </div>
+        <span class="chart-card-badge" id="weeklyBadge">—</span>
       </div>
-      <div class="chart-x">
-        <span>S08</span><span>S09</span><span>S10</span><span>S11</span><span>S12</span><span>S13</span>
-        <span>S14</span><span>S15</span><span>S16</span><span>S17</span><span>S18</span><span>S19</span>
+      <div class="chart-card-body">
+        <canvas id="weeklyViewsChart"></canvas>
+        <div class="chart-card-empty" id="weeklyEmpty" hidden>Pas encore d'historique sur 12 semaines.</div>
       </div>
     </div>
 
@@ -1860,7 +1850,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2001,17 +1991,21 @@ console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-
     setSubtitle();
     refreshFilterChipStates();
     let stats = null;
+    let evolution = [];
     try {
       // cachedJSON dedups in-flight + reuses results within 60s. On view
-      // switches without a filter change, all 3 hit the cache → instant.
-      const [s, a, p] = await Promise.all([
+      // switches without a filter change, all 4 hit the cache → instant.
+      // evolution feeds the weekly-views chart on the dashboard view.
+      const [s, a, p, evo] = await Promise.all([
         cachedJSON(buildStatsURL()),
         cachedJSON(buildAccountsURL(), []),
         cachedJSON('/api/projects', []),
+        cachedJSON(buildEvolutionURL(), []),
       ]);
       stats = s;
       accounts = Array.isArray(a) ? a : [];
       projects = Array.isArray(p) ? p : [];
+      evolution = Array.isArray(evo) ? evo : [];
       if (!stats) throw new Error('stats fetch failed');
     } catch (e) {
       console.error('[load] fetch failed:', e);
@@ -2121,6 +2115,10 @@ console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-
     } catch (e) {
       console.error('[load] kpi render:', e);
     }
+
+    // Weekly views chart (dashboard view only — canvas only exists there).
+    // Function no-ops if the canvas isn't in the DOM.
+    try { renderWeeklyViewsChart(evolution); } catch (e) { console.error('[load] weekly:', e); }
   }
 
   // ─── View renderers ─────────────────────────────────────────────────
@@ -2369,6 +2367,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-
     followers: null, views: null, donut: null, top: null,
     adviceRadar: null, adviceEngEvo: null,
     adviceComp: null, adviceDist: null, adviceAvg: null,
+    weekly: null,
   };
 
   // Brand palette per platform — single solid color per platform, picked
@@ -2458,6 +2457,110 @@ console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-
     const e = document.getElementById(emptyId);
     if (c) c.style.display = isEmpty ? 'none' : '';
     if (e) e.hidden = !isEmpty;
+  }
+
+  // ─── Dashboard view: weekly views chart (last 12 ISO weeks) ─────────
+  // Replaces the static placeholder bars that used to live in the HTML.
+  // Buckets daily-delta views into 7-day windows ending today, labeled
+  // by ISO week number (S08 .. S20). Fades old weeks, accents recent
+  // ones to draw the eye to the current trend.
+  function renderWeeklyViewsChart(evolution) {
+    const canvas = document.getElementById('weeklyViewsChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    // Compute daily deltas first (per account, then sum per date)
+    const byAccountSeries = {};
+    (evolution || []).forEach(row => {
+      if (!row.date) return;
+      const k = `${row.account_username}|${row.platform || 'tiktok'}`;
+      (byAccountSeries[k] = byAccountSeries[k] || []).push({ date: row.date, views: row.views || 0 });
+    });
+    const dailyDelta = {};
+    Object.values(byAccountSeries).forEach(series => {
+      series.sort((a, b) => a.date.localeCompare(b.date));
+      for (let i = 1; i < series.length; i++) {
+        const d = series[i].date;
+        const delta = Math.max(0, series[i].views - series[i - 1].views);
+        dailyDelta[d] = (dailyDelta[d] || 0) + delta;
+      }
+    });
+
+    // Bucket the last 12 weeks. Week starts Monday (FR convention).
+    const today = new Date();
+    const dow = today.getDay() || 7;            // 0=Sun -> 7
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dow - 1));
+    monday.setHours(0, 0, 0, 0);
+
+    function isoWeek(d) {
+      const t = new Date(d); t.setHours(0, 0, 0, 0);
+      t.setDate(t.getDate() + 4 - (t.getDay() || 7)); // Thursday of this week
+      const ys = new Date(t.getFullYear(), 0, 1);
+      return Math.ceil((((t - ys) / 86400000) + 1) / 7);
+    }
+
+    const weeks = [];
+    for (let w = 11; w >= 0; w--) {
+      const start = new Date(monday); start.setDate(monday.getDate() - 7 * w);
+      const end = new Date(start); end.setDate(start.getDate() + 6);
+      let sum = 0;
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        sum += dailyDelta[d.toISOString().slice(0, 10)] || 0;
+      }
+      weeks.push({ label: 'S' + String(isoWeek(start)).padStart(2, '0'), views: sum, start });
+    }
+
+    const labels = weeks.map(w => w.label);
+    const data = weeks.map(w => w.views);
+    const total = data.reduce((s, v) => s + v, 0);
+
+    const badge = document.getElementById('weeklyBadge');
+    if (badge) badge.textContent = total === 0 ? '—' : `${fmtCompact(total)} sur 12 sem.`;
+    setEmpty('weeklyViewsChart', 'weeklyEmpty', total === 0);
+    destroyChart('weekly');
+    if (total === 0) return;
+
+    chartInstances.weekly = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Vues',
+          data,
+          // Recent 4 weeks accented, older ones lighter — guides the eye.
+          backgroundColor: data.map((_, i) => i >= data.length - 4 ? '#FF69B4' : '#FFD6E7'),
+          borderRadius: 8,
+          borderSkipped: false,
+          barPercentage: 0.78,
+          categoryPercentage: 0.85,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 8, right: 4, bottom: 0, left: 0 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+            padding: 12, cornerRadius: 8,
+            titleFont: { size: 12, weight: '600' }, bodyFont: { size: 12 },
+            callbacks: {
+              title: items => {
+                const w = weeks[items[0].dataIndex];
+                const start = w.start;
+                const end = new Date(start); end.setDate(start.getDate() + 6);
+                return `${w.label} · ${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+              },
+              label: ctx => `  ${fmtCompact(ctx.parsed.y)} vues`,
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9aa0a6' } },
+          y: AXIS_Y_NUM,
+        }
+      }
+    });
   }
 
   async function renderTableCharts(accs, stats) {
@@ -3527,19 +3630,18 @@ console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-
     const prevComp = isCompetitorScope;
     isCompetitorScope = !!isComp;
     try {
-      // Common to all views
+      // Common to all views — load() always fetches these
       cachedJSON(buildStatsURL());
       cachedJSON(buildAccountsURL(), []);
       cachedJSON('/api/projects', []);
+      cachedJSON(buildEvolutionURL(), []); // for the weekly chart on dashboard
       // Per-view extras
       if (view === 'videos') {
         cachedJSON(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount)), []);
         cachedJSON(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount)), []);
       } else if (view === 'table') {
-        cachedJSON(buildEvolutionURL(), []);
         cachedJSON(buildVideosAllURL(), []);
       }
-      // accounts + dashboard need only the common fetches.
     } finally {
       isCompetitorScope = prevComp;
     }
