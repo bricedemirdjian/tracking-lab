@@ -528,65 +528,6 @@ button { font-family: inherit; cursor: pointer; }
 }
 .filter-reset[hidden] { display: none; }
 
-/* Hero cards — 2 oversized metric cards above the KPI grid for the most-watched values */
-.hero-cards {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 16px; margin-bottom: 24px;
-}
-@media (max-width: 900px) { .hero-cards { grid-template-columns: 1fr; } }
-.hero-card {
-  position: relative;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 28px 30px 24px;
-  overflow: hidden;
-  transition: box-shadow 200ms ease, transform 200ms ease;
-  box-shadow: 0 1px 2px rgba(16,18,20,0.04);
-}
-.hero-card:hover { box-shadow: 0 8px 28px rgba(255,105,180,0.10); }
-.hero-card-bg {
-  position: absolute; inset: 0;
-  background: radial-gradient(120% 80% at 100% 0%, rgba(255,105,180,0.10) 0%, rgba(255,105,180,0) 60%);
-  pointer-events: none;
-}
-.hero-card-head {
-  position: relative;
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 18px;
-}
-.hero-card-icon {
-  width: 38px; height: 38px;
-  border-radius: 12px;
-  background: rgba(255,105,180,0.12);
-  color: #FF69B4;
-  display: flex; align-items: center; justify-content: center;
-}
-.hero-card-label {
-  font-size: 11px; font-weight: 700;
-  color: var(--text-2);
-  text-transform: uppercase; letter-spacing: 0.9px;
-}
-.hero-card-value {
-  position: relative;
-  font-size: 56px; font-weight: 700;
-  color: var(--text-1);
-  letter-spacing: -2px; line-height: 1;
-  margin-bottom: 8px;
-}
-.hero-card-period {
-  position: relative;
-  font-size: 14px; color: var(--text-3);
-  margin-bottom: 14px;
-}
-.hero-card-foot {
-  position: relative;
-  font-size: 13px; font-weight: 600;
-  color: var(--text-2);
-  padding-top: 14px;
-  border-top: 1px dashed var(--border);
-}
-
 /* KPI cards — 5×2 grid (10 metrics total) */
 .kpis {
   display: grid; grid-template-columns: repeat(5, 1fr);
@@ -1613,37 +1554,7 @@ button { font-family: inherit; cursor: pointer; }
 
     <!-- Audience details -->
     <h2 class="section-h2">Ton audience en détail</h2>
-    <p class="section-sub">Vue d'ensemble sur la période sélectionnée</p>
-
-    <!-- Hero cards — Posts + Vues for the active filter period -->
-    <div class="hero-cards">
-      <div class="hero-card">
-        <div class="hero-card-bg"></div>
-        <div class="hero-card-head">
-          <span class="hero-card-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="3 9 12 14 21 9"/></svg>
-          </span>
-          <span class="hero-card-label">Posts publiés</span>
-        </div>
-        <div class="hero-card-value" id="heroPostsValue">—</div>
-        <div class="hero-card-period" id="heroPostsPeriod">—</div>
-        <div class="hero-card-foot" id="heroPostsAvg">—</div>
-      </div>
-
-      <div class="hero-card">
-        <div class="hero-card-bg"></div>
-        <div class="hero-card-head">
-          <span class="hero-card-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-          </span>
-          <span class="hero-card-label">Vues générées</span>
-        </div>
-        <div class="hero-card-value" id="heroViewsValue">—</div>
-        <div class="hero-card-period" id="heroViewsPeriod">—</div>
-        <div class="hero-card-foot" id="heroViewsAvg">—</div>
-      </div>
-    </div>
-
+    <p class="section-sub">Comptes nécessitant une mise à jour</p>
     <div class="attention" id="attentionCard" style="display:none">
       <div class="attention-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><path d="M9 14l2 2 4-4"/></svg>
@@ -1685,36 +1596,10 @@ button { font-family: inherit; cursor: pointer; }
       </div>
     </section>
 
-    <!-- ─── VIDEOS VIEW — Top performers + Latest posted ─── -->
+    <!-- ─── VIDEOS VIEW — Latest posted (top) + Top performers (below) ─── -->
     <section id="viewVideos" class="view" hidden>
 
       <div class="section-head-row">
-        <div>
-          <h2 class="section-h2">Meilleures vidéos</h2>
-          <p class="section-sub">Triées par nombre de vues décroissant</p>
-        </div>
-        <div class="count-picker pill-group" data-target="vidGridBest" aria-label="Nombre de vidéos">
-          <span class="pill" data-count="10">10</span>
-          <span class="pill active" data-count="20">20</span>
-          <span class="pill" data-count="50">50</span>
-          <span class="pill" data-count="all">All</span>
-        </div>
-      </div>
-      <div class="videos-swipe-wrap">
-        <button class="swipe-arrow prev is-disabled" data-target="vidGridBest" type="button" aria-label="Précédent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <div class="videos-swipe" id="vidGridBest"></div>
-        <button class="swipe-arrow next" data-target="vidGridBest" type="button" aria-label="Suivant">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-      <div class="swipe-progress" data-target="vidGridBest"><div class="swipe-progress-fill"></div></div>
-      <div id="vidEmptyBest" class="view-empty" hidden>
-        <p>Aucune vidéo top à afficher pour ce filtre.</p>
-      </div>
-
-      <div class="section-head-row" style="margin-top:36px">
         <div>
           <h2 class="section-h2">Dernières vidéos postées</h2>
           <p class="section-sub">Triées par date de publication décroissante</p>
@@ -1738,6 +1623,32 @@ button { font-family: inherit; cursor: pointer; }
       <div class="swipe-progress" data-target="vidGridLatest"><div class="swipe-progress-fill"></div></div>
       <div id="vidEmptyLatest" class="view-empty" hidden>
         <p>Aucune vidéo récente à afficher pour ce filtre.</p>
+      </div>
+
+      <div class="section-head-row" style="margin-top:36px">
+        <div>
+          <h2 class="section-h2">Meilleures vidéos</h2>
+          <p class="section-sub">Triées par nombre de vues décroissant</p>
+        </div>
+        <div class="count-picker pill-group" data-target="vidGridBest" aria-label="Nombre de vidéos">
+          <span class="pill" data-count="10">10</span>
+          <span class="pill active" data-count="20">20</span>
+          <span class="pill" data-count="50">50</span>
+          <span class="pill" data-count="all">All</span>
+        </div>
+      </div>
+      <div class="videos-swipe-wrap">
+        <button class="swipe-arrow prev is-disabled" data-target="vidGridBest" type="button" aria-label="Précédent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="videos-swipe" id="vidGridBest"></div>
+        <button class="swipe-arrow next" data-target="vidGridBest" type="button" aria-label="Suivant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="swipe-progress" data-target="vidGridBest"><div class="swipe-progress-fill"></div></div>
+      <div id="vidEmptyBest" class="view-empty" hidden>
+        <p>Aucune vidéo top à afficher pour ce filtre.</p>
       </div>
     </section>
 
@@ -1961,7 +1872,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-hero-in-audience', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-videos-reorder', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2180,25 +2091,6 @@ console.log('%c[TL] dashboard build v=2026-05-10-hero-in-audience', 'color:#FF69
       };
       const pctOf = (n, d) => d > 0 ? ((n / d) * 100).toFixed(2).replace('.', ',') + ' %' : '—';
       const perVideo = (n) => totalVideos > 0 ? `${fmtFull(Math.round(n / totalVideos))} / vidéo` : '— / vidéo';
-
-      // ── Hero cards (Posts + Vues) — large headline metrics for the period ──
-      // Days in the period drives the "X / day" footer line.
-      const periodDays = (state.date_from && state.date_to)
-        ? Math.max(1, Math.round((new Date(state.date_to) - new Date(state.date_from)) / 86400000) + 1)
-        : (state.range || 1);
-      const heroPeriodLbl = state.range != null
-        ? (state.range === 1 ? 'Sur les dernières 24 h' : `Sur les ${state.range} derniers jours`)
-        : (state.date_from && state.date_to ? `${state.date_from} → ${state.date_to}` : 'Période sélectionnée');
-      setDetail('heroPostsValue',  fmt(totalVideos));
-      setDetail('heroPostsPeriod', heroPeriodLbl);
-      setDetail('heroPostsAvg',    periodDays > 0
-        ? `${(totalVideos / periodDays).toFixed(periodDays > 30 ? 1 : 1).replace('.', ',')} posts / jour en moyenne`
-        : '—');
-      setDetail('heroViewsValue',  fmt(totalViews));
-      setDetail('heroViewsPeriod', heroPeriodLbl);
-      setDetail('heroViewsAvg',    periodDays > 0
-        ? `${fmtCompact(Math.round(totalViews / periodDays))} vues / jour en moyenne`
-        : '—');
 
       $('#kpiContents').textContent = fmt(totalVideos);
       setDetail('kpiContentsDetail', `${fmtFull(totalVideos)} · sur ${periodLbl}`);
