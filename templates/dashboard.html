@@ -1860,7 +1860,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -1900,11 +1900,13 @@ console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;f
     const toEl = $('#filterDateTo'); if (toEl) toEl.value = state.date_to;
   }
 
-  // Read URL params once (scope drives competitor filter, view drives which section is shown)
+  // Read URL params (scope drives competitor filter, view drives which section is shown).
+  // navView + isCompetitorScope are LET so SPA navigation can mutate them without
+  // a full page reload — see `navigateTo()` below.
   const urlParams = new URLSearchParams(window.location.search);
-  const navScope = urlParams.get('scope');                  // null | 'competitor'
-  const navView = urlParams.get('view');                    // null | 'accounts' | 'videos' | 'table'
-  const isCompetitorScope = navScope === 'competitor';
+  let navScope = urlParams.get('scope');                    // null | 'competitor'
+  let navView = urlParams.get('view');                      // null | 'accounts' | 'videos' | 'table'
+  let isCompetitorScope = navScope === 'competitor';
 
   function buildStatsURL() {
     const p = new URLSearchParams();
@@ -3412,7 +3414,8 @@ console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;f
   }
 
   // ─── Sidebar nav: highlight active item, swap title, and show the right view ───
-  (function applyNav() {
+  // Idempotent — safe to call on initial load AND on every SPA nav change.
+  function applyNav() {
     // 1. Highlight the active sidebar entry
     const prefix = isCompetitorScope ? 'competitor-' : '';
     const activeKey = `${prefix}${navView || 'dashboard'}`;
@@ -3446,9 +3449,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;f
     });
 
     // 5. Filter bar (period pills + custom dates + project + account chips)
-    // visible on Dashboard + Comptes (cards reflect the date window).
-    // Hidden on Vidéos / Tableau where the filter would not affect output
-    // in the way the user expects.
+    // visible on Dashboard + Comptes + Tableau.
     const showFilterBar = !navView || navView === 'accounts' || navView === 'table';
     const filterBar = document.querySelector('.filter-bar');
     if (filterBar) filterBar.hidden = !showFilterBar;
@@ -3456,9 +3457,61 @@ console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;f
     // unrelated cut.
     const exportBtn = document.getElementById('btnExportCsv');
     if (exportBtn) exportBtn.hidden = !!navView;
-  })();
+  }
 
-  // Initial sync — set the default date inputs from the 7d preset
+  // ─── SPA navigation ────────────────────────────────────────────────────
+  // Replaces full-page reloads on sidebar clicks. Switching between views
+  // now: pushState → re-toggle visible section → re-fetch data. ~100ms
+  // instead of ~3s (no HTML re-download, no Chart.js re-init, no JS cold
+  // start). Filter changes still call load() directly with the existing
+  // handlers; this is purely about cross-view nav.
+  async function navigateTo(href) {
+    const u = new URL(href, location.origin);
+    if (u.pathname !== '/dashboard') {
+      // External link or different page — let the browser handle it.
+      location.href = href;
+      return;
+    }
+    const newView = u.searchParams.get('view');
+    const newScope = u.searchParams.get('scope');
+    const newIsComp = newScope === 'competitor';
+    if (newView === navView && newIsComp === isCompetitorScope) {
+      // Same destination — no-op (still update querystring in case of param drift)
+      history.replaceState({}, '', u.toString());
+      return;
+    }
+    history.pushState({ view: newView, scope: newScope }, '', u.toString());
+    navView = newView;
+    navScope = newScope;
+    isCompetitorScope = newIsComp;
+    applyNav();
+    // Show the active section immediately, then fetch — feels instant
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    await load();
+  }
+
+  // Wire all sidebar dashboard links to SPA nav
+  document.querySelectorAll('.sb-item[href^="/dashboard"]').forEach(a => {
+    a.addEventListener('click', e => {
+      // Honor modifier-clicks (Cmd/Ctrl-click opens new tab) — fall through to default
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      navigateTo(a.href);
+    });
+  });
+
+  // Browser back/forward buttons
+  window.addEventListener('popstate', () => {
+    const params = new URLSearchParams(location.search);
+    navView = params.get('view');
+    navScope = params.get('scope');
+    isCompetitorScope = navScope === 'competitor';
+    applyNav();
+    load();
+  });
+
+  // Initial sync — apply nav state, set the default date inputs, fetch
+  applyNav();
   syncDatesFromRange();
   load();
 })();
