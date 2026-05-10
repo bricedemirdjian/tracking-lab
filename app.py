@@ -321,6 +321,38 @@ def billing():
                            stripe_pub_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
 
 
+@app.route("/account")
+@login_required
+def account():
+    """Mon Compte hub: profile, plan/usage, links to Facturation/Admin/Swarm, logout."""
+    from database import get_connection, _fetchone
+    plan_name = get_user_plan(current_user.data_user_id)
+    plan_meta = PLANS.get(plan_name, PLANS['starter'])
+    uid = current_user.data_user_id
+    with get_connection() as conn:
+        accounts_count = (_fetchone(conn,
+            "SELECT COUNT(*) AS cnt FROM accounts WHERE user_id = %s", (uid,)
+        ) or {}).get('cnt', 0)
+        projects_count = (_fetchone(conn,
+            "SELECT COUNT(*) AS cnt FROM projects WHERE user_id = %s", (uid,)
+        ) or {}).get('cnt', 0)
+        videos_count = (_fetchone(conn,
+            "SELECT COUNT(*) AS cnt FROM videos WHERE user_id = %s", (uid,)
+        ) or {}).get('cnt', 0)
+    usage = {
+        "accounts_count": accounts_count,
+        "projects_count": projects_count,
+        "videos_count": videos_count,
+    }
+    return render_template(
+        "account.html",
+        user=current_user,
+        plan_name=plan_name,
+        plan_meta=plan_meta,
+        usage=usage,
+    )
+
+
 @app.route("/api/billing/checkout", methods=["POST"])
 @login_required
 def api_billing_checkout():
