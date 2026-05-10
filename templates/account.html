@@ -151,39 +151,6 @@
     }
     .logout-btn:hover { background: rgba(255, 59, 48, 0.06); }
     .logout-btn svg { width: 16px; height: 16px; }
-
-    /* Company row — optional editable field */
-    .company-row {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      margin-top: 10px; font-size: 13px;
-    }
-    .company-label { color: var(--muted); }
-    .company-display {
-      background: transparent; border: 1px dashed transparent;
-      padding: 4px 8px; border-radius: 6px;
-      color: var(--text); font-size: 13px; font-weight: 500;
-      cursor: pointer; font-family: inherit;
-      transition: background 100ms ease, border-color 100ms ease;
-    }
-    .company-display:hover { background: #f4f4f4; border-color: var(--border); }
-    .company-placeholder { color: var(--muted); font-weight: 400; }
-    .company-edit {
-      display: flex; gap: 6px; align-items: center;
-    }
-    .company-edit input {
-      padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
-      font-size: 13px; font-family: inherit; min-width: 200px;
-      outline: none;
-    }
-    .company-edit input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,102,255,0.12); }
-    .company-save, .company-cancel {
-      padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
-      font-size: 13px; font-family: inherit; cursor: pointer;
-    }
-    .company-save { background: var(--text); color: #fff; border-color: var(--text); }
-    .company-save:hover { background: #000; }
-    .company-cancel { background: transparent; color: var(--muted); }
-    .company-cancel:hover { color: var(--text); }
   </style>
 </head>
 <body>
@@ -215,19 +182,6 @@
               {% if user.created_at.month is defined %}{{ fr_months[user.created_at.month] }} {{ user.created_at.year }}{% else %}{{ user.created_at }}{% endif %}
             </span>
           {% endif %}
-        </div>
-
-        <!-- Entreprise (optionnel) — click-to-edit -->
-        <div class="company-row" id="companyRow" data-value="{{ user.company or '' }}">
-          <span class="company-label">Entreprise</span>
-          <button type="button" class="company-display" id="companyDisplay">
-            {% if user.company %}{{ user.company }}{% else %}<span class="company-placeholder">+ Ajouter ton entreprise</span>{% endif %}
-          </button>
-          <form class="company-edit" id="companyEdit" hidden>
-            <input type="text" id="companyInput" maxlength="120" autocomplete="organization" placeholder="ex. MerciInternet">
-            <button type="submit" class="company-save">Enregistrer</button>
-            <button type="button" class="company-cancel" id="companyCancel">Annuler</button>
-          </form>
         </div>
       </div>
     </section>
@@ -316,60 +270,5 @@
     </div>
 
   </main>
-
-  <script>
-    (function() {
-      const row = document.getElementById('companyRow');
-      const display = document.getElementById('companyDisplay');
-      const form = document.getElementById('companyEdit');
-      const input = document.getElementById('companyInput');
-      const cancel = document.getElementById('companyCancel');
-      if (!row || !display || !form) return;
-
-      function open() {
-        input.value = row.dataset.value || '';
-        display.hidden = true;
-        form.hidden = false;
-        input.focus();
-        input.select();
-      }
-      function close() {
-        form.hidden = true;
-        display.hidden = false;
-      }
-      function setDisplayed(value) {
-        row.dataset.value = value || '';
-        if (value) {
-          display.textContent = value;
-        } else {
-          display.innerHTML = '<span class="company-placeholder">+ Ajouter ton entreprise</span>';
-        }
-      }
-
-      display.addEventListener('click', open);
-      cancel.addEventListener('click', close);
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const company = input.value.trim();
-        const btn = form.querySelector('.company-save');
-        btn.disabled = true; btn.textContent = '…';
-        try {
-          const res = await fetch('/api/account/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ company }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Erreur');
-          setDisplayed(data.company);
-          close();
-        } catch (err) {
-          alert('Impossible d\'enregistrer : ' + err.message);
-        } finally {
-          btn.disabled = false; btn.textContent = 'Enregistrer';
-        }
-      });
-    })();
-  </script>
 </body>
 </html>

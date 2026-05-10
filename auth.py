@@ -25,7 +25,6 @@ class User(UserMixin):
         self.role = user_dict.get('role', 'user')
         self.blocked = user_dict.get('blocked', False)
         self.created_at = user_dict.get('created_at')
-        self.company = user_dict.get('company')
 
     @property
     def is_admin(self):

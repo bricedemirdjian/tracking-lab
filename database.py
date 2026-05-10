@@ -424,15 +424,6 @@ def _migrate_user_company(conn):
         print(f"[Migration] user company: {e}")
 
 
-def update_user_company(user_id, company):
-    """Set or clear the optional company field on a user. Empty string -> NULL."""
-    conn = get_connection()
-    val = (company or "").strip() or None
-    _execute(conn, "UPDATE users SET company = %s WHERE id = %s", (val, user_id))
-    conn.close()
-    return val
-
-
 def _migrate_user_plan_columns(conn):
     """Add plan and stripe_customer_id columns to users table if missing."""
     try:
