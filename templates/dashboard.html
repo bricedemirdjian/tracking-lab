@@ -1289,10 +1289,6 @@ button { font-family: inherit; cursor: pointer; }
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         Tableau détaillé
       </a>
-      <a class="sb-item" href="/dashboard?view=advice" data-nav="advice">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5.9 1.2.9 2V17h6.2v-.3c0-.8.3-1.5.9-2A7 7 0 0 0 12 2z"/></svg>
-        Nos conseils
-      </a>
     </div>
 
     <!-- Concurrents — competitor accounts -->
@@ -1637,13 +1633,18 @@ button { font-family: inherit; cursor: pointer; }
       </div>
     </section>
 
-    <!-- ─── TABLE VIEW — audience details per account ─── -->
+    <!-- ─── TABLE VIEW — full audience analysis: 10 charts in 3 groups + per-account table ─── -->
     <section id="viewTable" class="view" hidden>
 
-      <!-- Audience charts block (responds to date filter) -->
-      <div class="charts-section">
-        <h2 class="section-h2">Analyse de l'audience</h2>
-        <p class="section-sub" id="chartsPeriodSub">—</p>
+      <h2 class="section-h2">Analyse de l'audience</h2>
+      <p class="section-sub" id="chartsPeriodSub">—</p>
+
+      <!-- ── Group 1: Évolution dans le temps ── -->
+      <div class="advice-group">
+        <div class="advice-group-head">
+          <h3 class="advice-group-title">Évolution dans le temps</h3>
+          <p class="advice-group-sub">Comment ton audience progresse jour après jour.</p>
+        </div>
         <div class="charts-grid">
 
           <div class="chart-card">
@@ -1677,6 +1678,45 @@ button { font-family: inherit; cursor: pointer; }
           <div class="chart-card">
             <div class="chart-card-head">
               <div>
+                <h3 class="chart-card-title">Évolution du taux d'engagement</h3>
+                <p class="chart-card-sub">Engagement quotidien rapporté aux vues du jour</p>
+              </div>
+              <span class="chart-card-badge" id="adviceEngEvoBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="adviceEngEvo"></canvas>
+              <div class="chart-card-empty" id="adviceEngEvoEmpty" hidden>Pas encore d'historique pour cette période.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Vues moyennes par vidéo postée</h3>
+                <p class="chart-card-sub">Tendance quotidienne · vues moyennes des nouvelles vidéos</p>
+              </div>
+              <span class="chart-card-badge" id="adviceAvgBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="adviceAvg"></canvas>
+              <div class="chart-card-empty" id="adviceAvgEmpty" hidden>Pas assez d'historique pour calculer la moyenne.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Group 2: Répartition par plateforme ── -->
+      <div class="advice-group">
+        <div class="advice-group-head">
+          <h3 class="advice-group-title">Répartition par plateforme</h3>
+          <p class="advice-group-sub">Composition et engagement par canal.</p>
+        </div>
+        <div class="charts-grid">
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
                 <h3 class="chart-card-title">Répartition des followers</h3>
                 <p class="chart-card-sub">Part de chaque plateforme dans ton audience</p>
               </div>
@@ -1697,6 +1737,45 @@ button { font-family: inherit; cursor: pointer; }
           <div class="chart-card">
             <div class="chart-card-head">
               <div>
+                <h3 class="chart-card-title">Taux d'engagement par plateforme</h3>
+                <p class="chart-card-sub">(likes + commentaires + partages) / vues, en %</p>
+              </div>
+              <span class="chart-card-badge" id="adviceRadarBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="adviceRadar"></canvas>
+              <div class="chart-card-empty" id="adviceRadarEmpty" hidden>Pas encore de vues sur cette période.</div>
+            </div>
+          </div>
+
+          <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Composition de l'engagement</h3>
+                <p class="chart-card-sub">Likes vs commentaires vs partages vs sauvegardes, par plateforme · <em>clique sur un libellé pour l'isoler</em></p>
+              </div>
+              <span class="chart-card-badge" id="adviceCompBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="adviceComp"></canvas>
+              <div class="chart-card-empty" id="adviceCompEmpty" hidden>Pas d'engagement à décomposer.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Group 3: Performance & insights ── -->
+      <div class="advice-group">
+        <div class="advice-group-head">
+          <h3 class="advice-group-title">Performance & insights</h3>
+          <p class="advice-group-sub">Qui performe, et quels créneaux pour publier.</p>
+        </div>
+        <div class="charts-grid">
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
                 <h3 class="chart-card-title">Top 5 comptes par vues</h3>
                 <p class="chart-card-sub">Sur la période sélectionnée</p>
               </div>
@@ -1705,6 +1784,34 @@ button { font-family: inherit; cursor: pointer; }
             <div class="chart-card-body">
               <canvas id="chartTop"></canvas>
               <div class="chart-card-empty" id="chartTopEmpty" hidden>Aucun compte avec des vues sur cette période.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Distribution des vues par vidéo</h3>
+                <p class="chart-card-sub">Combien de vidéos atteignent chaque palier de vues</p>
+              </div>
+              <span class="chart-card-badge" id="adviceDistBadge">—</span>
+            </div>
+            <div class="chart-card-body">
+              <canvas id="adviceDist"></canvas>
+              <div class="chart-card-empty" id="adviceDistEmpty" hidden>Pas de vidéos pour ce filtre.</div>
+            </div>
+          </div>
+
+          <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-card-head">
+              <div>
+                <h3 class="chart-card-title">Heatmap des créneaux de publication</h3>
+                <p class="chart-card-sub">Vues moyennes par vidéo · jour de la semaine × heure</p>
+              </div>
+              <span class="chart-card-badge" id="adviceHeatmapBadge">—</span>
+            </div>
+            <div class="chart-card-body" style="min-height: 220px;">
+              <div id="adviceHeatmap" class="heatmap"></div>
+              <div class="chart-card-empty" id="adviceHeatmapEmpty" hidden>Pas assez de vidéos pour ce filtre.</div>
             </div>
           </div>
 
@@ -1739,130 +1846,6 @@ button { font-family: inherit; cursor: pointer; }
       </div>
     </section>
 
-    <!-- ─── ADVICE VIEW — actionable insights organized in 3 axes ─── -->
-    <section id="viewAdvice" class="view" hidden>
-      <h2 class="section-h2">Nos conseils</h2>
-      <p class="section-sub" id="adviceSub">—</p>
-
-      <!-- ── Axis 1: when to post ── -->
-      <div id="adviceGroupWhen" class="advice-group">
-        <div class="advice-group-head">
-          <h3 class="advice-group-title">Quand poster ?</h3>
-          <p class="advice-group-sub">Quels créneaux performent le mieux dans ton historique de publication.</p>
-        </div>
-        <div class="charts-grid">
-
-          <div class="chart-card" style="grid-column: 1 / -1;">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Heatmap des créneaux de publication</h3>
-                <p class="chart-card-sub">Vues moyennes par vidéo · jour de la semaine × heure</p>
-              </div>
-              <span class="chart-card-badge" id="adviceHeatmapBadge">—</span>
-            </div>
-            <div class="chart-card-body" style="min-height: 220px;">
-              <div id="adviceHeatmap" class="heatmap"></div>
-              <div class="chart-card-empty" id="adviceHeatmapEmpty" hidden>Pas assez de vidéos pour ce filtre.</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ── Axis 2: quality of audience (engagement) ── -->
-      <div id="adviceGroupQuality" class="advice-group">
-        <div class="advice-group-head">
-          <h3 class="advice-group-title">Quelle qualité d'audience ?</h3>
-          <p class="advice-group-sub">Pas juste la portée — l'engagement réel que tu génères.</p>
-        </div>
-        <div class="charts-grid">
-
-          <div class="chart-card">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Taux d'engagement par plateforme</h3>
-                <p class="chart-card-sub">(likes + commentaires + partages) / vues, en %</p>
-              </div>
-              <span class="chart-card-badge" id="adviceRadarBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceRadar"></canvas>
-              <div class="chart-card-empty" id="adviceRadarEmpty" hidden>Pas encore de vues sur cette période.</div>
-            </div>
-          </div>
-
-          <div class="chart-card">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Évolution du taux d'engagement</h3>
-                <p class="chart-card-sub">Engagement quotidien rapporté aux vues du jour</p>
-              </div>
-              <span class="chart-card-badge" id="adviceEngEvoBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceEngEvo"></canvas>
-              <div class="chart-card-empty" id="adviceEngEvoEmpty" hidden>Pas encore d'historique pour cette période.</div>
-            </div>
-          </div>
-
-          <div class="chart-card" style="grid-column: 1 / -1;">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Composition de l'engagement</h3>
-                <p class="chart-card-sub">Likes vs commentaires vs partages vs sauvegardes, par plateforme · <em>clique sur un libellé pour l'isoler</em></p>
-              </div>
-              <span class="chart-card-badge" id="adviceCompBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceComp"></canvas>
-              <div class="chart-card-empty" id="adviceCompEmpty" hidden>Pas d'engagement à décomposer.</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ── Axis 3: which videos perform ── -->
-      <div id="adviceGroupContent" class="advice-group">
-        <div class="advice-group-head">
-          <h3 class="advice-group-title">Quelles vidéos performent ?</h3>
-          <p class="advice-group-sub">La forme de tes performances — outliers viraux et moyenne réelle.</p>
-        </div>
-        <div class="charts-grid">
-
-          <div class="chart-card">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Distribution des vues par vidéo</h3>
-                <p class="chart-card-sub">Combien de vidéos atteignent chaque palier de vues</p>
-              </div>
-              <span class="chart-card-badge" id="adviceDistBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceDist"></canvas>
-              <div class="chart-card-empty" id="adviceDistEmpty" hidden>Pas de vidéos pour ce filtre.</div>
-            </div>
-          </div>
-
-          <div class="chart-card">
-            <div class="chart-card-head">
-              <div>
-                <h3 class="chart-card-title">Vues moyennes par vidéo postée</h3>
-                <p class="chart-card-sub">Tendance quotidienne · vues moyennes des nouvelles vidéos</p>
-              </div>
-              <span class="chart-card-badge" id="adviceAvgBadge">—</span>
-            </div>
-            <div class="chart-card-body">
-              <canvas id="adviceAvg"></canvas>
-              <div class="chart-card-empty" id="adviceAvgEmpty" hidden>Pas assez d'historique pour calculer la moyenne.</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </section>
-
   </main>
 </div>
 
@@ -1870,7 +1853,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -1998,7 +1981,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
       if (navView === 'accounts') renderAccountsView(accounts, stats);
       else if (navView === 'videos') await renderVideosView();
       else if (navView === 'table') { renderTableView(accounts, stats); renderTableCharts(accounts, stats); }
-      else if (navView === 'advice') { renderAdviceView(accounts, stats); }
     } catch (e) { console.error('[load] view render:', e); }
 
     try {
@@ -2398,14 +2380,18 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
       return;
     }
 
-    // Fetch the daily evolution for the active filter (one row per
-    // account × snapshot_date, with followers + views).
+    // Fetch evolution + videos in parallel — both feed several charts each.
     let evolution = [];
+    let videos = [];
     try {
-      const r = await fetch(buildEvolutionURL());
-      evolution = r.ok ? await r.json() : [];
+      const [rEvo, rVid] = await Promise.all([
+        fetch(buildEvolutionURL()),
+        fetch(buildVideosAllURL()),
+      ]);
+      evolution = rEvo.ok ? await rEvo.json() : [];
+      videos    = rVid.ok ? await rVid.json() : [];
     } catch (e) {
-      console.warn('[TL] /api/evolution failed:', e);
+      console.warn('[TL] /api/evolution or /api/videos failed:', e);
     }
 
     // ── Chart 1: Évolution des followers (multi-line, one per platform) ──
@@ -2647,13 +2633,18 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
         });
       }
     }
+
+    // ── Advice charts (axes: quality + performance + when-to-post) ──
+    // These were originally on a separate "Nos conseils" page, now merged
+    // into the table view so all 10 audience charts live in one place
+    // grouped by intent. Each fn reads from already-fetched data.
+    renderAdviceQuality(stats, evolution);
+    renderAdviceContent(videos, evolution);
+    renderAdviceWhen(videos);
   }
 
-  // ─── Advice page (Nos conseils) ────────────────────────────────────
-  // 7 charts grouped in 3 axes: when to post, quality, content distribution.
-  // Pulls from /api/videos (heatmap+distribution+avg), /api/posts-per-day
-  // (cadence), /api/stats (radar+composition), /api/evolution (engagement
-  // over time). All four fetched in parallel.
+  // ─── Advice chart helpers (called from renderTableCharts) ──────────
+  // Heatmap, radar, eng-evolution, composition, distribution, avg-views.
   const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
   function buildVideosAllURL() {
@@ -2666,25 +2657,6 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
     p.set('sort_by', 'create_time');
     p.set('sort_order', 'DESC');
     return '/api/videos?' + p.toString();
-  }
-
-  async function renderAdviceView(accs, stats) {
-    const sub = document.getElementById('adviceSub');
-    if (sub) {
-      sub.textContent = 'Période : ' + (state.range != null
-        ? (state.range === 1 ? 'Dernière 24 h' : `Derniers ${state.range} jours`)
-        : `${state.date_from || ''} → ${state.date_to || ''}`);
-    }
-    if (typeof Chart === 'undefined') { console.warn('[TL] Chart.js missing'); return; }
-
-    const [videos, evolution] = await Promise.all([
-      fetch(buildVideosAllURL()).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(buildEvolutionURL()).then(r => r.ok ? r.json() : []).catch(() => []),
-    ]);
-
-    renderAdviceWhen(videos);
-    renderAdviceQuality(stats, evolution);
-    renderAdviceContent(videos, evolution);
   }
 
   // ── Axis 1: when to post ── (chart A heatmap only) ──
@@ -3354,12 +3326,12 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
     const eyebrow = document.querySelector('.h-eyebrow');
     if (eyebrow) {
       const scopeLbl = isCompetitorScope ? 'Concurrents' : 'Analytics';
-      const viewLbl = { accounts: 'Comptes', videos: 'Vidéos', table: 'Tableau détaillé', advice: 'Nos conseils' }[navView] || 'Tableau de bord';
+      const viewLbl = { accounts: 'Comptes', videos: 'Vidéos', table: 'Tableau détaillé' }[navView] || 'Tableau de bord';
       eyebrow.textContent = `${scopeLbl} · ${viewLbl}`;
     }
 
     // 4. Show ONLY the active view section
-    const views = ['Dashboard', 'Accounts', 'Videos', 'Table', 'Advice'];
+    const views = ['Dashboard', 'Accounts', 'Videos', 'Table'];
     const activeView = navView ? navView : 'dashboard';
     const targetId = 'view' + activeView.charAt(0).toUpperCase() + activeView.slice(1);
     views.forEach(v => {
@@ -3371,7 +3343,7 @@ console.log('%c[TL] dashboard build v=2026-05-09-advice3', 'color:#FF69B4;font-w
     // visible on Dashboard + Comptes (cards reflect the date window).
     // Hidden on Vidéos / Tableau where the filter would not affect output
     // in the way the user expects.
-    const showFilterBar = !navView || navView === 'accounts' || navView === 'table' || navView === 'advice';
+    const showFilterBar = !navView || navView === 'accounts' || navView === 'table';
     const filterBar = document.querySelector('.filter-bar');
     if (filterBar) filterBar.hidden = !showFilterBar;
     // Export CSV stays Dashboard-only — the secondary views export an
