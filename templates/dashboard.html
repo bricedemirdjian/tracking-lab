@@ -170,11 +170,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .sb-mgr-head {
   display: flex; align-items: center; justify-content: space-between;
-  width: 100%; padding: 12px 14px;
+  width: 100%;
+  min-height: 44px;          /* defensive — forces visible height */
+  padding: 12px 14px;
   background: transparent; border: none; cursor: pointer;
   font-size: 13px; font-weight: 600;
-  color: var(--text); font-family: inherit;
+  color: var(--text) !important; /* defensive — never invisible */
+  font-family: inherit;
   text-align: left;
+  line-height: 1.3;
+  appearance: none; -webkit-appearance: none; /* strip Safari button defaults */
 }
 .sb-mgr-head:hover { background: rgba(0,0,0,0.025); }
 .sb-mgr-chev {
@@ -2063,7 +2068,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-perday', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-mgr-fix', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
