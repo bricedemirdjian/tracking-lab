@@ -37,7 +37,19 @@ Or, if you've fixed the GitHub→Vercel auto-deploy (see "Permanent fix" in the 
 
 **Verify:** `curl -sI https://trackinglab.online/healthz` should return `200 OK` (proxied through Next → Flask). Before this step, `/healthz` returns the Next 404. If you see the 404 you got it wrong — check the rewrite block in `next.config.js`.
 
-### 2. Add the new OAuth callback URL in Google Cloud Console
+### 2. Set `CANONICAL_HOST` env var on the Flask Vercel project (BEFORE OAuth!)
+
+When the Flask app sits behind the Next.js proxy, Vercel infrastructure restamps `X-Forwarded-Host` with the internal destination (`app.trackinglab.online`), so Flask's `ProxyFix(x_host=1)` returns the wrong host. Without this env var, every URL Flask builds — OAuth `redirect_uri`, Stripe success/cancel URLs, the flask-login `next=` query param — leaks `app.trackinglab.online` into the user-facing flow. Verified by the curl `next=https://app.trackinglab.online/account` we saw immediately after step 1.
+
+- Vercel dashboard → `tracking-lab` project → Settings → Environment Variables
+- "Add" → Key: `CANONICAL_HOST`, Value: `www.trackinglab.online`, Environments: ✓ Production
+- Save → Vercel auto-triggers a redeploy of the Flask project (~30-60s)
+
+Wait for the redeploy to finish (`curl -sI https://app.trackinglab.online/dashboard | grep x-build-version` should reflect a new build timestamp).
+
+**Verify:** `curl -sI https://www.trackinglab.online/account` should now show `location: /login?next=https://www.trackinglab.online/account` (canonical host) instead of `app.trackinglab.online`. If you still see `app.trackinglab.online` in the `next=` param, the env var isn't set or the Flask project hasn't redeployed yet.
+
+### 3. Add the new OAuth callback URL in Google Cloud Console
 
 The Flask `auth_callback` route uses `url_for(..., _external=True)` which derives the redirect URI from `request.host_url`. When users start the OAuth flow on `trackinglab.online`, Google must accept `https://trackinglab.online/auth/callback` as a valid redirect URI.
 
@@ -49,7 +61,7 @@ The Flask `auth_callback` route uses `url_for(..., _external=True)` which derive
 
 **Verify:** open `https://trackinglab.online/login` in an incognito window, click "Continue with Google". The Google consent screen should NOT show the "this app's request is invalid" error. If it does, the redirect URI hasn't propagated yet (can take up to 5 min), or you typed it wrong.
 
-### 3. Update the Stripe webhook URL
+### 4. Update the Stripe webhook URL
 
 Stripe POSTs subscription events to a fixed URL. Currently set to `app.trackinglab.online/webhook/stripe`. After migration we want events on the apex.
 
@@ -60,7 +72,7 @@ Stripe POSTs subscription events to a fixed URL. Currently set to `app.trackingl
 
 **Verify:** in Stripe dashboard → Webhooks → click the endpoint → "Send test webhook" → choose `customer.subscription.updated` → send. Within 10s a green check should appear in the dashboard event log. If red, check Vercel function logs of the `tracking-lab` project for the inbound POST.
 
-### 4. Flip the GitHub Actions to hit the new domain
+### 5. Flip the GitHub Actions to hit the new domain
 
 Once steps 1-3 work end-to-end on `trackinglab.online`, update the cron + keep-warm workflows to use the apex:
 
@@ -73,7 +85,7 @@ The next workflow run will pick it up. The fallback in the YAML keeps `app.track
 
 **Verify:** trigger the workflow manually (Actions → "Hourly Scrape Cron" → "Run workflow") and check the log shows `https://trackinglab.online/api/cron/...` in the curl output.
 
-### 5. (Optional, after steady state) 301-redirect app.* to apex
+### 6. (Optional, after steady state) 301-redirect app.* to apex
 
 Once you've watched `trackinglab.online` for a week without auth/billing regressions, retire the `app.*` subdomain:
 

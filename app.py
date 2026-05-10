@@ -62,6 +62,27 @@ print(f"[Config] SECRET_KEY length: {len(app.config['SECRET_KEY'])}")
 if IS_PRODUCTION:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+
+# When the Flask app sits behind the Next.js landing proxy on
+# trackinglab.online, the Vercel infra restamps X-Forwarded-Host with the
+# internal destination (app.trackinglab.online), so ProxyFix(x_host=1) ends
+# up returning the wrong host. Result: url_for(_external=True) and
+# request.host_url generate https://app.trackinglab.online/... leaking the
+# internal subdomain into OAuth redirect_uri, Stripe success URLs, and the
+# flask-login `next=` query param.
+#
+# Setting CANONICAL_HOST in the env (e.g. CANONICAL_HOST=www.trackinglab.online)
+# forces every URL Flask builds to use that host. Set it on the Vercel
+# `tracking-lab` project once the migration is live; leave unset for local
+# dev or direct app.trackinglab.online access (where host_url is already
+# correct).
+_CANONICAL_HOST = os.environ.get('CANONICAL_HOST', '').strip()
+if _CANONICAL_HOST:
+    @app.before_request
+    def _force_canonical_host():
+        request.environ['HTTP_HOST'] = _CANONICAL_HOST
+        request.environ['wsgi.url_scheme'] = 'https'
+
 # Rate limiting — in-memory storage (fine for single-instance Render).
 # If we scale horizontally, swap storage_uri to Redis.
 def _rate_limit_key():
@@ -113,7 +134,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-10-hero-subtitle")
+    response.headers.setdefault("X-Build-Version", "2026-05-10-canonical-host")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
