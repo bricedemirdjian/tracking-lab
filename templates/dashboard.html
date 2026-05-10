@@ -728,9 +728,10 @@ button { font-family: inherit; cursor: pointer; }
   margin-top: -1px;
   line-height: 1.35;
 }
-.kpi-trend.zero { background: rgba(0,0,0,0.05); color: var(--text-3); }
-.kpi-trend.pos  { background: rgba(16,185,129,0.12); color: #047857; }
-.kpi-trend.neg  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
+/* Trend chips hidden per user request — kept in DOM so the JS that updates
+   them (updateKpiTrends + previousPeriodDates fetch) doesn't break, but
+   nothing renders. Set display: inline-flex to re-enable later. */
+.kpi-trend { display: none !important; }
 .kpi-value {
   font-size: 30px; font-weight: 700; letter-spacing: -1.2px;
   line-height: 1.05; color: var(--text);
@@ -2062,7 +2063,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-sidebar-mgr', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-perday', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2294,8 +2295,16 @@ console.log('%c[TL] dashboard build v=2026-05-10-sidebar-mgr', 'color:#FF69B4;fo
       const pctOf = (n, d) => d > 0 ? ((n / d) * 100).toFixed(2).replace('.', ',') + ' %' : '—';
       const perVideo = (n) => totalVideos > 0 ? `${fmtFull(Math.round(n / totalVideos))} / vidéo` : '— / vidéo';
 
+      // Period in days — for "X / jour" averaging on the KPI detail lines.
+      const periodDays = (state.date_from && state.date_to)
+        ? Math.max(1, Math.round((new Date(state.date_to) - new Date(state.date_from)) / 86400000) + 1)
+        : (state.range || 1);
+      const perDay = (n) => periodDays > 0
+        ? `${(n / periodDays).toFixed(periodDays > 30 ? 1 : 1).replace('.', ',')} / jour`
+        : '—';
+
       $('#kpiContents').textContent = fmt(totalVideos);
-      setDetail('kpiContentsDetail', `${fmtFull(totalVideos)} · sur ${periodLbl}`);
+      setDetail('kpiContentsDetail', perDay(totalVideos));
 
       $('#kpiViews').textContent = fmt(totalViews);
       setDetail('kpiViewsDetail', `${fmtFull(totalViews)} · ${perVideo(totalViews)}`);
