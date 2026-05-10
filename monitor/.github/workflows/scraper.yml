@@ -26,7 +26,7 @@ jobs:
       run:
         working-directory: monitor
     env:
-      TARGET_URL: https://app.trackinglab.online/dashboard
+      TARGET_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}/dashboard
       ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
       ALERT_MIN_SEVERITY: warning
       RUN_ID: ${{ github.run_id }}
