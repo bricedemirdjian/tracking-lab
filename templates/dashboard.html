@@ -1070,11 +1070,16 @@ button { font-family: inherit; cursor: pointer; }
 .chart-card {
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px 22px 16px;
+  border-radius: 18px;
+  padding: 22px 24px 18px;
   display: flex;
   flex-direction: column;
-  min-height: 320px;
+  min-height: 340px;
+  box-shadow: 0 1px 2px rgba(16, 18, 20, 0.04);
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+.chart-card:hover {
+  box-shadow: 0 4px 16px rgba(16, 18, 20, 0.06);
 }
 .chart-card-head {
   display: flex;
@@ -1084,16 +1089,18 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 14px;
 }
 .chart-card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-1);
-  letter-spacing: -0.1px;
+  letter-spacing: -0.2px;
   margin: 0;
+  line-height: 1.3;
 }
 .chart-card-sub {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-3);
-  margin: 2px 0 0;
+  margin: 4px 0 0;
+  line-height: 1.4;
 }
 .chart-card-badge {
   font-size: 11px;
@@ -1853,7 +1860,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-chart-polish', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2354,6 +2361,56 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
     if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace('.0', '').replace('.', ',') + 'k';
     return String(n);
   }
+  // Convert "YYYY-MM-DD" to French short format like "8 mai" — for X-axis labels.
+  // Falls back to the original string on parse failure.
+  function fmtDateShort(s) {
+    if (!s) return '';
+    const d = new Date(s + 'T00:00:00');
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  }
+  // Shared legend config — clean filled rounded rects, no hollow circles.
+  // Pass to plugins.legend on every chart that has more than one series.
+  const CLEAN_LEGEND = {
+    position: 'bottom',
+    labels: {
+      boxWidth: 14,
+      boxHeight: 14,
+      borderRadius: 4,
+      useBorderRadius: true,
+      padding: 16,
+      font: { size: 12, weight: '500' },
+      color: '#33373d',
+    },
+  };
+  // Shared axis defaults — lighter grid, fewer ticks, FR date labels on X.
+  const AXIS_X_DATE = {
+    grid: { display: false },
+    border: { display: false },
+    ticks: {
+      font: { size: 11 },
+      color: '#9aa0a6',
+      maxRotation: 0,
+      autoSkipPadding: 24,
+      callback: function (v) {
+        // For category scales, v is the index; for time/linear it's the value.
+        const lbl = this.getLabelForValue ? this.getLabelForValue(v) : v;
+        return fmtDateShort(lbl);
+      },
+    },
+  };
+  const AXIS_Y_NUM = {
+    beginAtZero: true,
+    grid: { color: '#f1f2f4' },
+    border: { display: false },
+    ticks: {
+      font: { size: 11 },
+      color: '#9aa0a6',
+      maxTicksLimit: 6,
+      padding: 8,
+      callback: v => fmtCompact(v),
+    },
+  };
   function destroyChart(key) {
     if (chartInstances[key]) {
       try { chartInstances[key].destroy(); } catch (e) { /* noop */ }
@@ -2412,17 +2469,24 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
       const datasets = platforms.map(plat => {
         const data = sortedDates.map(d => byDatePlatform[`${d}|${plat}`] || null);
         const hasAny = data.some(v => v != null && v > 0);
-        return hasAny ? {
+        if (!hasAny) return null;
+        const color = PLATFORM_COLOR[plat];
+        return {
           label: PLATFORM_LABEL[plat],
           data,
-          borderColor: PLATFORM_COLOR[plat],
-          backgroundColor: PLATFORM_COLOR[plat] + '22',
-          borderWidth: 2,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 4,
+          borderColor: color,
+          backgroundColor: color + '14', // ~8% alpha fill under the line
+          borderWidth: 2.5,
+          tension: 0.4,
+          fill: true,
+          pointRadius: data.length <= 7 ? 3 : 0, // visible dots when few points
+          pointBackgroundColor: color,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointHoverRadius: 6,
+          pointHoverBorderWidth: 2,
           spanGaps: true,
-        } : null;
+        };
       }).filter(Boolean);
 
       const isEmpty = sortedDates.length === 0 || datasets.length === 0;
@@ -2438,18 +2502,21 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
             plugins: {
-              legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, padding: 14, usePointStyle: true } },
+              legend: CLEAN_LEGEND,
               tooltip: {
                 backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
-                padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4,
-                callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtCompact(ctx.parsed.y)} followers` }
+                padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6,
+                titleFont: { size: 12, weight: '600' },
+                bodyFont: { size: 12 },
+                callbacks: {
+                  title: items => fmtDateShort(items[0].label),
+                  label: ctx => `  ${ctx.dataset.label}: ${fmtCompact(ctx.parsed.y)} followers`,
+                }
               }
             },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
-              y: { grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
-            }
+            scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
         });
       }
@@ -2500,33 +2567,39 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
                 const { ctx: c, chartArea } = chart;
                 if (!chartArea) return 'rgba(255,105,180,0.15)';
                 const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                g.addColorStop(0, 'rgba(255,105,180,0.30)');
+                g.addColorStop(0, 'rgba(255,105,180,0.32)');
                 g.addColorStop(1, 'rgba(255,105,180,0.00)');
                 return g;
               },
               fill: true,
-              borderWidth: 2,
-              tension: 0.35,
-              pointRadius: 0,
-              pointHoverRadius: 4,
+              borderWidth: 2.5,
+              tension: 0.4,
+              pointRadius: data.length <= 7 ? 3 : 0,
+              pointBackgroundColor: '#FF69B4',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 1.5,
+              pointHoverRadius: 6,
+              pointHoverBorderWidth: 2,
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
             plugins: {
               legend: { display: false },
               tooltip: {
                 backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
-                padding: 10, cornerRadius: 8,
-                callbacks: { label: ctx => `${fmtCompact(ctx.parsed.y)} vues` }
+                padding: 12, cornerRadius: 8,
+                titleFont: { size: 12, weight: '600' }, bodyFont: { size: 12 },
+                callbacks: {
+                  title: items => fmtDateShort(items[0].label),
+                  label: ctx => `  ${fmtCompact(ctx.parsed.y)} vues`,
+                }
               }
             },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
-              y: { grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
-            }
+            scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
         });
       }
@@ -2841,21 +2914,39 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
           data: { labels: dates, datasets: [{
             label: 'Engagement %', data,
             borderColor: '#FF69B4',
-            backgroundColor: 'rgba(255,105,180,0.10)',
-            fill: true, borderWidth: 2, tension: 0.35, pointRadius: 0, pointHoverRadius: 4,
+            backgroundColor: (ctx) => {
+              const chart = ctx.chart;
+              const { ctx: c, chartArea } = chart;
+              if (!chartArea) return 'rgba(255,105,180,0.10)';
+              const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              g.addColorStop(0, 'rgba(255,105,180,0.28)');
+              g.addColorStop(1, 'rgba(255,105,180,0.00)');
+              return g;
+            },
+            fill: true, borderWidth: 2.5, tension: 0.4,
+            pointRadius: data.length <= 7 ? 3 : 0,
+            pointBackgroundColor: '#FF69B4', pointBorderColor: '#fff',
+            pointBorderWidth: 1.5, pointHoverRadius: 6, pointHoverBorderWidth: 2,
           }] },
           options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8,
-                callbacks: { label: ctx => `${ctx.parsed.y.toFixed(2).replace('.', ',')} %` }
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 12, cornerRadius: 8,
+                titleFont: { size: 12, weight: '600' }, bodyFont: { size: 12 },
+                callbacks: {
+                  title: items => fmtDateShort(items[0].label),
+                  label: ctx => `  ${ctx.parsed.y.toFixed(2).replace('.', ',')} % d'engagement`,
+                }
               }
             },
             scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
-              y: { beginAtZero: true, grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => v + '%' } }
+              x: AXIS_X_DATE,
+              y: { ...AXIS_Y_NUM, ticks: { ...AXIS_Y_NUM.ticks, callback: v => v + '%' } }
             }
           }
         });
@@ -3018,22 +3109,37 @@ console.log('%c[TL] dashboard build v=2026-05-10-merge-charts', 'color:#FF69B4;f
           data: { labels: days, datasets: [{
             label: 'Vues moyennes', data,
             borderColor: '#FF69B4',
-            backgroundColor: 'rgba(255,105,180,0.10)',
-            fill: true, borderWidth: 2, tension: 0.35, pointRadius: 0, pointHoverRadius: 4,
+            backgroundColor: (ctx) => {
+              const chart = ctx.chart;
+              const { ctx: c, chartArea } = chart;
+              if (!chartArea) return 'rgba(255,105,180,0.10)';
+              const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              g.addColorStop(0, 'rgba(255,105,180,0.28)');
+              g.addColorStop(1, 'rgba(255,105,180,0.00)');
+              return g;
+            },
+            fill: true, borderWidth: 2.5, tension: 0.4,
+            pointRadius: data.length <= 7 ? 3 : 0,
+            pointBackgroundColor: '#FF69B4', pointBorderColor: '#fff',
+            pointBorderWidth: 1.5, pointHoverRadius: 6, pointHoverBorderWidth: 2,
           }] },
           options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8,
-                callbacks: { label: ctx => `${fmtCompact(ctx.parsed.y)} vues moy.` }
+                backgroundColor: '#111', titleColor: '#fff', bodyColor: '#fff',
+                padding: 12, cornerRadius: 8,
+                titleFont: { size: 12, weight: '600' }, bodyFont: { size: 12 },
+                callbacks: {
+                  title: items => fmtDateShort(items[0].label),
+                  label: ctx => `  ${fmtCompact(ctx.parsed.y)} vues / vidéo`,
+                }
               }
             },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', maxRotation: 0, autoSkipPadding: 18 } },
-              y: { beginAtZero: true, grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
-            }
+            scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
         });
       }
