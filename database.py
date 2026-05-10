@@ -321,6 +321,8 @@ def init_db():
     _migrate_user_roles(conn)
     # Migration: add plan/stripe_customer_id columns to users if missing
     _migrate_user_plan_columns(conn)
+    # Migration: add optional company column to users
+    _migrate_user_company(conn)
     # Migration: add is_competitor column to accounts if missing
     _migrate_competitor_column(conn)
     # Migration: add total_views/total_comments aggregated stats columns
@@ -402,6 +404,33 @@ def _migrate_user_roles(conn):
                 print("[Migration] Added role and blocked columns to users (SQLite)")
     except Exception as e:
         print(f"[Migration] user roles: {e}")
+
+
+def _migrate_user_company(conn):
+    """Add company column to users table if missing (optional free-text field)."""
+    try:
+        if DATABASE_URL:
+            cols = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='company'")
+            if not cols:
+                _execute(conn, "ALTER TABLE users ADD COLUMN company TEXT")
+                print("[Migration] Added company column to users (PostgreSQL)")
+        else:
+            cur = conn.cursor()
+            columns = [col[1] for col in cur.execute("PRAGMA table_info(users)").fetchall()]
+            if "company" not in columns:
+                cur.execute("ALTER TABLE users ADD COLUMN company TEXT")
+                print("[Migration] Added company column to users (SQLite)")
+    except Exception as e:
+        print(f"[Migration] user company: {e}")
+
+
+def update_user_company(user_id, company):
+    """Set or clear the optional company field on a user. Empty string -> NULL."""
+    conn = get_connection()
+    val = (company or "").strip() or None
+    _execute(conn, "UPDATE users SET company = %s WHERE id = %s", (val, user_id))
+    conn.close()
+    return val
 
 
 def _migrate_user_plan_columns(conn):

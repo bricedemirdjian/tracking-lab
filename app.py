@@ -20,6 +20,7 @@ from database import (
     get_all_users, set_user_blocked, set_user_role, delete_user_and_data,
     get_user_subscription, upsert_subscription, get_subscription_by_customer,
     set_user_plan, get_user_plan,
+    update_user_company,
 )
 from functools import wraps
 from tiktok_scraper import scrape_all_accounts_for_user, scrape_single_account_for_user
@@ -113,7 +114,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-10-mon-compte-pink")
+    response.headers.setdefault("X-Build-Version", "2026-05-10-company-field")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -351,6 +352,16 @@ def account():
         plan_meta=plan_meta,
         usage=usage,
     )
+
+
+@app.route("/api/account/profile", methods=["POST"])
+@login_required
+def api_account_profile():
+    """Update editable profile fields. Currently: company (optional, free-text, max 120)."""
+    payload = request.get_json(silent=True) or {}
+    company = (payload.get("company") or "")[:120]
+    saved = update_user_company(current_user.id, company)
+    return jsonify({"ok": True, "company": saved})
 
 
 @app.route("/api/billing/checkout", methods=["POST"])
