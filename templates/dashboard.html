@@ -1397,12 +1397,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .today-card-detail {
   font-size: 12.5px; color: var(--text-2);
-  font-weight: 500;
   padding-top: 12px;
   border-top: 1px dashed var(--border);
   line-height: 1.5;
 }
-.today-card-detail .plat {
+.today-card-detail-summary {
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+.today-card-detail-summary .plat {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 4px;
@@ -1410,6 +1414,43 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 11px;
   font-weight: 600;
   margin-right: 4px;
+}
+.today-detail-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.today-detail-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.today-detail-row:last-child { border-bottom: none; }
+.today-detail-platform {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.today-detail-platform svg { width: 11px; height: 11px; }
+.today-detail-name {
+  flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 500; color: var(--text);
+}
+.today-detail-value {
+  font-weight: 600;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.today-detail-empty {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; padding: 8px 0;
+}
+.today-detail-more {
+  font-size: 11px; color: var(--text-3);
+  text-align: center; padding-top: 4px;
 }
 
 /* ─────────────────────── Advice page (Nos conseils) ─────────────────────── */
@@ -2203,7 +2244,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-today-detail', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2948,64 +2989,115 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-detail', 'color:#FF69B4;f
     // fetched it in this load() pass.
     const videos = await cachedJSON(buildVideosAllURL(), []);
 
-    // Posts today: count videos whose create_time falls on today's local date.
-    // Track per-platform breakdown for the detail line.
-    let postsToday = 0;
+    // ── Posts today: collect each video posted today ──
+    const postsList = []; // [{ platform, username, views, title }]
     const postsByPlatform = { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
     (videos || []).forEach(v => {
       if (!v.create_time) return;
       const d = new Date(v.create_time);
       if (isNaN(d.getTime())) return;
-      // Use LOCAL date string (not UTC) to match the displayed weekday.
       const localKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       if (localKey === todayKey) {
-        postsToday += 1;
         const p = v.platform || 'tiktok';
         if (postsByPlatform[p] != null) postsByPlatform[p] += 1;
+        postsList.push({
+          platform: p,
+          username: v.account_username || v.username || '',
+          views: v.views || 0,
+          title: (v.description || v.title || '').slice(0, 60),
+        });
       }
     });
+    const postsToday = postsList.length;
+    postsList.sort((a, b) => (b.views || 0) - (a.views || 0));
 
-    // Views today: sum per-account delta where the snapshot date is today.
-    // Track per-platform breakdown.
+    // ── Views today: per-account delta where snapshot date = today ──
     const byAccountKey = {};
     (preloadedEvolution || []).forEach(row => {
       if (!row.date) return;
       const k = `${row.account_username}|${row.platform || 'tiktok'}`;
       (byAccountKey[k] = byAccountKey[k] || []).push({
-        date: row.date, views: row.views || 0, platform: row.platform || 'tiktok',
+        date: row.date, views: row.views || 0,
+        platform: row.platform || 'tiktok', username: row.account_username,
       });
     });
-    let viewsToday = 0;
+    const viewsList = []; // [{ platform, username, delta }]
     const viewsByPlatform = { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
     Object.values(byAccountKey).forEach(series => {
       series.sort((a, b) => a.date.localeCompare(b.date));
       for (let i = 1; i < series.length; i++) {
         if (series[i].date === todayKey) {
           const delta = Math.max(0, series[i].views - series[i-1].views);
-          viewsToday += delta;
-          const p = series[i].platform;
-          if (viewsByPlatform[p] != null) viewsByPlatform[p] += delta;
+          if (delta > 0) {
+            viewsList.push({
+              platform: series[i].platform,
+              username: series[i].username,
+              delta,
+            });
+            if (viewsByPlatform[series[i].platform] != null) {
+              viewsByPlatform[series[i].platform] += delta;
+            }
+          }
         }
       }
     });
+    const viewsToday = viewsList.reduce((s, r) => s + r.delta, 0);
+    viewsList.sort((a, b) => b.delta - a.delta);
 
-    // Build detail strings: " TT 3 · IG 1 · YT 0 · LI 0" (only show non-zero)
-    function buildDetail(map, formatter) {
+    // ── Render the values + per-platform summary + per-item list ──
+    postEls.forEach(el => { el.textContent = fmt(postsToday); });
+    viewEls.forEach(el => { el.textContent = fmt(viewsToday); });
+
+    function platformSummary(map, formatter) {
       const order = ['tiktok','instagram','youtube','linkedin'];
       const labels = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn' };
       const parts = order.filter(p => map[p] > 0).map(p =>
         `<span class="plat">${labels[p]}</span> ${formatter(map[p])}`
       );
-      return parts.length === 0 ? '<span style="color:var(--text-3)">Aucune activité par plateforme</span>' : parts.join(' · ');
+      return parts.join(' · ');
     }
 
-    postEls.forEach(el => { el.textContent = fmt(postsToday); });
-    viewEls.forEach(el => { el.textContent = fmt(viewsToday); });
+    function detailRow(platform, name, valueText) {
+      const color = PLATFORM_HEX[platform] || '#000';
+      const logo = PLATFORM_SVG_INLINE[platform] || '';
+      return `
+        <div class="today-detail-row">
+          <span class="today-detail-platform" style="background:${color}">${logo}</span>
+          <span class="today-detail-name">${escapeHTML(name)}</span>
+          <span class="today-detail-value">${valueText}</span>
+        </div>`;
+    }
+
+    const MAX_LIST = 5;
+
+    // Posts cards — list each video posted today
     document.querySelectorAll('.todayPostsDetail').forEach(el => {
-      el.innerHTML = buildDetail(postsByPlatform, n => n);
+      if (postsToday === 0) {
+        el.innerHTML = '<div class="today-detail-empty">Aucun post aujourd\'hui.</div>';
+        return;
+      }
+      const summary = `<div class="today-card-detail-summary">${platformSummary(postsByPlatform, n => n)}</div>`;
+      const rows = postsList.slice(0, MAX_LIST).map(p =>
+        detailRow(p.platform, '@' + p.username + (p.title ? ' — ' + p.title : ''), `${fmtCompact(p.views)} vues`)
+      ).join('');
+      const more = postsList.length > MAX_LIST
+        ? `<div class="today-detail-more">+ ${postsList.length - MAX_LIST} autre${postsList.length - MAX_LIST > 1 ? 's' : ''}</div>` : '';
+      el.innerHTML = summary + '<div class="today-detail-list">' + rows + '</div>' + more;
     });
+
+    // Views cards — list each account that gained views today
     document.querySelectorAll('.todayViewsDetail').forEach(el => {
-      el.innerHTML = buildDetail(viewsByPlatform, n => fmtCompact(n));
+      if (viewsToday === 0) {
+        el.innerHTML = '<div class="today-detail-empty">Pas de vues gagnées aujourd\'hui.</div>';
+        return;
+      }
+      const summary = `<div class="today-card-detail-summary">${platformSummary(viewsByPlatform, n => fmtCompact(n))}</div>`;
+      const rows = viewsList.slice(0, MAX_LIST).map(r =>
+        detailRow(r.platform, '@' + r.username, `+${fmtCompact(r.delta)} vues`)
+      ).join('');
+      const more = viewsList.length > MAX_LIST
+        ? `<div class="today-detail-more">+ ${viewsList.length - MAX_LIST} autre${viewsList.length - MAX_LIST > 1 ? 's' : ''}</div>` : '';
+      el.innerHTML = summary + '<div class="today-detail-list">' + rows + '</div>' + more;
     });
   }
 
