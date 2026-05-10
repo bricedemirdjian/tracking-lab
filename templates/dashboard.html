@@ -237,6 +237,19 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 4px;
   flex-shrink: 0;
 }
+/* Platform logo chip used in the sidebar accounts list — colored square +
+   white SVG centered. Matches the table view's cell-account-platform pattern. */
+.sb-acc-platform-logo {
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.sb-acc-platform-logo svg {
+  width: 13px; height: 13px;
+  display: block;
+}
 .sb-acc-row-name {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 500;
@@ -2075,7 +2088,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-mgr-labels', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-mgr-logos', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -4093,10 +4106,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-labels', 'color:#FF69B4;fon
     list.innerHTML = items.map(a => {
       const p = a.platform || 'tiktok';
       const color = PLATFORM_HEX[p] || '#000';
+      const logo = PLATFORM_SVG_INLINE[p] || '';
       return `
         <div class="sb-acc-row">
           <span class="sb-acc-row-handle">
-            <span class="sb-acc-platform-dot" style="background:${color}"></span>
+            <span class="sb-acc-platform-logo" style="background:${color}">${logo}</span>
             <span class="sb-acc-row-name">@${escapeHTML(a.username || '')}</span>
           </span>
           <button class="sb-acc-row-del" title="Supprimer ce compte" data-username="${escapeHTML(a.username || '')}">
@@ -4223,10 +4237,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-labels', 'color:#FF69B4;fon
     body.innerHTML = all.map(a => {
       const p = a.platform || 'tiktok';
       const color = PLATFORM_HEX[p] || '#000';
+      const logo = PLATFORM_SVG_INLINE[p] || '';
       return `
         <label class="sb-prj-acc">
           <input type="checkbox" data-account-id="${a.id}" ${projAccIds.has(String(a.id)) ? 'checked' : ''}>
-          <span class="sb-acc-platform-dot" style="background:${color}"></span>
+          <span class="sb-acc-platform-logo" style="background:${color}">${logo}</span>
           <span class="sb-prj-acc-name">@${escapeHTML(a.username || '')}</span>
         </label>`;
     }).join('');
