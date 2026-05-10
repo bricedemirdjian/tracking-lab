@@ -113,7 +113,15 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-10-mgr-fix")
+    response.headers.setdefault("X-Build-Version", "2026-05-10-no-cache")
+    # Force fresh HTML on every load. Chrome was caching the dashboard HTML
+    # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
+    # open with "Disable cache" toggled). `no-store` is the strict bypass.
+    # Static assets (CSS/JS) keep their long cache via the `?v=` query string.
+    if request.path in ("/", "/dashboard") or request.path.startswith("/dashboard?"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     if IS_PRODUCTION:
         response.headers.setdefault(
             "Strict-Transport-Security",
