@@ -1860,7 +1860,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-prefetch', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -1888,6 +1888,39 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
   const COUNT_LIMIT = (v) => v === 'all' ? 9999 : Number(v) || 20;
   let accounts = [];
   let projects = [];
+
+  // ─── In-memory GET cache (TTL 60s) ─────────────────────────────────────
+  // Massive perceived-speed win on view switches. Same URL within 60s = no
+  // network round-trip. Filter changes mutate the URL (date_from / project_id
+  // / etc. are query params) so they organically miss the cache. After 60s,
+  // entries expire so a real cron-driven data refresh eventually surfaces.
+  const _fetchCache = new Map();      // url -> { data, ts }
+  const _inflight = new Map();        // url -> Promise (dedup concurrent calls)
+  const FETCH_CACHE_TTL_MS = 60_000;
+  async function cachedJSON(url, fallback = null) {
+    const now = Date.now();
+    const hit = _fetchCache.get(url);
+    if (hit && (now - hit.ts) < FETCH_CACHE_TTL_MS) return hit.data;
+    if (_inflight.has(url)) return _inflight.get(url);
+    const p = (async () => {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        _fetchCache.set(url, { data, ts: Date.now() });
+        return data;
+      } catch (e) {
+        return fallback;
+      } finally {
+        _inflight.delete(url);
+      }
+    })();
+    _inflight.set(url, p);
+    return p;
+  }
+  // Manual cache invalidation — call when we know data changed (e.g. after
+  // adding an account, after triggering a fresh scrape).
+  function clearFetchCache() { _fetchCache.clear(); _inflight.clear(); }
 
   function fmtDate(d) { return d.toISOString().slice(0, 10); }
 
@@ -1969,14 +2002,17 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
     refreshFilterChipStates();
     let stats = null;
     try {
-      const [statsR, accR, projR] = await Promise.all([
-        fetch(buildStatsURL()),
-        fetch(buildAccountsURL()),
-        fetch('/api/projects'),
+      // cachedJSON dedups in-flight + reuses results within 60s. On view
+      // switches without a filter change, all 3 hit the cache → instant.
+      const [s, a, p] = await Promise.all([
+        cachedJSON(buildStatsURL()),
+        cachedJSON(buildAccountsURL(), []),
+        cachedJSON('/api/projects', []),
       ]);
-      stats = await statsR.json();
-      accounts = await accR.json();
-      try { projects = await projR.json(); } catch { projects = []; }
+      stats = s;
+      accounts = Array.isArray(a) ? a : [];
+      projects = Array.isArray(p) ? p : [];
+      if (!stats) throw new Error('stats fetch failed');
     } catch (e) {
       console.error('[load] fetch failed:', e);
       return;
@@ -2293,14 +2329,12 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
     latestGrid.innerHTML = loadingHTML;
 
     try {
-      const [bestR, latestR] = await Promise.all([
-        fetch(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount))),
-        fetch(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount))),
+      const [bestData, latestData] = await Promise.all([
+        cachedJSON(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount)), []),
+        cachedJSON(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount)), []),
       ]);
-      const bestData = await bestR.json();
-      const latestData = await latestR.json();
-      const best = Array.isArray(bestData) ? bestData : (bestData.videos || []);
-      const latest = Array.isArray(latestData) ? latestData : (latestData.videos || []);
+      const best = Array.isArray(bestData) ? bestData : (bestData?.videos || []);
+      const latest = Array.isArray(latestData) ? latestData : (latestData?.videos || []);
 
       if (best.length) {
         bestEmpty.hidden = true;
@@ -2440,18 +2474,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
     }
 
     // Fetch evolution + videos in parallel — both feed several charts each.
-    let evolution = [];
-    let videos = [];
-    try {
-      const [rEvo, rVid] = await Promise.all([
-        fetch(buildEvolutionURL()),
-        fetch(buildVideosAllURL()),
-      ]);
-      evolution = rEvo.ok ? await rEvo.json() : [];
-      videos    = rVid.ok ? await rVid.json() : [];
-    } catch (e) {
-      console.warn('[TL] /api/evolution or /api/videos failed:', e);
-    }
+    // Both go through cachedJSON: same URL within 60s = instant.
+    const [evolution, videos] = await Promise.all([
+      cachedJSON(buildEvolutionURL(), []),
+      cachedJSON(buildVideosAllURL(), []),
+    ]);
 
     // ── Chart 1: Évolution des followers (multi-line, one per platform) ──
     {
@@ -3490,15 +3517,63 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
     await load();
   }
 
-  // Wire all sidebar dashboard links to SPA nav
+  // ─── Prefetch a view's data ─────────────────────────────────────────
+  // Builds the URLs that view will need and warms them through cachedJSON.
+  // Called on hover (start of click intent — usually 100-300ms before the
+  // actual click) and once after initial load to warm "the other views".
+  // All buildXURL helpers read isCompetitorScope from closure, so we
+  // temporarily swap it for cross-scope hover prefetches and restore.
+  function prefetchForView(view, isComp) {
+    const prevComp = isCompetitorScope;
+    isCompetitorScope = !!isComp;
+    try {
+      // Common to all views
+      cachedJSON(buildStatsURL());
+      cachedJSON(buildAccountsURL(), []);
+      cachedJSON('/api/projects', []);
+      // Per-view extras
+      if (view === 'videos') {
+        cachedJSON(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount)), []);
+        cachedJSON(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount)), []);
+      } else if (view === 'table') {
+        cachedJSON(buildEvolutionURL(), []);
+        cachedJSON(buildVideosAllURL(), []);
+      }
+      // accounts + dashboard need only the common fetches.
+    } finally {
+      isCompetitorScope = prevComp;
+    }
+  }
+
+  // Wire all sidebar dashboard links: SPA nav on click, prefetch on hover.
   document.querySelectorAll('.sb-item[href^="/dashboard"]').forEach(a => {
     a.addEventListener('click', e => {
-      // Honor modifier-clicks (Cmd/Ctrl-click opens new tab) — fall through to default
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
       navigateTo(a.href);
     });
+    // Hover = strong click intent (~100-300ms head start before the click).
+    // We prefetch the destination's data so the cache is warm by the time
+    // navigateTo runs — usually click feels instant.
+    a.addEventListener('mouseenter', () => {
+      const u = new URL(a.href, location.origin);
+      const v = u.searchParams.get('view');
+      const isComp = u.searchParams.get('scope') === 'competitor';
+      prefetchForView(v, isComp);
+    }, { passive: true });
   });
+
+  // After the initial render finishes, warm the other in-scope views in the
+  // background so even the first cross-view click feels instant. Wrapped in
+  // setTimeout(0) so it doesn't compete with the initial paint.
+  function backgroundPrefetchOtherViews() {
+    setTimeout(() => {
+      const cur = navView || 'dashboard';
+      ['accounts', 'videos', 'table'].forEach(v => {
+        if (v !== cur) prefetchForView(v, isCompetitorScope);
+      });
+    }, 0);
+  }
 
   // Browser back/forward buttons
   window.addEventListener('popstate', () => {
@@ -3513,7 +3588,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-spa-nav', 'color:#FF69B4;font-w
   // Initial sync — apply nav state, set the default date inputs, fetch
   applyNav();
   syncDatesFromRange();
-  load();
+  load().then(backgroundPrefetchOtherViews);
 })();
 </script>
 </body>
