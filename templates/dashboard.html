@@ -1349,6 +1349,52 @@ button { font-family: inherit; cursor: pointer; }
    the chart even when isEmpty=false. */
 .chart-card-empty[hidden] { display: none !important; }
 
+/* "Aujourd'hui" cards — between attention card and Vues hebdomadaires.
+   2-col grid showing posts + views for the current day. */
+.today-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 768px) { .today-grid { grid-template-columns: 1fr; } }
+.today-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px 16px;
+  box-shadow: 0 1px 2px rgba(16,18,20,0.04);
+  transition: box-shadow 160ms ease;
+}
+.today-card:hover { box-shadow: 0 4px 14px rgba(16,18,20,0.06); }
+.today-card-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.today-card-icon {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: rgba(255,105,180,0.12);
+  color: #FF69B4;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.today-card-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.7px;
+  line-height: 1.3;
+}
+.today-card-value {
+  font-size: 36px; font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -1px; line-height: 1;
+  margin-bottom: 6px;
+}
+.today-card-sub {
+  font-size: 12px; color: var(--text-3);
+}
+
 /* ─────────────────────── Advice page (Nos conseils) ─────────────────────── */
 .advice-group { margin: 0 0 32px; }
 .advice-group-head { margin: 0 0 14px; }
@@ -1783,6 +1829,30 @@ button { font-family: inherit; cursor: pointer; }
       <div class="attention-arrow">→</div>
     </div>
 
+    <!-- Today card — posts + views for the current day -->
+    <div class="today-grid">
+      <div class="today-card">
+        <div class="today-card-head">
+          <span class="today-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="3 9 12 14 21 9"/></svg>
+          </span>
+          <span class="today-card-label">Posts publiés aujourd'hui</span>
+        </div>
+        <div class="today-card-value" id="todayPostsValue">—</div>
+        <div class="today-card-sub" id="todayDateLabel">—</div>
+      </div>
+      <div class="today-card">
+        <div class="today-card-head">
+          <span class="today-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="today-card-label">Vues réalisées aujourd'hui</span>
+        </div>
+        <div class="today-card-value" id="todayViewsValue">—</div>
+        <div class="today-card-sub" id="todayDateLabel2">—</div>
+      </div>
+    </div>
+
     <!-- Weekly views chart — real data, last 12 ISO weeks -->
     <div class="chart-card" style="min-height: 340px;">
       <div class="chart-card-head">
@@ -2088,7 +2158,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-mgr-logos', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-today-card', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2434,6 +2504,9 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-logos', 'color:#FF69B4;font
     // Weekly views chart (dashboard view only — canvas only exists there).
     // Function no-ops if the canvas isn't in the DOM.
     try { renderWeeklyViewsChart(evolution); } catch (e) { console.error('[load] weekly:', e); }
+
+    // Today card (posts + views for current day, dashboard view only).
+    try { renderTodayCard(evolution); } catch (e) { console.error('[load] today:', e); }
   }
 
   // ─── View renderers ─────────────────────────────────────────────────
@@ -2806,6 +2879,62 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-logos', 'color:#FF69B4;font
       el.textContent = text;
       el.className = 'kpi-trend ' + cls;
     });
+  }
+
+  // ─── Dashboard view: "Aujourd'hui" card (posts + views for today) ──
+  // Counts videos with create_time = today + sums per-account view deltas
+  // for the last snapshot pair where the most recent date is today.
+  // No-ops on non-dashboard views (DOM elements don't exist there).
+  async function renderTodayCard(preloadedEvolution) {
+    const postsEl = document.getElementById('todayPostsValue');
+    const viewsEl = document.getElementById('todayViewsValue');
+    if (!postsEl || !viewsEl) return; // not on dashboard view
+
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // FR-formatted date for the sub-label, matches the page subtitle style
+    const dateLbl = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const sub1 = document.getElementById('todayDateLabel');
+    const sub2 = document.getElementById('todayDateLabel2');
+    if (sub1) sub1.textContent = dateLbl[0].toUpperCase() + dateLbl.slice(1);
+    if (sub2) sub2.textContent = dateLbl[0].toUpperCase() + dateLbl.slice(1);
+
+    // Reuse the evolution we already have (passed in) — no extra fetch.
+    // For videos, cachedJSON returns instantly if renderTableCharts already
+    // fetched it in this load() pass.
+    const videos = await cachedJSON(buildVideosAllURL(), []);
+
+    // Posts today: count videos whose create_time falls on today's local date.
+    let postsToday = 0;
+    (videos || []).forEach(v => {
+      if (!v.create_time) return;
+      const d = new Date(v.create_time);
+      if (isNaN(d.getTime())) return;
+      // Use LOCAL date string (not UTC) to match the displayed weekday.
+      const localKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      if (localKey === todayKey) postsToday += 1;
+    });
+
+    // Views today: sum per-account delta where the snapshot date is today.
+    const byAccount = {};
+    (preloadedEvolution || []).forEach(row => {
+      if (!row.date) return;
+      const k = `${row.account_username}|${row.platform || 'tiktok'}`;
+      (byAccount[k] = byAccount[k] || []).push({ date: row.date, views: row.views || 0 });
+    });
+    let viewsToday = 0;
+    Object.values(byAccount).forEach(series => {
+      series.sort((a, b) => a.date.localeCompare(b.date));
+      for (let i = 1; i < series.length; i++) {
+        if (series[i].date === todayKey) {
+          viewsToday += Math.max(0, series[i].views - series[i-1].views);
+        }
+      }
+    });
+
+    postsEl.textContent = fmt(postsToday);
+    viewsEl.textContent = fmt(viewsToday);
   }
 
   // ─── Dashboard view: weekly views chart (last 12 ISO weeks) ─────────
