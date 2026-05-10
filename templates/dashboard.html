@@ -1556,11 +1556,11 @@ button { font-family: inherit; cursor: pointer; }
         <svg class="sb-mgr-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="sb-mgr-body">
-        <div id="sbProjectsList" class="sb-mgr-list"></div>
-        <form class="sb-new-prj" id="sbNewProjectForm">
+        <form class="sb-new-prj" id="sbNewProjectForm" style="margin-top: 0; margin-bottom: 10px;">
           <input type="text" id="sbNewProjectInput" placeholder="Nouveau projet…" maxlength="60" autocomplete="off">
           <button type="submit" title="Créer">+</button>
         </form>
+        <div id="sbProjectsList" class="sb-mgr-list"></div>
       </div>
     </div>
 
@@ -2073,7 +2073,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-mgr-final', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-mgr-fetch', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -4082,6 +4082,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-final', 'color:#FF69B4;font
   async function refreshSidebarAccounts() {
     const list = document.getElementById('sbAccountsList');
     if (!list) return;
+    // Always re-fetch — cachedJSON returns instantly if already loaded.
+    // Without this, opening the dropdown before load() completes shows
+    // "Aucun élément." even when the user has 17 accounts in DB.
+    const fresh = await cachedJSON(buildAccountsURL(), []);
+    if (Array.isArray(fresh) && fresh.length) accounts = fresh;
     const items = (accounts || []).slice().sort((a, b) => (a.username||'').localeCompare(b.username||''));
     list.innerHTML = items.map(a => {
       const p = a.platform || 'tiktok';
@@ -4127,6 +4132,9 @@ console.log('%c[TL] dashboard build v=2026-05-10-mgr-final', 'color:#FF69B4;font
   async function refreshSidebarProjects() {
     const list = document.getElementById('sbProjectsList');
     if (!list) return;
+    // Same defensive fetch as refreshSidebarAccounts — instant on cache hit.
+    const fresh = await cachedJSON('/api/projects', []);
+    if (Array.isArray(fresh)) projects = fresh;
     const projs = (projects || []).slice().sort((a, b) => (a.name||'').localeCompare(b.name||''));
     list.innerHTML = projs.map(p => `
       <div class="sb-prj-row" data-project-id="${p.id}">
