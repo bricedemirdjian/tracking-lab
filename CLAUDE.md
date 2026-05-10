@@ -8,7 +8,7 @@ A `CLAUDE.md` in `/Users/briique/Desktop/CLAUDE CODE/` describes the **ConvAnaly
 
 ## Project
 
-**Tracking Lab** — Flask web app that scrapes public TikTok / YouTube / Instagram / LinkedIn account stats and surfaces them in a dashboard. Production: `app.trackinglab.online` (deployed on Vercel).
+**Tracking Lab** — Flask web app that scrapes public TikTok / YouTube / Instagram / LinkedIn account stats and surfaces them in a dashboard. Production: `trackinglab.online` (target single domain post-migration; currently transitioning from `app.trackinglab.online`). Both run on Vercel; landing on `tracking-lab-v2` (Next.js), Flask app on `tracking-lab` project. See `MIGRATION_RUNBOOK.md` for the cutover plan.
 
 ## Common commands
 

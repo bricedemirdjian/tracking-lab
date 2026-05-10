@@ -1,6 +1,6 @@
 # Tracking Lab — UI Monitor
 
-Self-healing Playwright monitor for `app.trackinglab.online/dashboard`.
+Self-healing Playwright monitor for `trackinglab.online/dashboard` (set `APP_URL` env var to override; defaults to `https://app.trackinglab.online` until the migration to single-domain is complete).
 Runs hourly via GitHub Actions, extracts every KPI + the activity table,
 validates against a strict schema, and learns which selectors are reliable
 over time.

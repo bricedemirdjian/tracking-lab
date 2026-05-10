@@ -9,7 +9,7 @@ add_tracked_account upserts).
 Does NOT auto-scrape — run `python daily_scrape.py` afterward, or trigger
 the cron via:
   curl -H "Authorization: Bearer $CRON_SECRET" \\
-       https://app.trackinglab.online/api/cron/scrape-tiktok-youtube
+       "${APP_URL:-https://app.trackinglab.online}/api/cron/scrape-tiktok-youtube"
 
 Run:
     set -a && . ./.env.local && set +a    # load DATABASE_URL

@@ -59,13 +59,15 @@ jobs:
 
       - name: Ping /healthz
         if: steps.gate.outputs.proceed == 'true'
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}
         run: |
           # /healthz returns 200 OK after a SELECT 1 against Postgres.
           # Hitting it warms (a) the Vercel function, (b) the psycopg2 pool,
           # (c) the schema-cache short-circuit so init_db() is a no-op.
           OUT=$(curl -sS -o /tmp/body -w "%{http_code} %{time_total}s" \
                      --max-time 30 \
-                     "https://app.trackinglab.online/healthz")
+                     "${APP_URL:-https://app.trackinglab.online}/healthz")
           BODY=$(cat /tmp/body | head -c 200)
           echo "status: $OUT"
           echo "body:   $BODY"

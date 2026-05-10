@@ -79,6 +79,7 @@ jobs:
         if: steps.gate.outputs.proceed == 'true' && (steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'instagram')
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET is not set in repo secrets"
@@ -92,7 +93,7 @@ jobs:
             HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
                         -H "Authorization: Bearer $CRON_SECRET" \
                         --max-time 90 \
-                        "https://app.trackinglab.online/api/cron/scrape-instagram")
+                        "${APP_URL:-https://app.trackinglab.online}/api/cron/scrape-instagram")
             echo "$HTTP"
             if echo "$HTTP" | grep -q '"_timeout":true'; then
               echo "→ pass $pass timed out, will retry"
@@ -107,6 +108,7 @@ jobs:
         if: steps.gate.outputs.proceed == 'true' && (steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'tiktok-youtube')
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET is not set in repo secrets"
@@ -120,7 +122,7 @@ jobs:
             HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
                         -H "Authorization: Bearer $CRON_SECRET" \
                         --max-time 90 \
-                        "https://app.trackinglab.online/api/cron/scrape-tiktok-youtube")
+                        "${APP_URL:-https://app.trackinglab.online}/api/cron/scrape-tiktok-youtube")
             echo "$HTTP"
             if echo "$HTTP" | grep -q '"_timeout":true'; then
               echo "→ pass $pass timed out, will retry"
