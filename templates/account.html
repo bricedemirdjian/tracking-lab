@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mon compte · Tracking Lab</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #fafafa;
@@ -163,7 +166,7 @@
     <section class="profile">
       {% set initials = (user.name or user.email or '?').split(' ') | map('first') | join('') | upper %}
       {% set hue = (user.email | length * 37) % 360 if user.email else 200 %}
-      <div class="avatar" style="background: hsl({{ hue }}, 55%, 42%);">
+      <div class="avatar" style="background: hsl({{ hue }}, 55%, 42%);" aria-hidden="true">
         {{ initials[:2] }}
       </div>
       <div class="profile-info">
@@ -173,7 +176,11 @@
           {% set badge_class = 'badge-' + (plan_name if plan_name in ['starter','pro'] else 'agency') %}
           <span class="badge {{ badge_class }}">{{ plan_meta.name }}</span>
           {% if user.created_at %}
-            <span class="since">Membre depuis {{ user.created_at.strftime('%B %Y') if user.created_at.strftime is defined else user.created_at }}</span>
+            {% set fr_months = {1:'janvier',2:'février',3:'mars',4:'avril',5:'mai',6:'juin',7:'juillet',8:'août',9:'septembre',10:'octobre',11:'novembre',12:'décembre'} %}
+            <span class="since">
+              Membre depuis
+              {% if user.created_at.month is defined %}{{ fr_months[user.created_at.month] }} {{ user.created_at.year }}{% else %}{{ user.created_at }}{% endif %}
+            </span>
           {% endif %}
         </div>
       </div>
