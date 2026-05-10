@@ -573,6 +573,8 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1.35;
 }
 .kpi-trend.zero { background: rgba(0,0,0,0.05); color: var(--text-3); }
+.kpi-trend.pos  { background: rgba(16,185,129,0.12); color: #047857; }
+.kpi-trend.neg  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
 .kpi-value {
   font-size: 30px; font-weight: 700; letter-spacing: -1.2px;
   line-height: 1.05; color: var(--text);
@@ -698,6 +700,26 @@ button { font-family: inherit; cursor: pointer; }
   background: rgba(0,0,0,0.05); color: var(--text);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+}
+/* Positive variant: all accounts fresh — green tones instead of amber */
+.attention.attention-positive {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+  border-left: 4px solid #10B981;
+  cursor: default;
+}
+.attention.attention-positive:hover {
+  box-shadow: none; transform: none;
+}
+.attention.attention-positive .attention-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+.attention.attention-positive .attention-value {
+  color: #047857;
+}
+.attention.attention-positive .attention-arrow {
+  display: none;
 }
 
 /* Chart card */
@@ -1850,7 +1872,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-real-trends', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -1939,6 +1961,30 @@ console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;f
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
     return '/api/stats?' + p.toString();
+  }
+  // Same as buildStatsURL but with explicit dates — used for period-over-period
+  // delta computation (KPI trend chips).
+  function buildStatsURLForPeriod(from, to) {
+    const p = new URLSearchParams();
+    if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
+    if (state.account && state.account !== 'all') p.set('account', state.account);
+    if (from) p.set('date_from', from);
+    if (to)   p.set('date_to', to);
+    p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    return '/api/stats?' + p.toString();
+  }
+  // Returns { from, to } for the period of equal length immediately preceding
+  // the current state.date_from / state.date_to window. Returns null if dates
+  // aren't set (which shouldn't happen — syncDatesFromRange always sets them).
+  function previousPeriodDates() {
+    if (!state.date_from || !state.date_to) return null;
+    const start = new Date(state.date_from + 'T00:00:00');
+    const end   = new Date(state.date_to   + 'T00:00:00');
+    if (isNaN(start) || isNaN(end)) return null;
+    const lengthDays = Math.round((end - start) / 86400000) + 1;
+    const prevEnd = new Date(start); prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - lengthDays + 1);
+    return { from: fmtDate(prevStart), to: fmtDate(prevEnd) };
   }
   function buildEvolutionURL() {
     const p = new URLSearchParams();
@@ -2100,7 +2146,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;f
       const gainSign = followerGain > 0 ? '+' : '';
       setDetail('kpiFollowerGainDetail', `${gainSign}${fmtFull(followerGain)} · sur ${periodLbl}`);
 
-      // Attention card (stale > 36h)
+      // Attention card — always shown, with positive state when nothing's stale
       const stale = accounts.filter(a => {
         if (!a.last_updated) return true;
         return (Date.now() - new Date(a.last_updated).getTime()) / 3600000 > 36;
@@ -2108,13 +2154,46 @@ console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;f
       const att = $('#attentionCard');
       if (stale.length > 0) {
         att.style.display = '';
+        att.classList.remove('attention-positive');
+        $('#attLabel').textContent = 'Comptes à re-scraper';
         $('#attValue').textContent = stale.length;
         $('#attStatus').textContent = `Statut « pas de sync depuis 36h » (${stale.slice(0,3).map(a=>'@'+a.username).join(', ')}${stale.length > 3 ? '…' : ''})`;
+      } else {
+        // Positive state: all accounts fresh — show last scrape time.
+        att.style.display = '';
+        att.classList.add('attention-positive');
+        $('#attLabel').textContent = 'Tous les comptes à jour';
+        $('#attValue').textContent = '✓';
+        const mostRecent = accounts.reduce((m, a) => {
+          const t = a.last_updated ? new Date(a.last_updated).getTime() : 0;
+          return t > m ? t : m;
+        }, 0);
+        if (mostRecent > 0) {
+          const minsAgo = Math.round((Date.now() - mostRecent) / 60000);
+          const lbl = minsAgo < 60 ? `il y a ${minsAgo} min`
+                    : minsAgo < 1440 ? `il y a ${Math.round(minsAgo / 60)} h`
+                    : `il y a ${Math.round(minsAgo / 1440)} j`;
+          $('#attStatus').textContent = `Dernier scrape : ${lbl}`;
+        } else {
+          $('#attStatus').textContent = 'Tous synchronisés';
+        }
       }
 
     } catch (e) {
       console.error('[load] kpi render:', e);
     }
+
+    // ── Period-over-period trend chips for the KPIs ──────────────────────
+    // Fetch the previous-period stats (same length, ends day before current
+    // window) and compute a percentage delta for each metric. Cached →
+    // re-using the same URL across view switches has zero cost.
+    try {
+      const prev = previousPeriodDates();
+      if (prev && stats?.global) {
+        const prevStats = await cachedJSON(buildStatsURLForPeriod(prev.from, prev.to));
+        if (prevStats?.global) updateKpiTrends(stats.global, prevStats.global);
+      }
+    } catch (e) { console.error('[load] trend chips:', e); }
 
     // Weekly views chart (dashboard view only — canvas only exists there).
     // Function no-ops if the canvas isn't in the DOM.
@@ -2457,6 +2536,40 @@ console.log('%c[TL] dashboard build v=2026-05-10-weekly-chart', 'color:#FF69B4;f
     const e = document.getElementById(emptyId);
     if (c) c.style.display = isEmpty ? 'none' : '';
     if (e) e.hidden = !isEmpty;
+  }
+
+  // ─── KPI period-over-period trend chips ─────────────────────────────
+  // Compares current-period numbers against the same-length previous period
+  // and writes a +X% / -X% / +0% chip with green/red/grey styling onto each
+  // KPI card. When previous == 0 and current > 0, we show "+100%" cap so the
+  // chip stays informative without being absurd.
+  function updateKpiTrends(curr, prev) {
+    const pairs = [
+      ['kpiContentsTrend', curr.total_videos,    prev.total_videos],
+      ['kpiViewsTrend',    curr.total_views,     prev.total_views],
+      ['kpiLikesTrend',    curr.total_likes,     prev.total_likes],
+      ['kpiCommentsTrend', curr.total_comments,  prev.total_comments],
+      ['kpiSharesTrend',   curr.total_shares,    prev.total_shares],
+      ['kpiEngTrend',      curr.engagement_rate, prev.engagement_rate],
+      ['kpiAvgTrend',
+        (curr.total_videos > 0 ? curr.total_views / curr.total_videos : 0),
+        (prev.total_videos > 0 ? prev.total_views / prev.total_videos : 0)],
+      ['kpiFollowersTrend', curr.total_followers, prev.total_followers],
+    ];
+    pairs.forEach(([id, c, p]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let delta;
+      if (p > 0) delta = ((c - p) / p) * 100;
+      else if (c > 0) delta = 100;
+      else delta = 0;
+      let text, cls;
+      if (Math.abs(delta) < 0.5) { text = '+0 %'; cls = 'zero'; }
+      else if (delta > 0)        { text = '+' + (delta > 999 ? '999' : delta.toFixed(0)) + ' %'; cls = 'pos'; }
+      else                       { text = (delta < -999 ? '-999' : delta.toFixed(0)) + ' %'; cls = 'neg'; }
+      el.textContent = text;
+      el.className = 'kpi-trend ' + cls;
+    });
   }
 
   // ─── Dashboard view: weekly views chart (last 12 ISO weeks) ─────────
