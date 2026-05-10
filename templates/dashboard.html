@@ -1872,7 +1872,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-videos-reorder', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-10-allinone-dashboard', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -2063,9 +2063,21 @@ console.log('%c[TL] dashboard build v=2026-05-10-videos-reorder', 'color:#FF69B4
     // throw can't cascade.
     try { populateProjectFilter(); populateAccountFilter(); } catch (e) { console.error('[load] filters:', e); }
     try {
-      if (navView === 'accounts') renderAccountsView(accounts, stats);
-      else if (navView === 'videos') await renderVideosView();
-      else if (navView === 'table') { renderTableView(accounts, stats); renderTableCharts(accounts, stats); }
+      // Dashboard = all-in-one: render videos + table sections too so the
+      // single-page scroll has every chart populated. Specific view links
+      // still render only their own section (focused mode).
+      if (!navView) {
+        await renderVideosView();
+        renderTableView(accounts, stats);
+        renderTableCharts(accounts, stats);
+      } else if (navView === 'accounts') {
+        renderAccountsView(accounts, stats);
+      } else if (navView === 'videos') {
+        await renderVideosView();
+      } else if (navView === 'table') {
+        renderTableView(accounts, stats);
+        renderTableCharts(accounts, stats);
+      }
     } catch (e) { console.error('[load] view render:', e); }
 
     try {
@@ -3682,20 +3694,24 @@ console.log('%c[TL] dashboard build v=2026-05-10-videos-reorder', 'color:#FF69B4
       eyebrow.textContent = `${scopeLbl} · ${viewLbl}`;
     }
 
-    // 4. Show ONLY the active view section
+    // 4. Show the right view section(s).
+    // Dashboard is the "all-in-one" page: it stacks viewDashboard +
+    // viewVideos + viewTable in DOM order. Comptes / Vidéos / Tableau
+    // détaillé entries in the sidebar still filter to a single section
+    // when the user wants to focus on one.
     const views = ['Dashboard', 'Accounts', 'Videos', 'Table'];
     const activeView = navView ? navView : 'dashboard';
-    const targetId = 'view' + activeView.charAt(0).toUpperCase() + activeView.slice(1);
+    const visible = (activeView === 'dashboard')
+      ? new Set(['viewDashboard', 'viewVideos', 'viewTable'])
+      : new Set(['view' + activeView.charAt(0).toUpperCase() + activeView.slice(1)]);
     views.forEach(v => {
       const el = document.getElementById('view' + v);
-      if (el) el.hidden = (el.id !== targetId);
+      if (el) el.hidden = !visible.has(el.id);
     });
 
-    // 5. Filter bar (period pills + custom dates + project + account chips)
-    // visible on Dashboard + Comptes + Tableau.
-    const showFilterBar = !navView || navView === 'accounts' || navView === 'table';
+    // 5. Filter bar visible on every analytics view (all of them respect dates).
     const filterBar = document.querySelector('.filter-bar');
-    if (filterBar) filterBar.hidden = !showFilterBar;
+    if (filterBar) filterBar.hidden = false;
     // Export CSV stays Dashboard-only — the secondary views export an
     // unrelated cut.
     const exportBtn = document.getElementById('btnExportCsv');
@@ -3743,16 +3759,18 @@ console.log('%c[TL] dashboard build v=2026-05-10-videos-reorder', 'color:#FF69B4
     const prevComp = isCompetitorScope;
     isCompetitorScope = !!isComp;
     try {
-      // Common to all views — load() always fetches these
+      // Common to all views
       cachedJSON(buildStatsURL());
       cachedJSON(buildAccountsURL(), []);
       cachedJSON('/api/projects', []);
-      cachedJSON(buildEvolutionURL(), []); // for the weekly chart on dashboard
-      // Per-view extras
-      if (view === 'videos') {
+      cachedJSON(buildEvolutionURL(), []);
+      // Dashboard is now the all-in-one page: it needs the union of every
+      // per-view fetch. Specific view links only need their own slice.
+      if (!view || view === 'dashboard' || view === 'videos') {
         cachedJSON(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount)), []);
         cachedJSON(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount)), []);
-      } else if (view === 'table') {
+      }
+      if (!view || view === 'dashboard' || view === 'table') {
         cachedJSON(buildVideosAllURL(), []);
       }
     } finally {
