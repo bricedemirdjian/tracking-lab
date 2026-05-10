@@ -113,7 +113,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-10-no-cache")
+    response.headers.setdefault("X-Build-Version", "2026-05-10-mgr-bottom")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -177,14 +177,10 @@ def dashboard():
 @app.route("/dashboard/preview")
 @login_required
 def dashboard_preview():
-    """Standalone preview of the Salesia-cloned redesign.
-
-    Independent route — does NOT touch /dashboard. Self-contained template
-    (own CSS+JS inline). Hits /api/stats and /api/accounts via plain fetch.
-    Once the user validates visually, dashboard-salesia.html can be promoted
-    to dashboard.html with proper wiring of the legacy app.js handlers.
+    """Legacy preview route — Salesia design has been promoted to /dashboard.
+    Redirect any old bookmarks so users always land on the live UI.
     """
-    return render_template("dashboard-salesia.html", user=current_user)
+    return redirect("/dashboard", code=301)
 
 
 @app.route("/admin")
