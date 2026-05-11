@@ -71,17 +71,30 @@ if IS_PRODUCTION:
 # internal subdomain into OAuth redirect_uri, Stripe success URLs, and the
 # flask-login `next=` query param.
 #
-# Setting CANONICAL_HOST in the env (e.g. CANONICAL_HOST=www.trackinglab.online)
-# forces every URL Flask builds to use that host. Set it on the Vercel
-# `tracking-lab` project once the migration is live; leave unset for local
-# dev or direct app.trackinglab.online access (where host_url is already
-# correct).
+# Fix: inject a WSGI middleware AFTER ProxyFix that forces HTTP_HOST to
+# CANONICAL_HOST. WSGI level (not @app.before_request) because Werkzeug's
+# request.host is a cached_property — by the time before_request fires,
+# downstream hooks may have already cached the wrong value.
+#
+# Order matters: this wrapper goes OUTSIDE ProxyFix so it runs FIRST in the
+# request chain (`outer(inner(app))` → outer's __call__ runs first), giving
+# Flask a fully canonicalized environ before any cached_property fires.
 _CANONICAL_HOST = os.environ.get('CANONICAL_HOST', '').strip()
 if _CANONICAL_HOST:
-    @app.before_request
-    def _force_canonical_host():
-        request.environ['HTTP_HOST'] = _CANONICAL_HOST
-        request.environ['wsgi.url_scheme'] = 'https'
+    class CanonicalHostMiddleware:
+        def __init__(self, wsgi_app, host):
+            self.wsgi_app = wsgi_app
+            self.host = host
+
+        def __call__(self, environ, start_response):
+            environ['HTTP_HOST'] = self.host
+            environ['SERVER_NAME'] = self.host
+            environ['wsgi.url_scheme'] = 'https'
+            environ['HTTP_X_FORWARDED_HOST'] = self.host
+            environ['HTTP_X_FORWARDED_PROTO'] = 'https'
+            return self.wsgi_app(environ, start_response)
+
+    app.wsgi_app = CanonicalHostMiddleware(app.wsgi_app, _CANONICAL_HOST)
 
 # Rate limiting — in-memory storage (fine for single-instance Render).
 # If we scale horizontally, swap storage_uri to Redis.
@@ -134,7 +147,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-11-debug-host")
+    response.headers.setdefault("X-Build-Version", "2026-05-11-canonical-wsgi")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
