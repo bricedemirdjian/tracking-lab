@@ -80,13 +80,43 @@ if IS_PRODUCTION:
 # request chain (`outer(inner(app))` → outer's __call__ runs first), giving
 # Flask a fully canonicalized environ before any cached_property fires.
 _CANONICAL_HOST = os.environ.get('CANONICAL_HOST', '').strip()
+# Hosts that should 308-redirect to CANONICAL_HOST (deprecated subdomains).
+# Comma-separated env var; e.g. "app.trackinglab.online" during migration.
+# Exclude /webhook/* from the redirect so Stripe webhooks with the old URL
+# in flight still land cleanly.
+_LEGACY_HOSTS = {
+    h.strip().lower()
+    for h in os.environ.get('LEGACY_HOSTS', '').split(',')
+    if h.strip()
+}
 if _CANONICAL_HOST:
     class CanonicalHostMiddleware:
-        def __init__(self, wsgi_app, host):
+        def __init__(self, wsgi_app, host, legacy_hosts=None):
             self.wsgi_app = wsgi_app
             self.host = host
+            self.legacy_hosts = legacy_hosts or set()
 
         def __call__(self, environ, start_response):
+            original_host = environ.get('HTTP_HOST', '').split(':')[0].lower()
+            path = environ.get('PATH_INFO', '/')
+            # 308-redirect deprecated subdomains to the canonical host, but
+            # keep /webhook/* and /api/cron/* live on the old URL as a safety
+            # net for any legacy callers still pointed there.
+            if (original_host in self.legacy_hosts
+                    and not path.startswith('/webhook/')
+                    and not path.startswith('/api/cron/')):
+                query = environ.get('QUERY_STRING', '')
+                target = f'https://{self.host}{path}'
+                if query:
+                    target = f'{target}?{query}'
+                start_response('308 Permanent Redirect', [
+                    ('Location', target),
+                    ('Content-Type', 'text/plain; charset=utf-8'),
+                    ('Cache-Control', 'no-store'),
+                ])
+                return [b'Moved to ' + target.encode('utf-8')]
+            # Otherwise rewrite host to the canonical so downstream URL builders
+            # (host_url, url_for _external, flask-login next=) use it.
             environ['HTTP_HOST'] = self.host
             environ['SERVER_NAME'] = self.host
             environ['wsgi.url_scheme'] = 'https'
@@ -94,7 +124,7 @@ if _CANONICAL_HOST:
             environ['HTTP_X_FORWARDED_PROTO'] = 'https'
             return self.wsgi_app(environ, start_response)
 
-    app.wsgi_app = CanonicalHostMiddleware(app.wsgi_app, _CANONICAL_HOST)
+    app.wsgi_app = CanonicalHostMiddleware(app.wsgi_app, _CANONICAL_HOST, _LEGACY_HOSTS)
 
 # Rate limiting — in-memory storage (fine for single-instance Render).
 # If we scale horizontally, swap storage_uri to Redis.
@@ -147,7 +177,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-11-canonical-live")
+    response.headers.setdefault("X-Build-Version", "2026-05-11-legacy-308")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
