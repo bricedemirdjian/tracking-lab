@@ -134,7 +134,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-10-canonical-host")
+    response.headers.setdefault("X-Build-Version", "2026-05-11-debug-host")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -154,6 +154,23 @@ def _security_headers(response):
 init_db()
 init_auth(app)
 app.register_blueprint(auth_bp)
+
+
+# TEMP diagnostic endpoint — surfaces what Flask sees for host/proxy headers.
+# To remove after verifying the CANONICAL_HOST migration. No secrets exposed.
+@app.route("/__debug/host")
+def __debug_host():
+    return jsonify({
+        "canonical_host_env": os.environ.get('CANONICAL_HOST', '<UNSET>'),
+        "canonical_host_imported": _CANONICAL_HOST,
+        "middleware_active": bool(_CANONICAL_HOST),
+        "request_host": request.host,
+        "request_host_url": request.host_url,
+        "request_url": request.url,
+        "header_host": request.headers.get('Host'),
+        "header_x_forwarded_host": request.headers.get('X-Forwarded-Host'),
+        "is_production": IS_PRODUCTION,
+    })
 
 
 def admin_required(f):
