@@ -601,6 +601,7 @@ def _refresh_youtube_last_updated(username: str, user_id: int):
             "WHERE username = %s AND user_id = %s AND platform = %s",
             (username, user_id, 'youtube')
         )
+        conn.commit()  # _execute() does NOT auto-commit — same pattern as TT/IG refreshers
     finally:
         conn.close()
 
