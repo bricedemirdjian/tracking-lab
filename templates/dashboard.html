@@ -4084,17 +4084,40 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     state.account = e.target.value;
     load();
   });
-  document.getElementById('filterDateFrom').addEventListener('change', e => {
-    state.date_from = e.target.value || null;
-    state.range = null;
-    setActivePill('custom');
-    load();
-  });
-  document.getElementById('filterDateTo').addEventListener('change', e => {
-    state.date_to = e.target.value || null;
-    state.range = null;
-    setActivePill('custom');
-    load();
+  // Debounced custom-date filter handler. Wired to BOTH 'change' and 'input'
+  // events because input[type=date] is browser-flaky:
+  //   - Chrome fires `change` on picker close, `input` on picker tick — both
+  //     usually safe.
+  //   - Safari sometimes only fires `change` on blur, not on picker selection,
+  //     so the user clicks a date and nothing happens until they tab away.
+  //   - Firefox skips `change` entirely when the user types digits + Enter.
+  // Listening to both events + debouncing 250ms covers all of them without
+  // double-fetching.
+  let _dateFilterTimer = null;
+  function _onDateFilterEdit() {
+    const fromEl = document.getElementById('filterDateFrom');
+    const toEl = document.getElementById('filterDateTo');
+    const fromVal = fromEl && fromEl.value ? fromEl.value : null;
+    const toVal = toEl && toEl.value ? toEl.value : null;
+    // Only fire when BOTH dates are set + valid + from <= to. Otherwise we'd
+    // hit /api/stats with a half-formed range and render zeros.
+    if (!fromVal || !toVal) return;
+    if (fromVal > toVal) return;
+    if (state.date_from === fromVal && state.date_to === toVal && state.range == null) return;
+    clearTimeout(_dateFilterTimer);
+    _dateFilterTimer = setTimeout(() => {
+      state.date_from = fromVal;
+      state.date_to = toVal;
+      state.range = null;
+      setActivePill('custom');
+      // Invalidate any stale entries cached against the prior filter URLs.
+      clearFetchCache();
+      load();
+    }, 250);
+  }
+  ['change', 'input'].forEach(ev => {
+    document.getElementById('filterDateFrom').addEventListener(ev, _onDateFilterEdit);
+    document.getElementById('filterDateTo').addEventListener(ev, _onDateFilterEdit);
   });
   document.getElementById('filterReset').addEventListener('click', () => {
     state.project_id = 'all';
