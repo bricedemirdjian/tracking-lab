@@ -177,7 +177,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-11-datefilter-fix")
+    response.headers.setdefault("X-Build-Version", "2026-05-11-scrape-fix")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -1178,11 +1178,16 @@ def api_cron_daily_scrape():
 @app.route("/api/cron/scrape-tiktok-youtube", methods=["GET"])
 @limiter.limit("20 per hour", key_func=get_remote_address)
 def api_cron_scrape_tiktok_youtube():
-    """Hourly cron — TikTok + YouTube only."""
+    """Hourly cron — TikTok + YouTube + LinkedIn.
+
+    Route name kept for backwards-compat with the existing GitHub Actions
+    workflow + .env-pinned monitors. LinkedIn was added 2026-05-11 because
+    it had no cron of its own and was drifting >24h stale.
+    """
     err = _cron_auth_check()
     if err:
         return err
-    return _cron_scrape(platform_filter=["tiktok", "youtube"])
+    return _cron_scrape(platform_filter=["tiktok", "youtube", "linkedin"])
 
 
 @app.route("/api/cron/scrape-instagram", methods=["GET"])

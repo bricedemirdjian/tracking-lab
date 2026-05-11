@@ -580,6 +580,31 @@ async def fetch_tiktok_async(username: str, user_id: Optional[int] = None) -> An
 _YT_CACHE_HIT = object()
 
 
+def _refresh_youtube_last_updated(username: str, user_id: int):
+    """Cache-hit path for YouTube: bump last_updated so the cron's freshness
+    throttle reflects that we DID check the channel (we just didn't refetch
+    video details because the listing count matches DB).
+
+    Unlike TT/IG which refresh full profile stats on cache hit, YouTube's
+    pass-1 listing doesn't include channel-level stats (subscribers count
+    isn't exposed by yt-dlp's flat listing). A separate channel-stats fetch
+    would double the cron cost; for now we just touch the timestamp so the
+    account doesn't drift into 'stale > 24h' even though we're checking
+    every cron cycle. Followers update on the next pass-2 (triggered when
+    a new video is detected)."""
+    from database import get_connection, _execute
+    conn = get_connection()
+    try:
+        _execute(
+            conn,
+            "UPDATE accounts SET last_updated = NOW() "
+            "WHERE username = %s AND user_id = %s AND platform = %s",
+            (username, user_id, 'youtube')
+        )
+    finally:
+        conn.close()
+
+
 # ── YouTube (yt-dlp wrapped, 2-pass: listing + parallel details) ─────
 async def fetch_youtube_async(username: str, user_id: Optional[int] = None) -> Any:
     """
@@ -615,6 +640,7 @@ async def fetch_youtube_async(username: str, user_id: Optional[int] = None) -> A
             _count_videos_in_db_sync, username, user_id, "youtube"
         )
         if db_count >= len(listing):
+            await asyncio.to_thread(_refresh_youtube_last_updated, username, user_id)
             print(
                 f"  [YouTube] @{username}: cache hit "
                 f"({db_count}/{len(listing)} videos in DB) — skipping pass 2"
