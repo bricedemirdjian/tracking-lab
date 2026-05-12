@@ -1,131 +1,182 @@
 # Migration: app.trackinglab.online → trackinglab.online (single domain)
 
-**Goal:** All user-facing URLs live under `trackinglab.online`. Marketing landing on `/`, authenticated SaaS app on `/dashboard`, `/account`, `/billing`, `/admin`, `/api/*`, `/auth/*`, `/login`, `/logout`, `/webhook/*`, `/healthz`. The `app.trackinglab.online` subdomain becomes a transitional alias and eventually 301-redirects to the apex.
+**Status:** ✅ Complete (2026-05-12). Canonical domain is now `trackinglab.online` (apex, no `www.`). `www.*` and `app.*` both 308-redirect to it. This document is preserved as the post-mortem + rollback reference.
 
-**Why:** Single domain = single cookie scope = Stripe receipts that look professional, OAuth flows that don't bounce subdomains, fewer DNS/cert moving parts, cleaner brand for paying customers.
-
-**Architecture after migration:**
-- `trackinglab.online` → Vercel project `tracking-lab-v2` (Next.js landing) acting as reverse-proxy. Marketing routes (`/`, `/sitemap.xml`, `/robots.txt`) served by Next; everything else proxied to Flask via `next.config.js` `beforeFiles` rewrites.
-- `tracking-lab` Vercel project (Flask) keeps `app.trackinglab.online` as a hidden internal domain that Next.js calls server-to-server. Customers never see it.
+**Why we did it:** Single domain = single cookie scope = Stripe receipts that look professional, OAuth flows that don't bounce subdomains, fewer DNS/cert moving parts, cleaner brand for paying customers.
 
 ---
 
-## Code changes already shipped (this commit)
+## Final architecture
 
-- `.github/workflows/scrape-cron.yml` — both cron triggers read `${{ vars.APP_URL || 'https://app.trackinglab.online' }}`. Defaults preserved, flip via repo variable.
-- `.github/workflows/keep-warm.yml` — same `APP_URL` env pattern.
-- `monitor/.github/workflows/scraper.yml` — `TARGET_URL` reads `vars.APP_URL`.
-- `monitor/README.md`, `monitor/package.json`, `scripts/bulk_add_accounts.py`, `CLAUDE.md` — text references updated.
-- `v2/landing/next.config.js` — `beforeFiles` rewrites added for every authenticated path → Flask backend (env-overridable via `FLASK_BACKEND_URL`).
+```
+                        ┌─────────────────────────────────────┐
+  user                  │   trackinglab.online (CANONICAL)   │
+   │                    │   Vercel project: tracking-lab-v2  │
+   ▼                    │   Framework: Next.js                │
+ trackinglab.online ───▶│                                     │
+                        │   /              → Next landing     │
+                        │   /sitemap.xml   → Next             │
+                        │   /robots.txt    → Next             │
+                        │   /opengraph-img → Next             │
+                        │                                     │
+                        │   /dashboard, /account, /billing,  │
+                        │   /admin/*, /auth/*, /api/*,        │
+                        │   /webhook/*, /login, /login/*,     │
+                        │   /logout, /healthz                 │
+                        │     │                               │
+                        │     │ beforeFiles rewrites          │
+                        │     ▼                               │
+                        │   https://tracking-lab-nine.vercel.app  ──▶  Flask
+                        └─────────────────────────────────────┘
 
-**Nothing in `app.py` / `auth.py` needs to change.** Flask uses `request.host_url` for OAuth callback URL (`auth.py:100`) and Stripe success/cancel URLs (`app.py:367, 389`), so it self-adapts to whatever domain the request arrived on.
+  www.trackinglab.online ──308──▶ trackinglab.online      (Vercel domain redirect)
+  app.trackinglab.online ──308──▶ trackinglab.online      (Flask WSGI middleware)
+                                  EXCEPT /webhook/* and /api/cron/* — those keep
+                                  serving directly on app.* as a safety net for
+                                  any legacy client still pointed there.
+```
+
+**Two Vercel projects, two GitHub repos:**
+- `tracking-lab-v2` (Next.js landing, bricedemirdjian/tracking-lab-v2) owns `trackinglab.online` + `www.trackinglab.online`. Acts as reverse-proxy for everything except `/`, sitemap, robots, opengraph.
+- `tracking-lab` (Flask SaaS, bricedemirdjian/tracking-lab — this repo) owns `app.trackinglab.online` + the internal alias `tracking-lab-nine.vercel.app`. Customers never see either.
+
+**Flask code that makes the migration work:**
+- `app.py` `CanonicalHostMiddleware` (WSGI level, NOT `@app.before_request` — Werkzeug `cached_property` traps overrides if run after the request object is built).
+  - Reads `CANONICAL_HOST` env var → rewrites `HTTP_HOST` for outbound URLs (OAuth `redirect_uri`, Stripe success URLs, flask-login `next=`, anything built via `url_for(_external=True)` or `request.host_url`).
+  - Reads `LEGACY_HOSTS` env var (comma-separated) → 308-redirects requests whose original `Host` is in that list, EXCEPT `/webhook/*` and `/api/cron/*` paths.
+- `auth.py` and `app.py` Stripe handlers are unchanged: they use `request.host_url` and `url_for(_external=True)` which now correctly resolve to apex thanks to the middleware.
+
+**Required env vars on the `tracking-lab` Vercel project (Production):**
+- `CANONICAL_HOST=trackinglab.online`
+- `LEGACY_HOSTS=app.trackinglab.online,www.trackinglab.online`
+
+**Required env var on the `tracking-lab` GitHub repo (Actions Variables):**
+- `APP_URL=https://trackinglab.online`
 
 ---
 
-## User-side UI steps (in order — each one is a hard checkpoint)
+## What got shipped, in order (commits on `bricedemirdjian/tracking-lab` main unless noted)
 
-### 1. Deploy the v2 landing with new rewrites (BLOCKER for everything else)
+| # | Date | Commit | What |
+|---|---|---|---|
+| 1 | 2026-05-10 | `830e2c4` | Parameterize GH Actions `APP_URL`, monitor `TARGET_URL`, doc updates |
+| 2 | 2026-05-10 | `aa8efae` *(v2 repo)* | `v2/landing/next.config.js` `beforeFiles` rewrites for proxied paths |
+| 3 | 2026-05-10 | `97280c4` *(v2)* | Fix `:path*` empty-match bug — switched to `:path+` |
+| 4 | 2026-05-10 | `ded961e` | First `CANONICAL_HOST` middleware (broken — `@app.before_request` hit Werkzeug cached_property issue) |
+| 5 | 2026-05-10 | `5d5ae36` | Temp `/__debug/host` endpoint to verify what Flask sees |
+| 6 | 2026-05-10 | `fd6577d` | `CanonicalHostMiddleware` rewritten at WSGI level (the actual fix) |
+| 7 | 2026-05-11 | `057c3ff` | Remove `/__debug/host` after verification |
+| 8 | 2026-05-11 | `552a71f` *(v2)* | Add `/login/:path+` to rewrites (OAuth init was 404) |
+| 9 | 2026-05-11 | `2dd29fd` *(v2)* | Swap proxy backend `app.trackinglab.online` → `tracking-lab-nine.vercel.app` so the 308 doesn't loop |
+| 10 | 2026-05-11 | `e23eaa8` | `LEGACY_HOSTS` 308-redirect middleware (excludes `/webhook/*` and `/api/cron/*`) |
+| 11 | 2026-05-12 | (env var only) | `CANONICAL_HOST=trackinglab.online`, `LEGACY_HOSTS=app.trackinglab.online,www.trackinglab.online` |
 
-The `v2/landing/next.config.js` change must reach prod before users will see any of the new routing.
+---
+
+## User-side UI steps that were performed (kept here for rollback / re-do)
+
+### Vercel `tracking-lab-v2` project
+- Domain `www.trackinglab.online` configured to **308 Permanent Redirect → trackinglab.online**
+
+### Vercel `tracking-lab` project (Flask)
+- Env var **`CANONICAL_HOST=trackinglab.online`** (Production)
+- Env var **`LEGACY_HOSTS=app.trackinglab.online,www.trackinglab.online`** (Production)
+- Domain `app.trackinglab.online` kept as `Connect to environment: Production` (Flask middleware handles the redirect, not Vercel — needed because Vercel UI can only redirect to domains on the SAME project, and the target domain lives on the other project)
+
+### Google Cloud Console — OAuth 2.0 Client
+- Authorized redirect URIs (in order; keep all five during the transition):
+  1. `https://tracking-lab.onrender.com/auth/callback` *(legacy Render — can be removed)*
+  2. `https://tracking-lab-nine.vercel.app/auth/callback` *(legacy direct — can be removed)*
+  3. `https://app.trackinglab.online/auth/callback` *(legacy, keep ~1 week)*
+  4. `https://trackinglab.online/auth/callback` ✅ **(canonical, used by Flask redirect_uri now)**
+  5. `https://www.trackinglab.online/auth/callback` *(transitional, keep ~1 week)*
+
+### Stripe dashboard — Webhooks
+- Endpoint URL: `https://trackinglab.online/webhook/stripe`
+- Signing secret: **unchanged** (the `STRIPE_WEBHOOK_SECRET` env var on Vercel still works)
+
+### GitHub repo `bricedemirdjian/tracking-lab` — Actions Variables
+- `APP_URL=https://trackinglab.online`
+
+---
+
+## Verification commands (re-run anytime to confirm health)
 
 ```bash
-cd "/Users/briique/Desktop/CLAUDE CODE/TRACKING LAB/v2/landing"
-vercel --prod --yes
+# 1. Apex serves Next landing
+curl -sI https://trackinglab.online/ | head -1
+# → HTTP/2 200
+
+# 2. www. 308-redirects to apex
+curl -sI https://www.trackinglab.online/ | grep -i "^location"
+# → location: https://trackinglab.online/
+
+# 3. app. 308-redirects to apex (browser paths)
+curl -sI https://app.trackinglab.online/dashboard | grep -i "^location"
+# → location: https://trackinglab.online/dashboard
+
+# 4. Stripe webhook still lands on Flask via apex
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST https://trackinglab.online/webhook/stripe \
+  -H "Content-Type: application/json" -d '{}'
+# → HTTP 400  (signature missing, but Flask received it = good)
+
+# 5. Stripe webhook safety net on app. (excluded from 308)
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST https://app.trackinglab.online/webhook/stripe \
+  -H "Content-Type: application/json" -d '{}'
+# → HTTP 400  (still served directly, not redirected)
+
+# 6. Cron endpoint safety net on app. (excluded from 308)
+curl -s -o /dev/null -w "HTTP %{http_code}\n" https://app.trackinglab.online/api/cron/scrape-instagram
+# → HTTP 401  (auth missing, but Flask received it = good)
+
+# 7. OAuth init builds the canonical redirect_uri
+curl -sI https://trackinglab.online/login/google | grep -i "^location:" | \
+  grep -oE "redirect_uri=[^&]+" | sed 's/redirect_uri=//' | \
+  python3 -c "import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))"
+# → https://trackinglab.online/auth/callback
+
+# 8. flask-login next= param uses canonical
+curl -sI https://trackinglab.online/account | grep -i "^location"
+# → location: /login?next=https://trackinglab.online/account
+
+# 9. Flask build version (proves which deploy is live)
+curl -sI https://trackinglab.online/healthz | grep -i "x-build-version"
 ```
 
-Or, if you've fixed the GitHub→Vercel auto-deploy (see "Permanent fix" in the project memory): a `git push` will do it.
+---
 
-**Verify:** `curl -sI https://trackinglab.online/healthz` should return `200 OK` (proxied through Next → Flask). Before this step, `/healthz` returns the Next 404. If you see the 404 you got it wrong — check the rewrite block in `next.config.js`.
+## Rollback playbook (per step, in case any future change breaks something)
 
-### 2. Set `CANONICAL_HOST` env var on the Flask Vercel project (BEFORE OAuth!)
-
-When the Flask app sits behind the Next.js proxy, Vercel infrastructure restamps `X-Forwarded-Host` with the internal destination (`app.trackinglab.online`), so Flask's `ProxyFix(x_host=1)` returns the wrong host. Without this env var, every URL Flask builds — OAuth `redirect_uri`, Stripe success/cancel URLs, the flask-login `next=` query param — leaks `app.trackinglab.online` into the user-facing flow. Verified by the curl `next=https://app.trackinglab.online/account` we saw immediately after step 1.
-
-- Vercel dashboard → `tracking-lab` project → Settings → Environment Variables
-- "Add" → Key: `CANONICAL_HOST`, Value: `www.trackinglab.online`, Environments: ✓ Production
-- Save → Vercel auto-triggers a redeploy of the Flask project (~30-60s)
-
-Wait for the redeploy to finish (`curl -sI https://app.trackinglab.online/dashboard | grep x-build-version` should reflect a new build timestamp).
-
-**Verify:** `curl -sI https://www.trackinglab.online/account` should now show `location: /login?next=https://www.trackinglab.online/account` (canonical host) instead of `app.trackinglab.online`. If you still see `app.trackinglab.online` in the `next=` param, the env var isn't set or the Flask project hasn't redeployed yet.
-
-### 3. Add the new OAuth callback URL in Google Cloud Console
-
-The Flask `auth_callback` route uses `url_for(..., _external=True)` which derives the redirect URI from `request.host_url`. When users start the OAuth flow on `trackinglab.online`, Google must accept `https://trackinglab.online/auth/callback` as a valid redirect URI.
-
-- Open https://console.cloud.google.com/apis/credentials
-- Pick the OAuth 2.0 Client ID for Tracking Lab
-- "Authorized redirect URIs" → ADD `https://trackinglab.online/auth/callback`
-- KEEP the existing `https://app.trackinglab.online/auth/callback` (transitional safety net)
-- Save
-
-**Verify:** open `https://trackinglab.online/login` in an incognito window, click "Continue with Google". The Google consent screen should NOT show the "this app's request is invalid" error. If it does, the redirect URI hasn't propagated yet (can take up to 5 min), or you typed it wrong.
-
-### 4. Update the Stripe webhook URL
-
-Stripe POSTs subscription events to a fixed URL. Currently set to `app.trackinglab.online/webhook/stripe`. After migration we want events on the apex.
-
-- Open https://dashboard.stripe.com/webhooks
-- Pick the Tracking Lab endpoint
-- "Endpoint URL" → change to `https://trackinglab.online/webhook/stripe`
-- Save (Stripe re-issues a signing secret if you click "Roll signing secret" — DO NOT roll, keep current secret so existing `STRIPE_WEBHOOK_SECRET` env var keeps working)
-
-**Verify:** in Stripe dashboard → Webhooks → click the endpoint → "Send test webhook" → choose `customer.subscription.updated` → send. Within 10s a green check should appear in the dashboard event log. If red, check Vercel function logs of the `tracking-lab` project for the inbound POST.
-
-### 5. Flip the GitHub Actions to hit the new domain
-
-Once steps 1-3 work end-to-end on `trackinglab.online`, update the cron + keep-warm workflows to use the apex:
-
-- GitHub repo `bricedemirdjian/tracking-lab` → Settings → Secrets and variables → Actions → "Variables" tab → "New repository variable"
-- Name: `APP_URL`
-- Value: `https://trackinglab.online`
-- Save
-
-The next workflow run will pick it up. The fallback in the YAML keeps `app.trackinglab.online` working if the variable is unset, so this step is reversible.
-
-**Verify:** trigger the workflow manually (Actions → "Hourly Scrape Cron" → "Run workflow") and check the log shows `https://trackinglab.online/api/cron/...` in the curl output.
-
-### 6. (Optional, after steady state) 301-redirect app.* to apex
-
-Once you've watched `trackinglab.online` for a week without auth/billing regressions, retire the `app.*` subdomain:
-
-**Option A — Vercel domain config (no code change):**
-- Vercel dashboard → `tracking-lab` project → Settings → Domains → `app.trackinglab.online` → "Redirect to" → `trackinglab.online` → 301
-
-**Option B — Flask middleware (more control):** add to `app.py` `_security_headers()`:
-```python
-if request.host == 'app.trackinglab.online' and not request.path.startswith('/webhook/'):
-    return redirect(f'https://trackinglab.online{request.full_path}', code=301)
-```
-(Keep `/webhook/` accessible directly so any Stripe webhook still pinned to the old URL during a window keeps delivering.)
-
-**Verify:** `curl -sI https://app.trackinglab.online/dashboard` returns `301` and `Location: https://trackinglab.online/dashboard`.
+- **Apex broken (Next landing 5xx):** Vercel dashboard → `tracking-lab-v2` project → Deployments → previous successful one → "..." → "Promote to Production".
+- **Proxy rewrites broken (e.g. `/dashboard` 404 again):** revert `v2/landing/next.config.js` and `vercel --prod` from `v2/landing/`. Verify the FLASK_BACKEND points to `https://tracking-lab-nine.vercel.app` (NOT `app.trackinglab.online`, otherwise it loops with the WSGI 308).
+- **OAuth fails ("redirect_uri mismatch"):** check Google Cloud Console has `https://trackinglab.online/auth/callback` in the authorized redirect URIs. If not, add it; takes ~5 min to propagate.
+- **Stripe webhooks silently failing:** Stripe dashboard → Webhooks → click the endpoint → check the recent deliveries log. Common causes: webhook URL still pointing at `www.` or `app.` (look at the endpoint config), or signing secret rotated when it shouldn't have been (compare `STRIPE_WEBHOOK_SECRET` on Vercel).
+- **Cron failing 308 instead of 200:** check GH repo Actions Variables has `APP_URL=https://trackinglab.online`. If the var is missing, workflows fall back to `https://app.trackinglab.online` which still works (the cron paths are in the LEGACY_HOSTS exclusion list).
+- **All of Flask 500-ing:** check Vercel env vars on `tracking-lab` project — `CANONICAL_HOST` and `LEGACY_HOSTS` must be set. If missing, the middleware no-ops cleanly so this would only manifest as the OLD bug (URLs leaking `app.trackinglab.online`), not a 500. A 500 storm suggests a different cause.
+- **Direct `app.*` access broken (browser shows redirect loop):** the LEGACY_HOSTS middleware excludes `/webhook/*` and `/api/cron/*` but redirects everything else. A loop would only occur if `app.trackinglab.online` is also in the proxy chain — verify `v2/landing/next.config.js` uses `tracking-lab-nine.vercel.app`, NOT `app.trackinglab.online`.
 
 ---
 
-## Rollback plan
+## Known gotchas discovered during this migration (preserved for future migrations)
 
-If anything breaks at any step:
+1. **Werkzeug's `request.host` is a `cached_property`.** If you try to rewrite `HTTP_HOST` via `@app.before_request`, by the time your hook fires, some upstream hook (login_manager, CSRF, etc.) has already read `request.host`, locked the cached value, and your override has no effect. The fix is to run the rewrite at the WSGI layer, before Flask constructs the request object. See `CanonicalHostMiddleware` in `app.py`.
 
-- **Step 1 broken** (rewrites bad): redeploy the previous v2 landing build via Vercel dashboard → `tracking-lab-v2` project → Deployments → previous successful one → "..." → "Promote to Production"
-- **Step 2 broken** (OAuth): revert nothing — adding a redirect URI is purely additive. Just remove the new one from Google Console.
-- **Step 3 broken** (Stripe): change the webhook URL back to `app.trackinglab.online/webhook/stripe`.
-- **Step 4 broken** (cron): delete the `APP_URL` repo variable. Workflows fall back to the hardcoded default.
-- **Step 5 broken** (redirect): remove the redirect rule from Vercel or revert the app.py middleware patch.
+2. **Vercel restamps `X-Forwarded-Host` when proxying server-to-server.** The Next.js rewrites in `v2/landing/next.config.js` fetch the Flask backend over HTTP. When that internal request lands at Flask via the Vercel runtime, the X-Forwarded-Host header is set to the destination domain (`tracking-lab-nine.vercel.app`), not the original user-facing domain. That's why `ProxyFix(x_host=1)` alone isn't enough — we need `CANONICAL_HOST` to be a static config, not derived from request headers.
 
----
+3. **`_execute()` in `database.py` does NOT auto-commit.** All write helpers must explicitly call `conn.commit()` afterwards. Missed this in the YouTube cache-hit refresher and the UPDATE silently rolled back. Pattern to follow: see `_refresh_tiktok_stats_only` in `scraper_async.py`.
 
-## What CANNOT be done from CLI / code
+4. **`vercel env ls` always reports `Encrypted` regardless of the Sensitive flag.** Can't verify a value via CLI. To verify, either recreate the env var via the UI with Sensitive OFF (the dashboard then shows plaintext), or deploy a temp `/__debug` endpoint that echoes `os.environ.get('VAR_NAME')`. We used the latter — invaluable for catching the cached_property bug.
 
-- Vercel custom domain reconfiguration → user UI step
-- Google Cloud Console OAuth changes → user UI step
-- Stripe dashboard webhook URL → user UI step
-- GitHub repo Variables → user UI step
+5. **Next.js rewrite `:path*` matches empty.** A rewrite like `{ source: '/dashboard/:path*', destination: '$BACKEND/dashboard/:path*' }` ALSO matches `/dashboard` itself (with empty `:path*`) and proxies to `/dashboard/` (trailing slash). Flask's strict routing 404s on the trailing slash. Use `:path+` (one-or-more) when you want a true sub-path catch-all without empty match.
 
-These are all 2-3 minute clicks per platform. Total user time end-to-end: ~30 minutes including verification curls.
+6. **Vercel UI's "Redirect to Another Domain" only lists domains on the SAME project.** Can't redirect `app.trackinglab.online` (on `tracking-lab` project) to `trackinglab.online` (on `tracking-lab-v2` project) via the UI. Workaround: do the redirect in Flask middleware via `LEGACY_HOSTS`, OR `vercel.json` `redirects` array with a `has: host` condition.
+
+7. **`v2/landing/next.config.js` must NOT proxy to `app.trackinglab.online` once the 308 is live.** Doing so would cause infinite redirect loops on every proxied request. Use the Vercel-internal alias `tracking-lab-nine.vercel.app` instead — it's bound to the same Flask project but is exempt from the LEGACY_HOSTS redirect.
 
 ---
 
-## Open question: GitHub→Vercel auto-deploy on tracking-lab-v2
+## Optional follow-ups (when steady state is reached, ~7 days post-migration)
 
-Per `project_two_vercel_projects.md`, the v2 Vercel project has `link: NONE` — no Git connection. Step 1 above requires manual `vercel --prod` from the v2 directory. Until you connect the project to its GitHub repo (Vercel dashboard → Settings → Git → Connect Repository), every landing change requires the manual CLI deploy. Fix that hookup at any time; it's independent of the migration.
+- Remove the legacy redirect URIs from Google Cloud Console: `https://app.trackinglab.online/auth/callback`, `https://www.trackinglab.online/auth/callback`, `https://tracking-lab-nine.vercel.app/auth/callback`, `https://tracking-lab.onrender.com/auth/callback`. Keep only `https://trackinglab.online/auth/callback`.
+- Decommission `app.trackinglab.online` entirely (remove domain from Vercel `tracking-lab` project Settings → Domains). At that point the LEGACY_HOSTS exclusion logic for `/webhook/*` and `/api/cron/*` is no longer load-bearing and can be simplified.
+- Move the cron triggers off Vercel (per scaling-constraints memory: Vercel Hobby is non-commercial; eventually move scrape jobs to Supabase Edge Functions or a dedicated worker).
