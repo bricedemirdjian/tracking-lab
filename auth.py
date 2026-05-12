@@ -112,20 +112,16 @@ def auth_callback():
 
         user_email = userinfo['email'].strip().lower()
 
-        # ── Allowlist gate ────────────────────────────────────────────────
-        # Until the SaaS opens to public signup (paid plan = access), only
-        # explicitly-listed emails can sign in. Allowlist = ADMIN_EMAIL +
-        # MANAGER_EMAILS + ALLOWED_EMAILS env vars.
-        #
-        # If ALL three are unset, the gate is OFF (open signup) — useful for
-        # local dev. In production, at least ADMIN_EMAIL is always set, so
-        # the gate is always armed.
+        # Allowlist gate — opt-in via ENFORCE_ALLOWLIST=1. Public signup is
+        # open by default so the SaaS is commercializable. To re-arm the
+        # gate (e.g. private beta), set ENFORCE_ALLOWLIST=1 and populate
+        # ADMIN_EMAIL / MANAGER_EMAILS / ALLOWED_EMAILS.
         admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
         manager_emails = [e.strip().lower() for e in os.environ.get('MANAGER_EMAILS', '').split(',') if e.strip()]
         allowed_extra = [e.strip().lower() for e in os.environ.get('ALLOWED_EMAILS', '').split(',') if e.strip()]
         allowlist = {admin_email, *manager_emails, *allowed_extra} - {''}
 
-        if allowlist and user_email not in allowlist:
+        if os.environ.get('ENFORCE_ALLOWLIST') == '1' and allowlist and user_email not in allowlist:
             print(f"[Auth] Rejected sign-in: {user_email} not on allowlist")
             return render_template('blocked.html'), 403
 
