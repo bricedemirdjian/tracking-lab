@@ -140,7 +140,7 @@ def _ts_cast():
 # does a single SELECT against schema_meta — if the stored version matches,
 # every CREATE / migration is skipped (saves ~640ms per cold start). On
 # version mismatch, full init runs once and writes the new value.
-SCHEMA_VERSION = "2026-05-09-v1"
+SCHEMA_VERSION = "2026-05-12-error-tracking"
 
 
 def _is_schema_current(conn) -> bool:
