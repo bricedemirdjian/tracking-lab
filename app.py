@@ -316,7 +316,18 @@ def api_admin_scraping_health():
     from stripe_billing import get_scrape_cadence_hours
 
     cadence_h = get_scrape_cadence_hours("agency", is_admin=True)  # = 1h for admin
-    stale_threshold_h = cadence_h * 2
+
+    # Stale threshold accounts for the scheduled overnight pause: the cron
+    # only fires 9h-21h Paris time, so during the off window we'd see ~12h
+    # of legitimate gap. Tolerate up to 14h (12h pause + 2h margin) when
+    # outside business hours, otherwise enforce the tight 2× cadence.
+    try:
+        from zoneinfo import ZoneInfo
+        paris_hour = datetime.now(ZoneInfo("Europe/Paris")).hour
+    except Exception:
+        paris_hour = datetime.utcnow().hour  # fallback, may drift by DST
+    in_business = 9 <= paris_hour <= 21
+    stale_threshold_h = cadence_h * 2 if in_business else 14
 
     conn = get_connection()
     try:
