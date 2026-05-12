@@ -177,7 +177,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-12-today-expand")
+    response.headers.setdefault("X-Build-Version", "2026-05-12-api-today")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -845,6 +845,132 @@ def api_evolution():
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
     data = get_daily_evolution(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(data)
+
+
+@app.route("/api/today")
+@login_required
+def api_today():
+    """Posts published today + views gained today, computed server-side.
+
+    Replaces the JS-side delta computation that was producing 0 views even
+    when daily_snapshots had clear positive deltas — the cause appeared to
+    be timezone or cache-staleness in /api/evolution. By computing here
+    against CURRENT_DATE in Postgres, we get one source of truth tied to
+    server-local time.
+
+    Returns:
+      {
+        "date":       "YYYY-MM-DD",      # CURRENT_DATE on the DB server
+        "posts": {
+          "total":       int,
+          "by_platform": { "tiktok": int, ... },
+          "list":        [ { platform, username, views, title } ],
+        },
+        "views": {
+          "total":       int,
+          "by_platform": { "tiktok": int, ... },
+          "list":        [ { platform, username, delta } ],
+        }
+      }
+    """
+    from database import get_connection, _fetchall, _fetchone
+    uid = current_user.data_user_id
+    project_id = request.args.get("project_id")
+    is_competitor = request.args.get("competitor") == "true"
+    project_usernames = _resolve_project_usernames(uid, project_id)
+    project_usernames = _resolve_competitor_usernames(uid, request.args.get("competitor"), project_usernames)
+
+    conn = get_connection()
+    try:
+        # ── 1. Posts published today (videos.create_time on today's local date) ──
+        posts_q = """
+            SELECT v.platform, v.account_username AS username,
+                   COALESCE(v.views, 0) AS views,
+                   COALESCE(v.description, '') AS title
+            FROM videos v
+            WHERE v.user_id = %s
+              AND v.create_time::date = CURRENT_DATE
+        """
+        posts_params = [uid]
+        if project_usernames:
+            posts_q += " AND v.account_username IN (" + ",".join(["%s"] * len(project_usernames)) + ")"
+            posts_params.extend(project_usernames)
+        posts_q += " ORDER BY v.views DESC NULLS LAST LIMIT 200"
+        post_rows = _fetchall(conn, posts_q, posts_params)
+
+        # ── 2. Views gained today (today's snapshot minus the most-recent prior) ──
+        # JOIN today's snapshot row to the most recent snapshot strictly before
+        # today for the same (account, platform). LATERAL is the cleanest way.
+        views_q = """
+            SELECT t.account_username AS username, t.platform,
+                   GREATEST(0, t.total_views - p.total_views) AS delta
+            FROM daily_snapshots t
+            JOIN LATERAL (
+                SELECT total_views FROM daily_snapshots
+                WHERE user_id = t.user_id
+                  AND account_username = t.account_username
+                  AND platform = t.platform
+                  AND snapshot_date < t.snapshot_date
+                ORDER BY snapshot_date DESC
+                LIMIT 1
+            ) p ON true
+            WHERE t.user_id = %s
+              AND t.snapshot_date = CURRENT_DATE
+        """
+        views_params = [uid]
+        if project_usernames:
+            views_q += " AND t.account_username IN (" + ",".join(["%s"] * len(project_usernames)) + ")"
+            views_params.extend(project_usernames)
+        views_q += " ORDER BY delta DESC"
+        view_rows = _fetchall(conn, views_q, views_params)
+    finally:
+        conn.close()
+
+    posts_by_platform = {"tiktok": 0, "instagram": 0, "youtube": 0, "linkedin": 0}
+    posts_list = []
+    for r in post_rows:
+        platform = r.get("platform") or "tiktok"
+        if platform in posts_by_platform:
+            posts_by_platform[platform] += 1
+        posts_list.append({
+            "platform": platform,
+            "username": r.get("username") or "",
+            "views": int(r.get("views") or 0),
+            "title": (r.get("title") or "")[:60],
+        })
+
+    views_by_platform = {"tiktok": 0, "instagram": 0, "youtube": 0, "linkedin": 0}
+    views_list = []
+    total_views = 0
+    for r in view_rows:
+        delta = int(r.get("delta") or 0)
+        if delta <= 0:
+            continue
+        platform = r.get("platform") or "tiktok"
+        if platform in views_by_platform:
+            views_by_platform[platform] += delta
+        total_views += delta
+        views_list.append({
+            "platform": platform,
+            "username": r.get("username") or "",
+            "delta": delta,
+        })
+
+    # Use server-local current date so JS doesn't have to guess timezones
+    from datetime import date as _date
+    return jsonify({
+        "date": _date.today().isoformat(),
+        "posts": {
+            "total": len(posts_list),
+            "by_platform": posts_by_platform,
+            "list": posts_list,
+        },
+        "views": {
+            "total": total_views,
+            "by_platform": views_by_platform,
+            "list": views_list,
+        },
+    })
 
 
 @app.route("/api/best-videos")

@@ -2971,78 +2971,36 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
   // Counts videos with create_time = today + sums per-account view deltas
   // for the last snapshot pair where the most recent date is today.
   // No-ops on non-dashboard views (DOM elements don't exist there).
-  async function renderTodayCard(preloadedEvolution) {
+  async function renderTodayCard(_unusedEvolution) {
     const postEls = document.querySelectorAll('.todayPostsValue');
     const viewEls = document.querySelectorAll('.todayViewsValue');
     if (postEls.length === 0 && viewEls.length === 0) return; // no card in DOM (other view)
 
     const today = new Date();
-    const todayKey = today.toISOString().slice(0, 10); // YYYY-MM-DD
-
     // FR-formatted date for the sub-label, matches the page subtitle style.
     const dateLbl = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
     const dateLblCap = dateLbl[0].toUpperCase() + dateLbl.slice(1);
     document.querySelectorAll('.todayDateLabel').forEach(el => { el.textContent = dateLblCap; });
 
-    // Reuse the evolution we already have (passed in) — no extra fetch.
-    // For videos, cachedJSON returns instantly if renderTableCharts already
-    // fetched it in this load() pass.
-    const videos = await cachedJSON(buildVideosAllURL(), []);
+    // Source of truth: /api/today computes posts + view-deltas server-side
+    // against CURRENT_DATE in Postgres. Replaces the previous JS-side delta
+    // computation over evolution data, which was producing 0 views when
+    // snapshots clearly had positive deltas (timezone or cache staleness).
+    const todayURL = (() => {
+      const p = new URLSearchParams();
+      if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
+      p.set('competitor', isCompetitorScope ? 'true' : 'false');
+      return '/api/today?' + p.toString();
+    })();
+    const data = await cachedJSON(todayURL, { posts: { total: 0, by_platform: {}, list: [] }, views: { total: 0, by_platform: {}, list: [] } });
 
-    // ── Posts today: collect each video posted today ──
-    const postsList = []; // [{ platform, username, views, title }]
-    const postsByPlatform = { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
-    (videos || []).forEach(v => {
-      if (!v.create_time) return;
-      const d = new Date(v.create_time);
-      if (isNaN(d.getTime())) return;
-      const localKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      if (localKey === todayKey) {
-        const p = v.platform || 'tiktok';
-        if (postsByPlatform[p] != null) postsByPlatform[p] += 1;
-        postsList.push({
-          platform: p,
-          username: v.account_username || v.username || '',
-          views: v.views || 0,
-          title: (v.description || v.title || '').slice(0, 60),
-        });
-      }
-    });
-    const postsToday = postsList.length;
-    postsList.sort((a, b) => (b.views || 0) - (a.views || 0));
+    const postsList = (data.posts && data.posts.list) || [];
+    const postsByPlatform = (data.posts && data.posts.by_platform) || { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
+    const postsToday = (data.posts && data.posts.total) || 0;
 
-    // ── Views today: per-account delta where snapshot date = today ──
-    const byAccountKey = {};
-    (preloadedEvolution || []).forEach(row => {
-      if (!row.date) return;
-      const k = `${row.account_username}|${row.platform || 'tiktok'}`;
-      (byAccountKey[k] = byAccountKey[k] || []).push({
-        date: row.date, views: row.views || 0,
-        platform: row.platform || 'tiktok', username: row.account_username,
-      });
-    });
-    const viewsList = []; // [{ platform, username, delta }]
-    const viewsByPlatform = { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
-    Object.values(byAccountKey).forEach(series => {
-      series.sort((a, b) => a.date.localeCompare(b.date));
-      for (let i = 1; i < series.length; i++) {
-        if (series[i].date === todayKey) {
-          const delta = Math.max(0, series[i].views - series[i-1].views);
-          if (delta > 0) {
-            viewsList.push({
-              platform: series[i].platform,
-              username: series[i].username,
-              delta,
-            });
-            if (viewsByPlatform[series[i].platform] != null) {
-              viewsByPlatform[series[i].platform] += delta;
-            }
-          }
-        }
-      }
-    });
-    const viewsToday = viewsList.reduce((s, r) => s + r.delta, 0);
-    viewsList.sort((a, b) => b.delta - a.delta);
+    const viewsList = (data.views && data.views.list) || [];
+    const viewsByPlatform = (data.views && data.views.by_platform) || { tiktok: 0, instagram: 0, youtube: 0, linkedin: 0 };
+    const viewsToday = (data.views && data.views.total) || 0;
 
     // ── Render the values + per-platform summary + per-item list ──
     postEls.forEach(el => { el.textContent = fmt(postsToday); });
