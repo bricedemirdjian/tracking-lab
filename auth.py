@@ -87,7 +87,8 @@ def login():
         )
         user = User(user_dict)
         login_user(user, remember=True)
-        seed_user_data(user.id)
+        # NOTE: seed_user_data() removed here too (see auth_callback comment).
+        # Dev-mode users start with an empty dashboard — add accounts via UI.
         if is_new:
             _maybe_send_welcome(user_dict)
         return redirect(url_for('dashboard'))
@@ -109,6 +110,25 @@ def auth_callback():
         if not userinfo:
             userinfo = oauth.google.get('https://openidconnect.googleapis.com/v1/userinfo').json()
 
+        user_email = userinfo['email'].strip().lower()
+
+        # ── Allowlist gate ────────────────────────────────────────────────
+        # Until the SaaS opens to public signup (paid plan = access), only
+        # explicitly-listed emails can sign in. Allowlist = ADMIN_EMAIL +
+        # MANAGER_EMAILS + ALLOWED_EMAILS env vars.
+        #
+        # If ALL three are unset, the gate is OFF (open signup) — useful for
+        # local dev. In production, at least ADMIN_EMAIL is always set, so
+        # the gate is always armed.
+        admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
+        manager_emails = [e.strip().lower() for e in os.environ.get('MANAGER_EMAILS', '').split(',') if e.strip()]
+        allowed_extra = [e.strip().lower() for e in os.environ.get('ALLOWED_EMAILS', '').split(',') if e.strip()]
+        allowlist = {admin_email, *manager_emails, *allowed_extra} - {''}
+
+        if allowlist and user_email not in allowlist:
+            print(f"[Auth] Rejected sign-in: {user_email} not on allowlist")
+            return render_template('blocked.html'), 403
+
         user_dict, is_new = create_or_update_user(
             google_id=userinfo['sub'],
             email=userinfo['email'],
@@ -121,22 +141,26 @@ def auth_callback():
             return render_template('blocked.html'), 403
 
         # Auto-assign admin role if email matches ADMIN_EMAIL
-        admin_email = os.environ.get('ADMIN_EMAIL', '').strip()
-        if admin_email and userinfo['email'].strip().lower() == admin_email.lower() and user_dict.get('role') != 'admin':
+        if admin_email and user_email == admin_email and user_dict.get('role') != 'admin':
             set_user_role(user_dict['id'], 'admin')
             user_dict['role'] = 'admin'
 
         # Auto-assign manager role if email matches MANAGER_EMAILS
-        manager_emails = [e.strip().lower() for e in os.environ.get('MANAGER_EMAILS', '').split(',') if e.strip()]
-        if userinfo['email'].lower() in manager_emails and user_dict.get('role') not in ('admin', 'manager'):
+        if user_email in manager_emails and user_dict.get('role') not in ('admin', 'manager'):
             set_user_role(user_dict['id'], 'manager')
             user_dict['role'] = 'manager'
 
         user = User(user_dict)
         login_user(user, remember=True)
 
-        # Auto-seed historical data for new users with no accounts
-        seed_user_data(user.id)
+        # NOTE: seed_user_data() was previously called here. It cloned the
+        # contents of seed_data.json (6 demo TikTok accounts + their videos
+        # + snapshots) into EVERY new user's user_id, which (a) leaked the
+        # admin's actual tracked usernames to anyone who signed up, and (b)
+        # populated a fake dashboard for users who hadn't added accounts
+        # themselves. Removed 2026-05-12. The admin already has the seed
+        # applied from initial setup; new users should add their own
+        # accounts via the UI.
 
         # Welcome email on first login only (non-blocking, best-effort)
         if is_new:
