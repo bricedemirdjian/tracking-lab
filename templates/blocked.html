@@ -1,18 +1,122 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acces refuse - Tracking Lab</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260409">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accès refusé · Tracking Lab</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #ffffff;
+      --border: #e5e5e5;
+      --text: #111;
+      --muted: #6b6b6b;
+      --accent: #FF69B4;
+      --accent-hover: #f05aa0;
+      --accent-soft: rgba(255, 105, 180, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 32px;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    }
+    .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent-hover));
+      margin: 0 auto 24px;
+      box-shadow: 0 0 0 6px var(--accent-soft);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin: 0 0 12px;
+      color: var(--text);
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 14.5px;
+      margin: 0 0 32px;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border: 1px solid var(--accent);
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { color: var(--text); border-color: var(--text); }
+    .footnote {
+      margin-top: 28px;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .footnote a { color: var(--accent); text-decoration: none; }
+    .footnote a:hover { text-decoration: underline; }
+  </style>
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh">
-    <div style="text-align:center;max-width:400px;padding:40px">
-        <div style="font-size:64px;margin-bottom:20px">&#128683;</div>
-        <h1 style="color:var(--accent);margin-bottom:16px;font-size:24px;letter-spacing:-0.3px">Acces refuse</h1>
-        <p style="color:var(--text-secondary);margin-bottom:24px">Votre compte a ete bloque par l'administrateur. Si vous pensez qu'il s'agit d'une erreur, contactez l'administrateur.</p>
-        <a href="/login" class="btn btn-secondary">Retour</a>
+<body>
+  <main class="card">
+    <div class="logo" aria-hidden="true"></div>
+    <h1>Accès refusé</h1>
+    <p class="lead">
+      Ce compte Google n'a pas accès à Tracking Lab. Si tu penses que c'est une erreur,
+      contacte l'administrateur ou réessaie avec un autre compte.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/logout">Réessayer avec un autre compte</a>
+      <a class="btn btn-secondary" href="/">Retour à l'accueil</a>
     </div>
+    <p class="footnote">
+      Besoin d'un accès ? Écris-nous à <a href="mailto:tom@merciinternet.com">tom@merciinternet.com</a>
+    </p>
+  </main>
 </body>
 </html>
