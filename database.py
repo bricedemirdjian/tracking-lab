@@ -325,6 +325,8 @@ def init_db():
     _migrate_user_company(conn)
     # Migration: add is_competitor column to accounts if missing
     _migrate_competitor_column(conn)
+    # Migration: per-account scraping health columns (failures, last error, last success)
+    _migrate_account_error_tracking(conn)
     # Migration: add total_views/total_comments aggregated stats columns
     _migrate_engagement_totals_columns(conn)
     # Migration: composite indices used by hot dashboard queries
@@ -447,6 +449,69 @@ def _migrate_user_plan_columns(conn):
                 print("[Migration] Added stripe_customer_id column to users (SQLite)")
     except Exception as e:
         print(f"[Migration] user plan columns: {e}")
+
+
+def _migrate_account_error_tracking(conn):
+    """Add per-account scraping health columns:
+    - consecutive_failures: count of failed fetches since last success
+    - last_error_msg: short error string for the most recent failure
+    - last_success_at: timestamp of the most recent successful fetch
+
+    Lets the admin health endpoint surface accounts that are silently
+    failing without having to scan Vercel logs.
+    """
+    new_cols = [
+        ("consecutive_failures", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_error_msg",       "TEXT"),
+        ("last_success_at",      "TIMESTAMP"),
+    ]
+    for col, defn in new_cols:
+        try:
+            if DATABASE_URL:
+                exists = _fetchall(conn,
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name='accounts' AND column_name=%s",
+                    (col,))
+                if not exists:
+                    _execute(conn, f"ALTER TABLE accounts ADD COLUMN {col} {defn}")
+                    print(f"[Migration] Added {col} column to accounts (PostgreSQL)")
+            else:
+                cur = conn.cursor()
+                columns = [c[1] for c in cur.execute("PRAGMA table_info(accounts)").fetchall()]
+                if col not in columns:
+                    cur.execute(f"ALTER TABLE accounts ADD COLUMN {col} {defn}")
+                    print(f"[Migration] Added {col} column to accounts (SQLite)")
+        except Exception as e:
+            print(f"[Migration] {col}: {e}")
+
+
+def record_scrape_success(user_id, username, platform):
+    """Mark a successful scrape: reset failure counter, stamp last_success_at."""
+    conn = get_connection()
+    try:
+        _execute(conn,
+            "UPDATE accounts SET consecutive_failures = 0, last_error_msg = NULL, "
+            "last_success_at = NOW() "
+            "WHERE user_id = %s AND username = %s AND platform = %s",
+            (user_id, username, platform))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_scrape_failure(user_id, username, platform, error_msg):
+    """Mark a failed scrape: increment counter, store error message (truncated)."""
+    conn = get_connection()
+    try:
+        msg = (error_msg or "")[:300]
+        _execute(conn,
+            "UPDATE accounts SET consecutive_failures = consecutive_failures + 1, "
+            "last_error_msg = %s "
+            "WHERE user_id = %s AND username = %s AND platform = %s",
+            (msg, user_id, username, platform))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _migrate_competitor_column(conn):

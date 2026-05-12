@@ -1121,6 +1121,12 @@ async def scrape_accounts_async(
                         "username": username, "status": "cached",
                         "videos": db_count, "platform": platform,
                     }
+                    if user_id is not None:
+                        try:
+                            from database import record_scrape_success
+                            await asyncio.to_thread(record_scrape_success, user_id, username, platform)
+                        except Exception as e:
+                            print(f"  [health-track] {username}: {e}")
                     if on_done:
                         try:
                             on_done(username, True, db_count)
@@ -1134,6 +1140,12 @@ async def scrape_accounts_async(
                         "username": username, "status": "success",
                         "videos": count, "platform": platform,
                     }
+                    if user_id is not None:
+                        try:
+                            from database import record_scrape_success
+                            await asyncio.to_thread(record_scrape_success, user_id, username, platform)
+                        except Exception as e:
+                            print(f"  [health-track] {username}: {e}")
                     if on_done:
                         try:
                             on_done(username, True, count)
@@ -1148,9 +1160,15 @@ async def scrape_accounts_async(
                     await asyncio.to_thread(
                         _upsert_empty_account_sync, username, platform, user_id
                     )
+                    if user_id is not None:
+                        try:
+                            from database import record_scrape_failure
+                            await asyncio.to_thread(record_scrape_failure, user_id, username, platform, "no_data")
+                        except Exception as e:
+                            print(f"  [health-track] {username}: {e}")
                     if on_done:
                         try:
-                            on_done(username, True, 0)  # no_data is not an error
+                            on_done(username, True, 0)  # no_data is not an error from cron's POV
                         except Exception as e:
                             print(f"  [on_done] {username}: {e}")
 
@@ -1160,6 +1178,12 @@ async def scrape_accounts_async(
                     "username": username, "status": "error",
                     "videos": 0, "platform": platform,
                 }
+                if user_id is not None:
+                    try:
+                        from database import record_scrape_failure
+                        await asyncio.to_thread(record_scrape_failure, user_id, username, platform, str(e))
+                    except Exception as e2:
+                        print(f"  [health-track] {username}: {e2}")
                 if on_done:
                     try:
                         on_done(username, False, 0)
