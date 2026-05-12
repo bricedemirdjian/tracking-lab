@@ -177,7 +177,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-12-health-track")
+    response.headers.setdefault("X-Build-Version", "2026-05-12-health-banner")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
@@ -299,6 +299,77 @@ def api_admin_swarm_metrics():
 def api_admin_users():
     users = get_all_users()
     return jsonify(users)
+
+
+@app.route("/api/admin/scraping-health")
+@admin_required
+def api_admin_scraping_health():
+    """Per-account scraping health: who's failing, who's stale, who's healthy.
+
+    Computes per-account staleness against the cadence the cron uses
+    (admin override always 1h via get_scrape_cadence_hours). An account
+    is 'stale' if last_updated > 2× cadence. 'Failing' if
+    consecutive_failures >= 3. Returns counters + the list of accounts
+    sorted by severity.
+    """
+    from database import get_connection, _fetchall
+    from stripe_billing import get_scrape_cadence_hours
+
+    cadence_h = get_scrape_cadence_hours("agency", is_admin=True)  # = 1h for admin
+    stale_threshold_h = cadence_h * 2
+
+    conn = get_connection()
+    try:
+        rows = _fetchall(conn, """
+            SELECT
+                a.user_id, a.username, a.platform,
+                a.last_updated,
+                a.consecutive_failures,
+                a.last_error_msg,
+                a.last_success_at,
+                COALESCE(a.is_competitor, FALSE) AS is_competitor,
+                EXTRACT(EPOCH FROM (NOW() - a.last_updated))::bigint AS sec_since_update,
+                EXTRACT(EPOCH FROM (NOW() - a.last_success_at))::bigint AS sec_since_success
+            FROM accounts a
+            WHERE a.user_id = %s
+            ORDER BY a.consecutive_failures DESC, a.last_updated ASC NULLS FIRST
+        """, (current_user.data_user_id,))
+    finally:
+        conn.close()
+
+    healthy = []
+    stale = []
+    failing = []
+    for r in rows:
+        item = {
+            "username": r.get("username"),
+            "platform": r.get("platform"),
+            "is_competitor": bool(r.get("is_competitor")),
+            "consecutive_failures": int(r.get("consecutive_failures") or 0),
+            "last_error_msg": r.get("last_error_msg") or None,
+            "sec_since_update": int(r.get("sec_since_update") or 0) if r.get("sec_since_update") is not None else None,
+            "sec_since_success": int(r.get("sec_since_success") or 0) if r.get("sec_since_success") is not None else None,
+        }
+        if item["consecutive_failures"] >= 3:
+            failing.append(item)
+        elif item["sec_since_update"] is not None and item["sec_since_update"] > stale_threshold_h * 3600:
+            stale.append(item)
+        else:
+            healthy.append(item)
+
+    return jsonify({
+        "cadence_hours": cadence_h,
+        "stale_threshold_hours": stale_threshold_h,
+        "summary": {
+            "total": len(rows),
+            "healthy": len(healthy),
+            "stale": len(stale),
+            "failing": len(failing),
+        },
+        "failing": failing,
+        "stale": stale,
+        "healthy": healthy,
+    })
 
 
 @app.route("/api/admin/block/<int:user_id>", methods=["POST"])

@@ -453,6 +453,29 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 
+/* Admin-only scraping health banner — sits below the header, only renders
+   when /api/admin/scraping-health reports stale or failing accounts. */
+.health-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 159, 10, 0.08);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #8a5a00;
+  width: fit-content;
+  max-width: 100%;
+}
+.health-banner .health-icon { font-size: 14px; flex-shrink: 0; }
+.health-banner .health-text { flex: 1; min-width: 0; }
+.health-banner .health-link {
+  color: var(--accent); text-decoration: none; font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.health-banner .health-link:hover { text-decoration: underline; }
+
 /* Toolbar (right side) */
 .toolbar {
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
@@ -1709,6 +1732,14 @@ button { font-family: inherit; cursor: pointer; }
           <span>Exporter CSV</span>
         </a>
       </div>
+      {% if user.is_admin %}
+      <!-- Admin-only scraping health banner. Hidden until JS confirms there's something to alert about. -->
+      <div class="health-banner" id="healthBanner" hidden>
+        <span class="health-icon" aria-hidden="true">⚠️</span>
+        <span class="health-text" id="healthBannerText"></span>
+        <a class="health-link" href="/admin/swarm">Voir détails →</a>
+      </div>
+      {% endif %}
     </div>
 
     <!-- Filter bar — segmented period + custom dates + free filters -->
@@ -4348,6 +4379,34 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       });
     }, 0);
   }
+
+  // ─── Admin-only: scraping-health banner ───────────────────────────────
+  // Polls /api/admin/scraping-health once per page-load. Shows a warning
+  // banner if any accounts are failing or stale. Non-admins never see it
+  // (server returns 403, banner stays hidden).
+  async function pollScrapingHealth() {
+    const banner = document.getElementById('healthBanner');
+    if (!banner) return; // non-admin: element wasn't rendered
+    try {
+      const res = await fetch('/api/admin/scraping-health', { credentials: 'same-origin' });
+      if (!res.ok) return; // 403 for non-admin or transient — silent skip
+      const data = await res.json();
+      const s = data.summary || {};
+      if ((s.failing || 0) === 0 && (s.stale || 0) === 0) {
+        banner.hidden = true;
+        return;
+      }
+      const parts = [];
+      if (s.failing) parts.push(`${s.failing} compte${s.failing > 1 ? 's' : ''} en erreur`);
+      if (s.stale)   parts.push(`${s.stale} compte${s.stale > 1 ? 's' : ''} obsolète${s.stale > 1 ? 's' : ''}`);
+      const text = document.getElementById('healthBannerText');
+      if (text) text.textContent = parts.join(' · ') + ` (sur ${s.total} suivis)`;
+      banner.hidden = false;
+    } catch (e) {
+      // silent — health-check shouldn't break the dashboard
+    }
+  }
+  setTimeout(pollScrapingHealth, 800);
 
   // Browser back/forward buttons
   window.addEventListener('popstate', () => {
