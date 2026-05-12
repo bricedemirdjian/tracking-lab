@@ -43,12 +43,12 @@
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
     }
     .logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent-hover));
-      margin: 0 auto 24px;
-      box-shadow: 0 0 0 6px var(--accent-soft);
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
     }
     h1 {
       font-size: 22px;
@@ -104,7 +104,19 @@
 </head>
 <body>
   <main class="card">
-    <div class="logo" aria-hidden="true"></div>
+    <div class="logo" aria-hidden="true">
+      <svg width="56" height="56" viewBox="0 0 40 40" fill="none">
+        <defs>
+          <radialGradient id="blockedLogoDot" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FF69B4" stop-opacity="1"/>
+            <stop offset="45%" stop-color="#FF69B4" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#FF69B4" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="20" cy="20" r="20" fill="url(#blockedLogoDot)"/>
+        <circle cx="20" cy="20" r="7" fill="#FF69B4"/>
+      </svg>
+    </div>
     <h1>Accès refusé</h1>
     <p class="lead">
       Ce compte Google n'a pas accès à Tracking Lab. Si tu penses que c'est une erreur,
@@ -115,7 +127,7 @@
       <a class="btn btn-secondary" href="/">Retour à l'accueil</a>
     </div>
     <p class="footnote">
-      Besoin d'un accès ? Écris-nous à <a href="mailto:tom@merciinternet.com">tom@merciinternet.com</a>
+      Besoin d'un accès ? Écris-nous à <a href="mailto:brice.demirdjian@gmail.com">brice.demirdjian@gmail.com</a>
     </p>
   </main>
 </body>

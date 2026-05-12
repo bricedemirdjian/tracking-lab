@@ -177,7 +177,7 @@ def _security_headers(response):
     )
     # Build identifier for ops debugging — bump when shipping fixes that
     # need to be confirmed visible at the edge. Curl-able without auth.
-    response.headers.setdefault("X-Build-Version", "2026-05-12-login-typography")
+    response.headers.setdefault("X-Build-Version", "2026-05-12-blocked-logo-email")
     # Force fresh HTML on every load. Chrome was caching the dashboard HTML
     # despite `max-age=0, must-revalidate` (only re-fetched while DevTools was
     # open with "Disable cache" toggled). `no-store` is the strict bypass.
