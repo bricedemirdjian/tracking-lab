@@ -324,15 +324,31 @@ async def fetch_instagram_async(username: str, user_id: Optional[int] = None) ->
                 )
                 return _IG_CACHE_HIT
 
+    # First attempt
     data = await _request_json(
         url,
         params={"username": username, "secret": _PROXY_SECRET},
         label=f"Instagram @{username}",
     )
 
+    # Inline retry: many IG proxy failures are transient (rate limit blip,
+    # 5xx from the underlying API, timeout). One retry after 600ms catches
+    # roughly 30-50% of these per ad-hoc observation — cheaper than waiting
+    # an hour for the next cron pass. Kept to a single retry so a permanently
+    # broken endpoint doesn't cost us 60s × N accounts.
+    if not data or "error" in data:
+        first_error = (data or {}).get("error") if isinstance(data, dict) else None
+        print(f"  [Instagram] @{username}: first attempt empty/error ({first_error or 'no data'}) — retrying once")
+        await asyncio.sleep(0.6)
+        data = await _request_json(
+            url,
+            params={"username": username, "secret": _PROXY_SECRET},
+            label=f"Instagram @{username} (retry)",
+        )
+
     if not data or "error" in data:
         if data and "error" in data:
-            print(f"  [Instagram] @{username} error: {data['error']}")
+            print(f"  [Instagram] @{username} error after retry: {data['error']}")
         return None
 
     videos = data.get("videos", []) or []
