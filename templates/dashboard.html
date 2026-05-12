@@ -1455,8 +1455,24 @@ button { font-family: inherit; cursor: pointer; }
 }
 .today-detail-more {
   font-size: 11px; color: var(--text-3);
-  text-align: center; padding-top: 4px;
+  text-align: center; padding: 8px 4px 4px;
+  cursor: pointer;
+  background: transparent; border: none;
+  width: 100%;
+  font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 6px;
+  transition: background 100ms ease, color 100ms ease;
 }
+.today-detail-more:hover { background: var(--bg-2); color: var(--text-1); }
+.today-detail-more .chev {
+  display: inline-block;
+  transition: transform 200ms ease;
+}
+.today-card-detail.is-expanded .today-detail-more .chev { transform: rotate(180deg); }
+/* Rows past MAX_LIST are hidden until the parent gets .is-expanded */
+.today-detail-row.is-extra { display: none; }
+.today-card-detail.is-expanded .today-detail-row.is-extra { display: flex; }
 
 /* ─────────────────────── Advice page (Nos conseils) ─────────────────────── */
 .advice-group { margin: 0 0 32px; }
@@ -3054,35 +3070,78 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
 
     const MAX_LIST = 5;
 
+    // Renders rows where the first MAX_LIST are always visible and the
+    // rest carry .is-extra (hidden by default). The "+ N autres" element
+    // is a <button> that toggles .is-expanded on the parent .today-card-detail
+    // — CSS unhides .is-extra rows and rotates the chevron.
+    function detailRowWithIndex(content, idx) {
+      const cls = idx >= MAX_LIST ? 'today-detail-row is-extra' : 'today-detail-row';
+      return content.replace('today-detail-row', cls);
+    }
+
+    function renderDetailHTML(list, summaryHTML, rowBuilder, emptyText) {
+      if (list.length === 0) {
+        return `<div class="today-detail-empty">${emptyText}</div>`;
+      }
+      const rows = list.map((item, idx) => detailRowWithIndex(rowBuilder(item), idx)).join('');
+      const hiddenCount = Math.max(0, list.length - MAX_LIST);
+      const more = hiddenCount > 0
+        ? `<button type="button" class="today-detail-more" data-toggle="today-detail">
+             <span class="more-label">+ ${hiddenCount} autre${hiddenCount > 1 ? 's' : ''}</span>
+             <span class="chev" aria-hidden="true">▾</span>
+           </button>` : '';
+      return summaryHTML + '<div class="today-detail-list">' + rows + '</div>' + more;
+    }
+
     // Posts cards — list each video posted today
     document.querySelectorAll('.todayPostsDetail').forEach(el => {
-      if (postsToday === 0) {
-        el.innerHTML = '<div class="today-detail-empty">Aucun post aujourd\'hui.</div>';
-        return;
-      }
-      const summary = `<div class="today-card-detail-summary">${platformSummary(postsByPlatform, n => n)}</div>`;
-      const rows = postsList.slice(0, MAX_LIST).map(p =>
-        detailRow(p.platform, '@' + p.username + (p.title ? ' — ' + p.title : ''), `${fmtCompact(p.views)} vues`)
-      ).join('');
-      const more = postsList.length > MAX_LIST
-        ? `<div class="today-detail-more">+ ${postsList.length - MAX_LIST} autre${postsList.length - MAX_LIST > 1 ? 's' : ''}</div>` : '';
-      el.innerHTML = summary + '<div class="today-detail-list">' + rows + '</div>' + more;
+      el.classList.remove('is-expanded');
+      const summary = postsToday > 0
+        ? `<div class="today-card-detail-summary">${platformSummary(postsByPlatform, n => n)}</div>`
+        : '';
+      el.innerHTML = renderDetailHTML(
+        postsList,
+        summary,
+        p => detailRow(p.platform, '@' + p.username + (p.title ? ' — ' + p.title : ''), `${fmtCompact(p.views)} vues`),
+        'Aucun post aujourd\'hui.'
+      );
     });
 
     // Views cards — list each account that gained views today
     document.querySelectorAll('.todayViewsDetail').forEach(el => {
-      if (viewsToday === 0) {
-        el.innerHTML = '<div class="today-detail-empty">Pas de vues gagnées aujourd\'hui.</div>';
-        return;
-      }
-      const summary = `<div class="today-card-detail-summary">${platformSummary(viewsByPlatform, n => fmtCompact(n))}</div>`;
-      const rows = viewsList.slice(0, MAX_LIST).map(r =>
-        detailRow(r.platform, '@' + r.username, `+${fmtCompact(r.delta)} vues`)
-      ).join('');
-      const more = viewsList.length > MAX_LIST
-        ? `<div class="today-detail-more">+ ${viewsList.length - MAX_LIST} autre${viewsList.length - MAX_LIST > 1 ? 's' : ''}</div>` : '';
-      el.innerHTML = summary + '<div class="today-detail-list">' + rows + '</div>' + more;
+      el.classList.remove('is-expanded');
+      const summary = viewsToday > 0
+        ? `<div class="today-card-detail-summary">${platformSummary(viewsByPlatform, n => fmtCompact(n))}</div>`
+        : '';
+      el.innerHTML = renderDetailHTML(
+        viewsList,
+        summary,
+        r => detailRow(r.platform, '@' + r.username, `+${fmtCompact(r.delta)} vues`),
+        'Pas de vues gagnées aujourd\'hui.'
+      );
     });
+
+    // Wire the toggle (event delegation so re-rendered cards keep working).
+    if (!document._todayDetailMoreWired) {
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.today-detail-more');
+        if (!btn) return;
+        const card = btn.closest('.today-card-detail');
+        if (!card) return;
+        const expanded = card.classList.toggle('is-expanded');
+        const label = btn.querySelector('.more-label');
+        if (label) {
+          if (expanded) {
+            label.textContent = 'Réduire';
+          } else {
+            const totalRows = card.querySelectorAll('.today-detail-row').length;
+            const hidden = Math.max(0, totalRows - MAX_LIST);
+            label.textContent = `+ ${hidden} autre${hidden > 1 ? 's' : ''}`;
+          }
+        }
+      });
+      document._todayDetailMoreWired = true;
+    }
   }
 
   // ─── Dashboard view: weekly views chart (last 12 ISO weeks) ─────────
