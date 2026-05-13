@@ -475,6 +475,10 @@ button { font-family: inherit; cursor: pointer; }
   white-space: nowrap;
 }
 .health-banner .health-link:hover { text-decoration: underline; }
+/* Without this, the display:flex above wins over the UA [hidden] { display:none }
+   rule, so the banner stays visible (with an empty text span) before pollScrapingHealth
+   has set its content — same pitfall already handled for .chart-card-empty below. */
+.health-banner[hidden] { display: none !important; }
 
 /* Toolbar (right side) */
 .toolbar {
@@ -4389,7 +4393,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (!banner) return; // non-admin: element wasn't rendered
     try {
       const res = await fetch('/api/admin/scraping-health', { credentials: 'same-origin' });
-      if (!res.ok) return; // 403 for non-admin or transient — silent skip
+      if (!res.ok) { banner.hidden = true; return; } // 403/5xx — defense in depth, keep hidden
       const data = await res.json();
       const s = data.summary || {};
       if ((s.failing || 0) === 0 && (s.stale || 0) === 0) {
@@ -4403,7 +4407,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       if (text) text.textContent = parts.join(' · ') + ` (sur ${s.total} suivis)`;
       banner.hidden = false;
     } catch (e) {
-      // silent — health-check shouldn't break the dashboard
+      banner.hidden = true; // network error — keep hidden, never show an empty banner
     }
   }
   setTimeout(pollScrapingHealth, 800);
