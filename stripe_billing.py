@@ -9,7 +9,11 @@ PLANS = {
         'price': 0,
         'price_annual': 0,
         'max_accounts': 1,
-        'max_videos': 100,
+        # No video-count cap on any plan — marketing copy still mentions
+        # "100 vidéos" as a friendly anchor, but the scraper is now uncapped
+        # (see SCRAPER_TIKTOK_LIMIT / SCRAPER_YOUTUBE_LIMIT in scraper_async).
+        # The gauge in account.html uses this for visual headroom only.
+        'max_videos': 999999,
         'max_projects': 1,
         'max_shared_users': 0,
         'platforms': ['tiktok', 'youtube'],
@@ -28,7 +32,7 @@ PLANS = {
         'price_id': os.environ.get('STRIPE_PRO_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_PRO_ANNUAL_PRICE_ID'),
         'max_accounts': 5,
-        'max_videos': 1000,
+        'max_videos': 999999,  # see starter — caps removed plan-wide
         'max_projects': 5,
         'max_shared_users': 2,
         'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],

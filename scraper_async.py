@@ -46,10 +46,15 @@ BASE_BACKOFF    = float(os.environ.get("SCRAPER_BASE_BACKOFF", "0.5"))
 # anonymous endpoints handle 16 fine; bump again only after observing
 # 429s in the wild.
 YT_DETAIL_CONCURRENCY = int(os.environ.get("SCRAPER_YT_DETAIL_CONCURRENCY", "16"))
-# Per-platform listing caps. Defaults match Vercel's 60s budget for the cron.
-# For one-off historical backfills, raise via env (e.g. SCRAPER_TIKTOK_LIMIT=9999).
-TIKTOK_LIMIT  = int(os.environ.get("SCRAPER_TIKTOK_LIMIT", "100"))
-YOUTUBE_LIMIT = int(os.environ.get("SCRAPER_YOUTUBE_LIMIT", "30"))
+# Per-platform listing caps. Defaults are intentionally high — there is no
+# plan-tier-based video cap; we want every account to surface its full
+# history regardless of plan. The practical ceiling is Vercel's 60s function
+# budget: accounts with thousands of videos may not finish in one pass, but
+# the cron's multi-pass logic + cache fast-path picks them up on later runs.
+# Dial back via env (e.g. SCRAPER_TIKTOK_LIMIT=200) if a specific account
+# causes repeated cron timeouts.
+TIKTOK_LIMIT  = int(os.environ.get("SCRAPER_TIKTOK_LIMIT", "9999"))
+YOUTUBE_LIMIT = int(os.environ.get("SCRAPER_YOUTUBE_LIMIT", "9999"))
 
 _SUPABASE_PROXY = "https://vpirlefqxnvmxbmndhmn.supabase.co/functions/v1"
 _PROXY_SECRET   = os.environ.get("SCRAPER_PROXY_SECRET", "tracking-lab-2026")
