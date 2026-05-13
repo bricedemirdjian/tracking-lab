@@ -1664,6 +1664,35 @@ button { font-family: inherit; cursor: pointer; }
       </a>
     </div>
 
+    <!-- Plateformes — filters every endpoint by `platform=X`. Clicking an item
+         preserves the current scope (analytics/concurrents) + view (dashboard/
+         accounts/videos/table) so users keep their context when switching plats. -->
+    <div class="sb-section">
+      <div class="sb-section-head">
+        <span class="sb-section-label">Plateformes</span><span class="sb-chev">▾</span>
+      </div>
+      <a class="sb-item" href="#" data-platform-nav="all" data-nav="platform-all">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+        Toutes
+      </a>
+      <a class="sb-item" href="#" data-platform-nav="tiktok" data-nav="platform-tiktok">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 0 1 3.183-4.51v-3.5a6.329 6.329 0 0 0-5.394 10.692 6.33 6.33 0 0 0 10.857-4.424V8.687a8.182 8.182 0 0 0 4.773 1.526V6.79a4.831 4.831 0 0 1-1.003-.104z"/></svg>
+        TikTok
+      </a>
+      <a class="sb-item" href="#" data-platform-nav="instagram" data-nav="platform-instagram">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        Instagram
+      </a>
+      <a class="sb-item" href="#" data-platform-nav="youtube" data-nav="platform-youtube">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        YouTube
+      </a>
+      <a class="sb-item" href="#" data-platform-nav="linkedin" data-nav="platform-linkedin">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        LinkedIn
+      </a>
+    </div>
+
     <!-- Sidebar manager: Gérer tes comptes (import form + delete list) -->
     <div class="sb-mgr" id="sbMgrAccounts">
       <button type="button" class="sb-mgr-head" data-toggle="sbMgrAccounts" aria-expanded="false">
@@ -2358,6 +2387,10 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
   const urlParams = new URLSearchParams(window.location.search);
   let navScope = urlParams.get('scope');                    // null | 'competitor'
   let navView = urlParams.get('view');                      // null | 'accounts' | 'videos' | 'table'
+  // Platform segmentation (sidebar 'Plateformes' section). null = all platforms.
+  const _PLATFORMS = ['tiktok', 'instagram', 'youtube', 'linkedin'];
+  let navPlatform = urlParams.get('platform');
+  if (navPlatform && !_PLATFORMS.includes(navPlatform)) navPlatform = null;
   let isCompetitorScope = navScope === 'competitor';
 
   function buildStatsURL() {
@@ -2367,6 +2400,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (state.date_from) p.set('date_from', state.date_from);
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     return '/api/stats?' + p.toString();
   }
   // Same as buildStatsURL but with explicit dates — used for period-over-period
@@ -2378,6 +2412,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (from) p.set('date_from', from);
     if (to)   p.set('date_to', to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     return '/api/stats?' + p.toString();
   }
   // Returns { from, to } for the period of equal length immediately preceding
@@ -2400,11 +2435,13 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (state.date_from) p.set('date_from', state.date_from);
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     return '/api/evolution?' + p.toString();
   }
   function buildAccountsURL() {
     const p = new URLSearchParams();
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     return '/api/accounts?' + p.toString();
   }
   function buildVideosURL() {
@@ -2413,6 +2450,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (state.date_from) p.set('date_from', state.date_from);
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     p.set('sort_by', 'create_time');
     p.set('sort_order', 'DESC');
     return '/api/videos?' + p.toString();
@@ -2739,6 +2777,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (state.date_to) p.set('date_to', state.date_to);
     if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     p.set('limit', String(limit));
     return `/api/${endpoint}?` + p.toString();
   }
@@ -3025,6 +3064,8 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       const p = new URLSearchParams();
       if (state.project_id && state.project_id !== 'all') p.set('project_id', state.project_id);
       p.set('competitor', isCompetitorScope ? 'true' : 'false');
+      if (navPlatform) p.set('platform', navPlatform);
+    if (navPlatform) p.set('platform', navPlatform);
       return '/api/today?' + p.toString();
     })();
     const data = await cachedJSON(todayURL, { posts: { total: 0, by_platform: {}, list: [] }, views: { total: 0, by_platform: {}, list: [] } });
@@ -3537,6 +3578,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (state.date_from) p.set('date_from', state.date_from);
     if (state.date_to) p.set('date_to', state.date_to);
     p.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) p.set('platform', navPlatform);
     p.set('sort_by', 'create_time');
     p.set('sort_order', 'DESC');
     return '/api/videos?' + p.toString();
@@ -4260,11 +4302,15 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
   // ─── Sidebar nav: highlight active item, swap title, and show the right view ───
   // Idempotent — safe to call on initial load AND on every SPA nav change.
   function applyNav() {
-    // 1. Highlight the active sidebar entry
+    // 1. Highlight the active sidebar entry. Platform items live in their own
+    // group keyed `platform-<name>` (or `platform-all`), so we match against
+    // either the Analytics/Concurrents nav key OR the platform nav key.
     const prefix = isCompetitorScope ? 'competitor-' : '';
     const activeKey = `${prefix}${navView || 'dashboard'}`;
+    const activePlatKey = `platform-${navPlatform || 'all'}`;
     document.querySelectorAll('.sb-item[data-nav]').forEach(link => {
-      link.classList.toggle('active', link.dataset.nav === activeKey);
+      const k = link.dataset.nav;
+      link.classList.toggle('active', k === activeKey || k === activePlatKey);
     });
 
     // 2. Swap the H1 sub-line text based on scope (Analytics vs Concurrents)
@@ -4280,7 +4326,10 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     if (eyebrow) {
       const scopeLbl = isCompetitorScope ? 'Concurrents' : 'Analytics';
       const viewLbl = { accounts: 'Comptes', videos: 'Vidéos', table: 'Tableau détaillé' }[navView] || 'Tableau de bord';
-      eyebrow.textContent = `${scopeLbl} · ${viewLbl}`;
+      const platLbl = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn' }[navPlatform];
+      eyebrow.textContent = platLbl
+        ? `${scopeLbl} · ${platLbl} · ${viewLbl}`
+        : `${scopeLbl} · ${viewLbl}`;
     }
 
     // 4. Show the right view section(s).
@@ -4320,6 +4369,9 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       location.href = href;
       return;
     }
+    // Platform is orthogonal to view/scope — preserve the active filter when
+    // jumping between Analytics/Concurrents/view tabs so users don't lose it.
+    if (navPlatform) u.searchParams.set('platform', navPlatform);
     const newView = u.searchParams.get('view');
     const newScope = u.searchParams.get('scope');
     const newIsComp = newScope === 'competitor';
@@ -4384,6 +4436,35 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       prefetchForView(v, isComp);
     }, { passive: true });
   });
+
+  // Platform segmentation: clicking a Plateformes item updates navPlatform,
+  // rewrites the URL preserving view+scope, and reloads data. The URL
+  // builders (buildStatsURL, buildVideosURL, …) pick up navPlatform from
+  // closure on the next load(), so every endpoint sees ?platform=X.
+  document.querySelectorAll('.sb-item[data-platform-nav]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      const target = a.dataset.platformNav;          // 'all' | 'tiktok' | …
+      const newPlatform = target === 'all' ? null : target;
+      if (newPlatform === navPlatform) return;       // no-op
+      const u = new URL(location.href);
+      if (newPlatform) u.searchParams.set('platform', newPlatform);
+      else u.searchParams.delete('platform');
+      history.pushState({ platform: newPlatform }, '', u.toString());
+      navPlatform = newPlatform;
+      applyNav();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      load();
+    });
+  });
+
+  // Browser back/forward should also restore navPlatform — extend the
+  // existing popstate handler below by re-reading the param.
+  window.addEventListener('popstate', () => {
+    const p = new URLSearchParams(location.search).get('platform');
+    navPlatform = (p && _PLATFORMS.includes(p)) ? p : null;
+  }, { capture: true });   // run before the existing popstate that calls load()
 
   // After the initial render finishes, warm the other in-scope views in the
   // background so even the first cross-view click feels instant. Wrapped in

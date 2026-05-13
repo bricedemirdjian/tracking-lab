@@ -809,6 +809,11 @@ def api_accounts():
         # `with_last_post=True` adds last_post_at — used by the dashboard to flag
         # inactive accounts that fall outside the current date window.
         accounts = get_all_accounts(user_id=current_user.data_user_id, is_competitor=is_competitor, with_last_post=True)
+    # Sidebar 'Plateformes' filter — keep at the end so it works for both
+    # project-scoped and global account fetches above.
+    plat = request.args.get("platform")
+    if plat in _SUPPORTED_PLATFORMS:
+        accounts = [a for a in accounts if a.get("platform") == plat]
     return jsonify(accounts)
 
 
@@ -888,6 +893,35 @@ def _resolve_competitor_usernames(user_id, competitor_param, project_usernames):
     return project_usernames
 
 
+_SUPPORTED_PLATFORMS = ("tiktok", "instagram", "youtube", "linkedin")
+
+
+def _apply_platform_filter(user_id, platform_param, project_usernames):
+    """Intersect project_usernames with accounts on the given platform.
+
+    Frontend sidebar 'Plateformes' section sends ?platform=tiktok|instagram|youtube|linkedin
+    to scope the whole dashboard to one platform. We resolve here so every data
+    endpoint applies the filter consistently (videos, stats, evolution, today).
+    Returns ['__none__'] if the intersection is empty so downstream IN-clauses
+    match zero rows (cleaner than passing an empty list).
+    """
+    if platform_param not in _SUPPORTED_PLATFORMS:
+        return project_usernames
+    from database import get_connection, _fetchall
+    conn = get_connection()
+    try:
+        rows = _fetchall(conn,
+            "SELECT username FROM accounts WHERE user_id = %s AND platform = %s",
+            (user_id, platform_param))
+    finally:
+        conn.close()
+    plat_unames = [r["username"] for r in rows]
+    if project_usernames:
+        intersected = [u for u in project_usernames if u in plat_unames]
+        return intersected if intersected else ["__none__"]
+    return plat_unames if plat_unames else ["__none__"]
+
+
 @app.route("/api/videos")
 @login_required
 def api_videos():
@@ -898,6 +932,7 @@ def api_videos():
     sort_order = request.args.get("sort_order", "DESC")
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
+    project_usernames = _apply_platform_filter(current_user.data_user_id, request.args.get("platform"), project_usernames)
 
     videos = get_videos(account, date_from, date_to, sort_by, sort_order, user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(videos)
@@ -919,6 +954,7 @@ def api_stats():
         project_usernames = [a['username'] for a in comp_accounts]
         if not project_usernames:
             project_usernames = ["__none__"]  # Force empty result
+    project_usernames = _apply_platform_filter(current_user.data_user_id, request.args.get("platform"), project_usernames)
     try:
         per_account = get_aggregated_stats(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
         global_stats = get_global_stats(date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
@@ -958,6 +994,7 @@ def api_evolution():
 
     project_usernames = _resolve_project_usernames(current_user.data_user_id, request.args.get("project_id"))
     project_usernames = _resolve_competitor_usernames(current_user.data_user_id, request.args.get("competitor"), project_usernames)
+    project_usernames = _apply_platform_filter(current_user.data_user_id, request.args.get("platform"), project_usernames)
     data = get_daily_evolution(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
     return jsonify(data)
 
@@ -994,6 +1031,7 @@ def api_today():
     is_competitor = request.args.get("competitor") == "true"
     project_usernames = _resolve_project_usernames(uid, project_id)
     project_usernames = _resolve_competitor_usernames(uid, request.args.get("competitor"), project_usernames)
+    project_usernames = _apply_platform_filter(uid, request.args.get("platform"), project_usernames)
 
     conn = get_connection()
     try:
