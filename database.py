@@ -741,12 +741,18 @@ def get_user_by_id(user_id):
 # ==================== Account management ====================
 
 def add_tracked_account(user_id, username, platform="tiktok", is_competitor=False):
+    # Leave last_updated NULL on first INSERT so _is_due() in the cron returns
+    # True (its "never scraped → always due" branch). Otherwise a fresh row
+    # with last_updated=NOW() looks "just scraped" to the cron and gets skipped
+    # for the full plan cadence (6h on starter), so new signups would wait
+    # 6h before seeing any data. last_updated is bumped to a real timestamp
+    # by upsert_account on the first scrape attempt.
     conn = get_connection()
     _execute(conn, """
         INSERT INTO accounts (username, display_name, platform, user_id, is_competitor, last_updated)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, NULL)
         ON CONFLICT (username, user_id, platform) DO UPDATE SET is_competitor = EXCLUDED.is_competitor
-    """, (username, username, platform, user_id, is_competitor, datetime.now().isoformat()))
+    """, (username, username, platform, user_id, is_competitor))
     conn.commit()
     conn.close()
 
