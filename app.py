@@ -289,6 +289,29 @@ def api_admin_swarm_metrics():
         summary["endpoint_stats"] = stats.get("endpoints", {})
         summary["learned_paths"] = stats.get("learned_paths", {})
         return jsonify(summary)
+    except ImportError:
+        # scraper_healing/ is excluded from the Vercel bundle (see .vercelignore).
+        # The swarm is a local-only debug tool — cycles are written to a JSONL
+        # on the developer's machine. Return empty defaults so the dashboard
+        # renders its existing empty state instead of HTTP 500.
+        return jsonify({
+            "metrics": {
+                "success_rate": 0.0,
+                "failure_rate": 0.0,
+                "data_completeness_score": 0.0,
+                "selector_stability_score": 0.0,
+                "adversarial_resilience_score": 0.0,
+                "evolution_effectiveness_score": 0.0,
+                "n_cycles": 0,
+                "n_success": 0,
+                "n_failure": 0,
+                "n_adversarial_cycles": 0,
+            },
+            "recent_cycles": [],
+            "endpoint_stats": {},
+            "learned_paths": {},
+            "swarm_unavailable": True,
+        })
     except Exception as e:
         app.logger.exception("swarm_metrics_failed")
         return jsonify({"error": str(e)[:200]}), 500
