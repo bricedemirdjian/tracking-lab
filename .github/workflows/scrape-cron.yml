@@ -24,8 +24,12 @@ name: Scrape cron (hourly)
 
 on:
   schedule:
-    # Every hour UTC. The Paris-hour gate below filters to 9-21 local.
-    - cron: '0 * * * *'
+    # Every hour UTC at minute 13. The Paris-hour gate below filters to 9-21
+    # local. We avoid minute :00 because GitHub's docs explicitly warn that
+    # schedules at the top of the hour are most likely to be delayed (or
+    # silently dropped) under platform load — we observed 1h+ gaps when this
+    # was '0 * * * *', leaving newly-added accounts un-scraped for hours.
+    - cron: '13 * * * *'
   workflow_dispatch:
     inputs:
       platforms:
