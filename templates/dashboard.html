@@ -2178,7 +2178,7 @@ button { font-family: inherit; cursor: pointer; }
             <div class="chart-card-head">
               <div>
                 <h3 class="chart-card-title">Composition de l'engagement</h3>
-                <p class="chart-card-sub">Likes vs commentaires vs partages vs sauvegardes, par plateforme · <em>clique sur un libellé pour l'isoler</em></p>
+                <p class="chart-card-sub">Likes vs commentaires vs partages, par plateforme · <em>clique sur un libellé pour l'isoler</em></p>
               </div>
               <span class="chart-card-badge" id="adviceCompBadge">—</span>
             </div>
@@ -3772,11 +3772,15 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       destroyChart('adviceComp');
       if (!isEmpty) {
         const labels = activePlatforms.map(p => PLATFORM_LABEL[p]);
+        // 'Sauvegardes' (saves) series dropped until we switch off yt-dlp
+        // for TikTok — yt-dlp's TT extractor strips collect_count, so saves
+        // are always 0 in the DB and would render as an empty bar. Re-add
+        // when we have a fetcher that surfaces the field (see commit history
+        // and dashboard saves option D discussion).
         const series = [
           { label: 'Likes',         key: 'likes',    color: '#FF69B4' },
           { label: 'Commentaires',  key: 'comments', color: '#7C3AED' },
           { label: 'Partages',      key: 'shares',   color: '#0A66C2' },
-          { label: 'Sauvegardes',   key: 'saves',    color: '#10B981' },
         ];
         const datasets = series.map(d => ({
           label: d.label,
