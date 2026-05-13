@@ -848,14 +848,24 @@ def api_add_account():
 
     add_tracked_account(user_id=current_user.data_user_id, username=username, platform=platform, is_competitor=is_competitor)
 
-    # On Vercel: don't auto-scrape (too slow, timeout risk). User clicks "Scraper" instead.
-    # Locally: scrape in background thread.
-    if not os.environ.get('VERCEL'):
-        user_id = current_user.data_user_id
-        thread = threading.Thread(target=scrape_single_account_for_user, args=(username, user_id, platform))
-        thread.start()
+    # Synchronously trigger the first scrape so a brand-new user sees their
+    # stats the moment they land on /dashboard. Previously this was a Vercel
+    # no-op (waited for next cron — 0-60min, felt broken) and a local thread.
+    # Single-account scrape typically fits well inside Vercel's 60s function
+    # budget: TikTok ~15-25s, Instagram ~5-15s, LinkedIn ~3-5s, YouTube scales
+    # with channel size. If it fails or times out, the account row is still
+    # in DB with last_updated=NULL, so the next cron pass picks it up.
+    user_id = current_user.data_user_id
+    first_scrape = "skipped"
+    try:
+        result = scrape_single_account_for_user(username, user_id, platform=platform)
+        first_scrape = result.get("status", "error") if isinstance(result, dict) else "error"
+    except Exception as e:
+        # Don't fail the request — account is added, cron will retry the scrape.
+        print(f"[add_account] first scrape failed for @{username}: {e}")
+        first_scrape = "deferred"
 
-    return jsonify({"status": "success", "username": username})
+    return jsonify({"status": "success", "username": username, "first_scrape": first_scrape})
 
 
 @app.route("/api/accounts/remove", methods=["POST"])

@@ -4224,7 +4224,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       const platform = document.getElementById('newAccountPlatform').value;
       if (!username) return;
       addBtn.disabled = true;
-      addBtn.textContent = 'Ajout…';
+      addBtn.textContent = 'Récupération… (~30s)';
       try {
         const r = await fetch('/api/accounts/add', {
           method: 'POST',
@@ -4234,9 +4234,18 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || 'erreur');
         document.getElementById('newAccountUsername').value = '';
-        addBtn.textContent = '✓ Ajouté';
+        // Show outcome of the first scrape so the user knows whether stats are
+        // ready or still pending (cron will pick up deferred ones within 1h).
+        const outcome = j.first_scrape;
+        if (outcome === 'success' || outcome === 'cached') {
+          addBtn.textContent = '✓ Stats prêtes';
+        } else if (outcome === 'deferred' || outcome === 'no_data') {
+          addBtn.textContent = '✓ Ajouté · stats en cours';
+        } else {
+          addBtn.textContent = '✓ Ajouté';
+        }
         await load();
-        setTimeout(() => { addBtn.textContent = '+ Ajouter'; addBtn.disabled = false; }, 1500);
+        setTimeout(() => { addBtn.textContent = '+ Ajouter'; addBtn.disabled = false; }, 2000);
       } catch (e) {
         addBtn.textContent = '✗ ' + (e.message || 'erreur');
         setTimeout(() => { addBtn.textContent = '+ Ajouter'; addBtn.disabled = false; }, 2500);
