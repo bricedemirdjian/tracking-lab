@@ -1056,7 +1056,12 @@ async def _process_and_store(
                 shares=vdata.get("repost_count", 0) or 0,
                 saves=vdata.get("forward_count", 0) or 0,
                 thumbnail_url=mirrored_thumb,
-                video_url=vdata.get("webpage_url"),
+                # yt-dlp's TikTok extractor in extract_flat=True mode emits
+                # `url` (the canonical /@user/video/<id> page) but not
+                # `webpage_url` — YT does the opposite. Fall back so both
+                # platforms write a real link instead of NULL, otherwise
+                # dashboard 'Voir la vidéo' cards land on '#'.
+                video_url=vdata.get("webpage_url") or vdata.get("url"),
                 user_id=user_id,
                 platform=platform,
             )
