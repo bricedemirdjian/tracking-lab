@@ -4530,6 +4530,15 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     }
   }
   setTimeout(pollScrapingHealth, 800);
+  // Re-poll every 60s so the banner auto-clears when the cron refreshes
+  // accounts — without this it stayed frozen on the initial state from
+  // page load, giving the impression that scraping was still broken even
+  // after a manual cron had just succeeded. Skip while tab is in the
+  // background to avoid burning the function budget on idle dashboards.
+  setInterval(() => {
+    if (document.hidden) return;
+    pollScrapingHealth();
+  }, 60_000);
 
   // Browser back/forward buttons
   window.addEventListener('popstate', () => {
