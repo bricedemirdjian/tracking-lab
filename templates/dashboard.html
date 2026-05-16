@@ -1566,6 +1566,73 @@ button { font-family: inherit; cursor: pointer; }
 }
 .data-table tfoot td { color: var(--text-1); padding: 12px 14px; }
 .data-table tfoot .tfoot-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); }
+/* Sub-title under an advice-card head — used for the video-analysis cards */
+.advice-card .advice-card-sub {
+  font-size: 12px; color: var(--text-3);
+  margin: 2px 0 0 28px;  /* aligned with the title (after the 18px icon + gap) */
+  font-weight: 400;
+}
+/* Per-video analysis grid — 3 cards side by side on desktop, stacked on mobile */
+.vid-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 6px 0 0;
+}
+.vid-analysis-card {
+  display: flex; flex-direction: column;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+  text-decoration: none; color: inherit;
+}
+.vid-analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--text-4);
+}
+.vid-analysis-card .vac-top {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+  font-size: 11.5px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+}
+.vid-analysis-card .vac-rank {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 12px; font-weight: 700;
+}
+.vid-analysis-card.flop .vac-rank { background: #f59e0b; }
+.vid-analysis-card .vac-views {
+  font-size: 22px; font-weight: 700; color: var(--text-1);
+  margin: 0 0 2px; line-height: 1.1;
+}
+.vid-analysis-card .vac-views-sub {
+  font-size: 11.5px; color: var(--text-3);
+  margin: 0 0 10px;
+}
+.vid-analysis-card .vac-desc {
+  font-size: 13px; color: var(--text-2);
+  margin: 0 0 12px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; min-height: 36px;
+}
+.vid-analysis-card .vac-tags {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 0 0 4px;
+}
+.vid-analysis-card .vac-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg-soft, #f5f5f7);
+  border-radius: 999px;
+  font-size: 11px; color: var(--text-2);
+  font-weight: 500;
+}
+.vid-analysis-card .vac-tag.good { background: rgba(16, 185, 129, 0.1); color: #047857; }
+.vid-analysis-card .vac-tag.bad  { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
 
 /* Day × Hour heatmap (CSS grid only — no Chart.js plugin needed) */
 .heatmap {
@@ -2360,6 +2427,41 @@ button { font-family: inherit; cursor: pointer; }
             <h4 class="advice-card-title">Tes patterns gagnants</h4>
           </div>
           <ul class="advice-card-list" id="advicePerfList"></ul>
+        </div>
+      </div>
+
+      <!-- ── Group 4: Analyse vidéo par vidéo ── -->
+      <!-- Concrete, video-level "why this worked" callouts. Each card opens
+           the actual videos in a new tab (video_url is backfilled for all
+           platforms). Populated by computeVideoAnalysis() from /api/videos. -->
+      <div class="advice-group" id="adviceVideoGroup" hidden>
+        <div class="advice-group-head">
+          <h3 class="advice-group-title">Analyse vidéo par vidéo</h3>
+          <p class="advice-group-sub">Pourquoi certaines vidéos cartonnent et pas d'autres — pour reproduire ce qui marche.</p>
+        </div>
+        <div class="advice-card" id="adviceTopVidsCard">
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🚀</span>
+            <h4 class="advice-card-title">Pourquoi ces vidéos cartonnent</h4>
+            <p class="advice-card-sub">Top 3 vues sur la période · clic pour voir la vidéo</p>
+          </div>
+          <div class="vid-analysis-grid" id="adviceTopVidsList"></div>
+        </div>
+        <div class="advice-card" id="adviceRecipeCard" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🧪</span>
+            <h4 class="advice-card-title">La recette de tes hits</h4>
+            <p class="advice-card-sub">Pattern dominant dans tes 25 % meilleures vidéos vs ton catalogue global</p>
+          </div>
+          <ul class="advice-card-list" id="adviceRecipeList"></ul>
+        </div>
+        <div class="advice-card" id="adviceFlopVidsCard" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">⚠️</span>
+            <h4 class="advice-card-title">Ce qui n'a pas marché (et pourquoi)</h4>
+            <p class="advice-card-sub">3 vidéos sous-performantes pour comprendre les patterns à éviter</p>
+          </div>
+          <div class="vid-analysis-grid" id="adviceFlopVidsList"></div>
         </div>
       </div>
 
@@ -3663,6 +3765,7 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     try { computeEvolutionAdvice(evolution, stats); } catch (e) { console.warn('[advice/evo]', e); }
     try { computePlatformAdvice(stats, accs); }       catch (e) { console.warn('[advice/plat]', e); }
     try { computePerfAdvice(videos, stats, accs); }   catch (e) { console.warn('[advice/perf]', e); }
+    try { computeVideoAnalysis(videos); }             catch (e) { console.warn('[advice/vid]', e); }
   }
 
   // ─── Advice cards (actionable insights, computed client-side) ──────
@@ -3890,9 +3993,233 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     card.hidden = false;
   }
 
-  // ─── Advice chart helpers (called from renderTableCharts) ──────────
-  // Heatmap, radar, eng-evolution, composition, distribution, avg-views.
-  const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  // ── Video-level analysis: what makes individual videos succeed/fail ──
+  // Computes per-video features (description length, hashtag count, posting
+  // slot, duration bucket, engagement composition) and compares the top
+  // performers vs the bottom performers to surface concrete reproducible
+  // patterns. Each video is clickable — opens the actual post on the
+  // platform via video_url (backfilled for TikTok in commit bf61292).
+  function _videoFeatures(v) {
+    const desc = String(v.description || '').trim();
+    const hashtags = (desc.match(/#[\p{L}\w]+/gu) || []);
+    const mentions = (desc.match(/@[\p{L}\w.]+/gu) || []);
+    const hasEmoji = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{27BF}]/u.test(desc);
+    const dur = Number(v.duration) || 0;
+    const durBucket = dur < 15 ? '<15s' : dur < 30 ? '15-30s' : dur < 60 ? '30-60s' : '60s+';
+    let day = null, hour = null;
+    if (v.create_time) {
+      const d = new Date(v.create_time);
+      if (!isNaN(d)) { day = d.getDay(); hour = d.getHours(); }
+    }
+    const dayLbl = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][day] || null;
+    const views = Number(v.views) || 0;
+    const likes = Number(v.likes) || 0;
+    const comments = Number(v.comments) || 0;
+    const shares = Number(v.shares) || 0;
+    const saves = Number(v.saves) || 0;
+    const eng = likes + comments + shares + saves;
+    // Dominant engagement type tells you what KIND of content this is.
+    let engType = null;
+    if (eng > 0) {
+      const parts = [['émotion', likes], ['discussion', comments], ['viralité', shares], ['référence', saves]];
+      parts.sort((a,b) => b[1] - a[1]);
+      if (parts[0][1] >= eng * 0.55) engType = parts[0][0];
+    }
+    return {
+      v, desc, descLen: desc.length, hashtagCount: hashtags.length,
+      mentionCount: mentions.length, hasEmoji, dur, durBucket,
+      day, hour, dayLbl,
+      views, likes, comments, shares, saves, eng,
+      engRate: views > 0 ? (eng / views) * 100 : 0,
+      engType,
+    };
+  }
+  function _vidUrl(v) {
+    if (v.video_url) return v.video_url;
+    if (v.url) return v.url;
+    // Reconstruct TikTok URL from username + video_id (defensive fallback)
+    if (v.platform === 'tiktok' && v.video_id && v.account_username) {
+      return `https://www.tiktok.com/@${v.account_username}/video/${v.video_id}`;
+    }
+    return '#';
+  }
+  function _platformAvatar(platform) {
+    const bg = { tiktok:'#000', instagram:'#E1306C', youtube:'#FF0000', linkedin:'#0A66C2' }[platform] || '#666';
+    return `<span class="cell-account-platform" style="background:${bg};color:#fff">${PLATFORM_SVG_INLINE[platform] || ''}</span>`;
+  }
+  // Build the tags shown on each video card — concrete attributes the user
+  // can replicate (or avoid). Each tag has an optional good/bad slant so the
+  // viewer instantly sees what's a strength vs a weakness.
+  function _videoTags(f, recipe) {
+    const tags = [];
+    if (f.dayLbl !== null && f.hour !== null) {
+      const inBestSlot = recipe && recipe.bestSlots && recipe.bestSlots.some(s => s.dayLbl === f.dayLbl && Math.abs(s.hour - f.hour) <= 1);
+      tags.push({ label: `${f.dayLbl} ${f.hour}h`, kind: inBestSlot ? 'good' : '' });
+    }
+    if (f.durBucket) {
+      const isHitBucket = recipe && recipe.dominantBucket && f.durBucket === recipe.dominantBucket;
+      tags.push({ label: f.durBucket, kind: isHitBucket ? 'good' : '' });
+    }
+    if (f.hashtagCount > 0) {
+      tags.push({ label: `${f.hashtagCount} hashtag${f.hashtagCount > 1 ? 's' : ''}`, kind: f.hashtagCount >= 3 ? 'good' : '' });
+    } else {
+      tags.push({ label: 'aucun hashtag', kind: 'bad' });
+    }
+    if (f.engType) {
+      tags.push({ label: f.engType, kind: '' });
+    }
+    if (f.descLen > 0 && f.descLen < 30) {
+      tags.push({ label: 'hook visuel', kind: 'good' });
+    } else if (f.descLen >= 140) {
+      tags.push({ label: 'description longue', kind: 'bad' });
+    }
+    return tags;
+  }
+
+  function _renderVideoCard(f, rank, isFlop, recipe) {
+    const url = _vidUrl(f.v);
+    const tags = _videoTags(f, recipe);
+    const desc = f.desc || '<em style="opacity:0.5">Pas de description</em>';
+    const platform = f.v.platform || 'tiktok';
+    return `
+      <a class="vid-analysis-card ${isFlop ? 'flop' : ''}" href="${escapeHTML(url)}" target="_blank" rel="noopener">
+        <div class="vac-top">
+          <span class="vac-rank">${rank}</span>
+          ${_platformAvatar(platform)}
+          @${escapeHTML(f.v.account_username || '')}
+        </div>
+        <div class="vac-views">${fmt(f.views)} vues</div>
+        <div class="vac-views-sub">${fmt(f.likes)} likes · ${fmt(f.comments)} comm. · ${f.engRate.toFixed(2).replace('.', ',')} % engagement</div>
+        <div class="vac-desc">${escapeHTML(desc).slice(0, 140)}${desc.length > 140 ? '…' : ''}</div>
+        <div class="vac-tags">${tags.map(t => `<span class="vac-tag ${t.kind}">${t.label}</span>`).join('')}</div>
+      </a>`;
+  }
+
+  // Mode (most common value) helper for pattern detection.
+  function _mode(arr) {
+    if (!arr.length) return null;
+    const counts = new Map();
+    arr.forEach(v => counts.set(v, (counts.get(v) || 0) + 1));
+    let bestK = null, bestC = 0;
+    for (const [k, c] of counts) { if (c > bestC) { bestK = k; bestC = c; } }
+    return { value: bestK, count: bestC, share: bestC / arr.length };
+  }
+
+  function computeVideoAnalysis(videos) {
+    const group = document.getElementById('adviceVideoGroup');
+    if (!group) return;
+    // Need at least 6 videos with views to draw a meaningful top/bottom split.
+    const withFeatures = (videos || [])
+      .filter(v => Number(v.views) > 0 && v.create_time)
+      .map(_videoFeatures);
+    if (withFeatures.length < 6) { group.hidden = true; return; }
+    group.hidden = false;
+
+    // Sort by views, take top 3 and bottom 3 (within views > 0).
+    const sorted = withFeatures.slice().sort((a, b) => b.views - a.views);
+    const top = sorted.slice(0, 3);
+    const bottom = sorted.slice(-3).reverse();   // worst first
+
+    // Recipe = pattern across the top 25 % vs the rest.
+    const topCount = Math.max(3, Math.ceil(withFeatures.length * 0.25));
+    const topQuart = sorted.slice(0, topCount);
+    const restQuart = sorted.slice(topCount);
+
+    const recipe = {
+      dominantBucket: _mode(topQuart.map(f => f.durBucket))?.value,
+      bestSlots: (() => {
+        // Best slot = day+hour combo most common in top quartile (≥2 occurrences)
+        const slotKey = f => (f.dayLbl !== null ? `${f.dayLbl}-${f.hour}` : null);
+        const slots = new Map();
+        topQuart.forEach(f => {
+          const k = slotKey(f);
+          if (!k) return;
+          slots.set(k, (slots.get(k) || 0) + 1);
+        });
+        return [...slots.entries()]
+          .filter(([, c]) => c >= 2)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(([k]) => ({ dayLbl: k.split('-')[0], hour: Number(k.split('-')[1]) }));
+      })(),
+    };
+
+    // ── Render top videos ──
+    const topList = document.getElementById('adviceTopVidsList');
+    if (topList) topList.innerHTML = top.map((f, i) => _renderVideoCard(f, i + 1, false, recipe)).join('');
+
+    // ── Render flops (only if we have enough spread — worst < median / 4) ──
+    const median = sorted[Math.floor(sorted.length / 2)].views;
+    const flopCard = document.getElementById('adviceFlopVidsCard');
+    const flopList = document.getElementById('adviceFlopVidsList');
+    if (flopList && flopCard && bottom[0].views <= median / 4) {
+      flopList.innerHTML = bottom.map((f, i) => _renderVideoCard(f, i + 1, true, recipe)).join('');
+      flopCard.hidden = false;
+    } else if (flopCard) {
+      flopCard.hidden = true;   // performance is even — no clear "flops" to call out
+    }
+
+    // ── Render recipe (the formula) ──
+    const recipeCard = document.getElementById('adviceRecipeCard');
+    const recipeList = document.getElementById('adviceRecipeList');
+    if (!recipeCard || !recipeList) return;
+    const tips = [];
+
+    // Duration pattern
+    const topBuckets = topQuart.map(f => f.durBucket);
+    const restBuckets = restQuart.map(f => f.durBucket);
+    const topModeDur = _mode(topBuckets);
+    const restModeDur = _mode(restBuckets);
+    if (topModeDur && topModeDur.share >= 0.5 && (!restModeDur || topModeDur.value !== restModeDur.value)) {
+      tips.push({type:'good', html:`<strong>Durée : ${topModeDur.value}</strong> domine tes hits (${Math.round(topModeDur.share * 100)} %). Ton reste de catalogue est plutôt sur ${restModeDur ? restModeDur.value : 'autre chose'} — privilégie le format ${topModeDur.value} pour les contenus que tu veux pousser.`});
+    } else if (topModeDur && topModeDur.share >= 0.5) {
+      tips.push({type:'', html:`Tes hits sont majoritairement <strong>${topModeDur.value}</strong> (${Math.round(topModeDur.share * 100)} %). Format cohérent avec le reste de ton catalogue — c'est ta zone de confort, exploite-la.`});
+    }
+
+    // Hashtag pattern
+    const topHashMed = topQuart.map(f => f.hashtagCount).sort((a,b) => a-b)[Math.floor(topQuart.length / 2)];
+    const restHashMed = restQuart.length ? restQuart.map(f => f.hashtagCount).sort((a,b) => a-b)[Math.floor(restQuart.length / 2)] : 0;
+    if (topHashMed >= restHashMed + 2) {
+      tips.push({type:'good', html:`<strong>Hashtags : médiane ${topHashMed} sur tes hits</strong> vs ${restHashMed} sur le reste. L'algo amplifie quand tu cibles précisément — vise ${topHashMed}-${topHashMed + 2} hashtags pertinents par vidéo.`});
+    } else if (restHashMed >= topHashMed + 2 && topHashMed <= 2) {
+      tips.push({type:'good', html:`<strong>Tes hits ont moins de hashtags</strong> (médiane ${topHashMed} vs ${restHashMed} ailleurs). Ton audience te trouve sans surcharge SEO — concentre-toi sur 1-2 hashtags signature plutôt que la chasse.`});
+    }
+
+    // Posting slot pattern
+    if (recipe.bestSlots.length > 0) {
+      const slots = recipe.bestSlots.map(s => `<em>${s.dayLbl} ${s.hour}h</em>`).join(' et ');
+      tips.push({type:'good', html:`<strong>Créneau gagnant : ${slots}</strong> — ces slots reviennent dans tes top 25 %. Bloque-les en priorité pour tes vidéos travaillées.`});
+    }
+
+    // Description-length pattern
+    const topDescAvg = topQuart.reduce((s, f) => s + f.descLen, 0) / topQuart.length;
+    const restDescAvg = restQuart.length ? restQuart.reduce((s, f) => s + f.descLen, 0) / restQuart.length : 0;
+    if (topDescAvg + 30 < restDescAvg) {
+      tips.push({type:'good', html:`<strong>Descriptions courtes</strong> chez tes hits (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs). Hook visuel ou intrigue : la vidéo parle d'elle-même.`});
+    } else if (topDescAvg > restDescAvg + 50) {
+      tips.push({type:'good', html:`Tes hits ont des <strong>descriptions plus longues</strong> (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs) — l'algo lit ce texte pour le ranking, garde le storytelling.`});
+    }
+
+    // Engagement-type pattern: what KIND of reactions do hits get?
+    const topEngTypes = topQuart.map(f => f.engType).filter(Boolean);
+    const topEngMode = _mode(topEngTypes);
+    if (topEngMode && topEngMode.share >= 0.5) {
+      const meaning = {
+        'émotion':    'tes hits sont des contenus émotionnels purs (likes dominants) — bon pour audience croissance',
+        'discussion': 'tes hits déclenchent des commentaires — contenus clivants ou questions ouvertes, parfait pour communauté',
+        'viralité':   'tes hits sont partagés — formats "à montrer à un ami", capitalise sur le humor/utility',
+        'référence':  'tes hits sont sauvegardés — contenus à valeur/tutos, utilise-les en lead magnet ou pour conversion',
+      }[topEngMode.value] || 'pattern d\'engagement spécifique';
+      tips.push({type:'good', html:`<strong>Type dominant : ${topEngMode.value}</strong> (${Math.round(topEngMode.share * 100)} % des hits) — ${meaning}.`});
+    }
+
+    if (tips.length === 0) {
+      recipeCard.hidden = true;
+    } else {
+      recipeList.innerHTML = tips.map(t => _bullet(t.type, t.html)).join('');
+      recipeCard.hidden = false;
+    }
+  }
 
   function buildVideosAllURL() {
     const p = new URLSearchParams();
