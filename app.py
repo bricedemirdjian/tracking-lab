@@ -959,10 +959,15 @@ def api_stats():
         per_account = get_aggregated_stats(account, date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
         global_stats = get_global_stats(date_from, date_to, user_id=current_user.data_user_id, account_usernames=project_usernames)
     except Exception as e:
-        print(f"[API] Error in /api/stats: {e}")
-        global_stats = {"total_videos": 0, "total_views": 0, "total_likes": 0,
-                        "total_comments": 0, "total_shares": 0, "total_saves": 0}
-        per_account = []
+        # Previously this caught all exceptions and silently returned an
+        # all-zeros dict with HTTP 200. The frontend's cachedJSON cached that
+        # fake-success response for 60s, so a transient DB hiccup (pool
+        # exhausted, query timeout) made every KPI display 0 for a full
+        # minute — the "stats à 0 desfois" bug. Now we return HTTP 500 with
+        # the error message, cachedJSON refuses to cache, and the dashboard
+        # keeps the previous values instead of flashing zeros.
+        app.logger.exception("api_stats_failed")
+        return jsonify({"error": str(e)[:200]}), 500
 
     # Ensure all values are numeric (PostgreSQL may return None)
     for key in ["total_videos", "total_views", "total_likes", "total_comments", "total_shares", "total_saves", "total_followers"]:
