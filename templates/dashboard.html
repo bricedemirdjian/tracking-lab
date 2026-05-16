@@ -1634,7 +1634,11 @@ button { font-family: inherit; cursor: pointer; }
 .vid-analysis-card .vac-tag.good { background: rgba(16, 185, 129, 0.1); color: #047857; }
 .vid-analysis-card .vac-tag.bad  { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
 
-/* Day × Hour heatmap (CSS grid only — no Chart.js plugin needed) */
+/* Day × Hour heatmap (CSS grid only — no Chart.js plugin needed)
+   Sparse-data fix: previously the grid had so much white space (empty cells
+   were #f5f5f7 on a white card body, ~invisible) that users perceived the
+   heatmap as completely blank. Bumped the empty-cell color, added a subtle
+   border to make the grid structure readable even with one filled cell. */
 .heatmap {
   display: grid;
   grid-template-columns: 42px repeat(24, 1fr);
@@ -1660,16 +1664,18 @@ button { font-family: inherit; cursor: pointer; }
 .heatmap-hour-label { font-size: 9px; }
 .heatmap-cell {
   border-radius: 4px;
-  background: #f5f5f7;
+  background: #ececf0;            /* darker default so empty cells are visible on white */
+  border: 1px solid #e0e0e6;      /* subtle outline = grid structure stays readable */
   cursor: default;
   transition: outline 80ms ease-in-out;
+  min-height: 18px;               /* defensive — guarantees the cell takes vertical space */
 }
-.heatmap-cell[data-v="0"]  { background: #f5f5f7; }
-.heatmap-cell[data-v="1"]  { background: #ffe1ef; }
-.heatmap-cell[data-v="2"]  { background: #ffb6d6; }
-.heatmap-cell[data-v="3"]  { background: #ff8ac0; }
-.heatmap-cell[data-v="4"]  { background: #FF69B4; }
-.heatmap-cell[data-v="5"]  { background: #d8438f; }
+.heatmap-cell[data-v="0"]  { background: #ececf0; border-color: #e0e0e6; }
+.heatmap-cell[data-v="1"]  { background: #ffe1ef; border-color: #ffd0e3; }
+.heatmap-cell[data-v="2"]  { background: #ffb6d6; border-color: #ff9ec5; }
+.heatmap-cell[data-v="3"]  { background: #ff8ac0; border-color: #ff70b1; }
+.heatmap-cell[data-v="4"]  { background: #FF69B4; border-color: #ff4ea4; }
+.heatmap-cell[data-v="5"]  { background: #d8438f; border-color: #be3577; }
 .heatmap-cell:hover { outline: 2px solid var(--text-1); outline-offset: 1px; z-index: 1; }
 .heatmap-legend {
   grid-column: 1 / -1;
@@ -4290,6 +4296,9 @@ console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69
     const root = document.getElementById('adviceHeatmap');
     const empty = document.getElementById('adviceHeatmapEmpty');
     const badge = document.getElementById('adviceHeatmapBadge');
+    // Defensive log: tells us at a glance whether we're rendering the empty
+    // state vs the cell grid, and whether the root element was actually found.
+    console.log('[heatmap]', { totalPosts, maxAvg: Math.round(maxAvg), rootFound: !!root, bucketKeys: Object.keys(buckets).length });
     if (totalPosts === 0 || maxAvg === 0) {
       if (root) root.innerHTML = '';
       if (empty) empty.hidden = false;
