@@ -2506,7 +2506,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -4303,9 +4303,27 @@ console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69
       if (root) root.innerHTML = '';
       if (empty) empty.hidden = false;
       if (badge) badge.textContent = '—';
-    } else {
-      if (empty) empty.hidden = true;
-      if (badge) badge.textContent = `${totalPosts} vidéo${totalPosts > 1 ? 's' : ''}`;
+      return;
+    }
+    if (empty) empty.hidden = true;
+    if (badge) badge.textContent = `${totalPosts} vidéo${totalPosts > 1 ? 's' : ''}`;
+    // Internal try/catch so a partial failure here can't strand the heatmap
+    // mid-render (badge set + cells dropped on the floor). On error we write
+    // a visible placeholder INSIDE the root, so the user sees evidence of a
+    // bug instead of mysterious blank space.
+    try {
+      // Log scaling — when one bucket dominates (e.g. 6M-view outlier) linear
+      // scaling pushes 95% of cells to data-v=0/1, leaving the grid looking
+      // empty even when most slots have real activity. Map via log so a slot
+      // with 1 000 avg views still gets a visible cell color even if the max
+      // is 6 000 000.
+      const logScale = (a) => {
+        if (a <= 0) return 0;
+        const ln = Math.log10(a + 1);
+        const lnMax = Math.log10(maxAvg + 1);
+        if (lnMax <= 0) return 0;
+        return Math.max(1, Math.min(5, Math.round((ln / lnMax) * 5)));
+      };
       const cells = [];
       cells.push('<div class="heatmap-corner"></div>');
       for (let h = 0; h < 24; h++) {
@@ -4315,19 +4333,19 @@ console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69
         cells.push(`<div class="heatmap-day-label">${DAY_LABELS[d]}</div>`);
         for (let h = 0; h < 24; h++) {
           const a = cellAvg[`${d}|${h}`] || 0;
-          const v = a === 0 ? 0 : Math.min(5, 1 + Math.floor((a / maxAvg) * 4.99));
+          const v = logScale(a);
           const count = buckets[`${d}|${h}`]?.count || 0;
           const tip = count > 0
             ? `${DAY_LABELS[d]} ${h}h — ${count} post${count > 1 ? 's' : ''} · ${fmtCompact(Math.round(a))} vues moy.`
             : `${DAY_LABELS[d]} ${h}h — pas de post`;
-          cells.push(`<div class="heatmap-cell" data-v="${v}" title="${tip}"></div>`);
+          cells.push(`<div class="heatmap-cell" data-v="${v}" title="${tip.replace(/"/g, '&quot;')}"></div>`);
         }
       }
       cells.push(`
         <div class="heatmap-legend">
           <span>Moins</span>
           <div class="heatmap-legend-scale">
-            <span style="background:#f5f5f7"></span>
+            <span style="background:#ececf0"></span>
             <span style="background:#ffe1ef"></span>
             <span style="background:#ffb6d6"></span>
             <span style="background:#ff8ac0"></span>
@@ -4336,9 +4354,18 @@ console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69
           </div>
           <span>Plus</span>
         </div>`);
-      if (root) root.innerHTML = cells.join('');
+      if (root) {
+        root.innerHTML = cells.join('');
+        console.log('[heatmap] rendered cells:', root.children.length);
+      } else {
+        console.warn('[heatmap] root element missing — heatmap container not in DOM');
+      }
+    } catch (err) {
+      console.error('[heatmap] render threw:', err);
+      if (root) {
+        root.innerHTML = `<div style="padding:14px;color:#b91c1c;font-size:12px">Erreur d'affichage de la heatmap : ${String(err.message || err).slice(0, 160)}</div>`;
+      }
     }
-
   }
 
   // ── Axis 2: quality ── (charts C radar + D engagement evolution + E composition) ──
