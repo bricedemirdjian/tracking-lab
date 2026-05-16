@@ -1527,6 +1527,45 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-3);
   margin: 0;
 }
+/* Advice card — actionable insights inserted after each chart group.
+   Populated client-side from the same data fetched for the charts. */
+.advice-card {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, rgba(255,105,180,0.04), rgba(255,255,255,0));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+}
+.advice-card[hidden] { display: none !important; }
+.advice-card-head { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.advice-card-icon { font-size: 18px; flex-shrink: 0; }
+.advice-card-title { font-size: 14px; font-weight: 700; color: var(--text-1); margin: 0; letter-spacing: -0.1px; }
+.advice-card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.advice-card-list li {
+  font-size: 13.5px; line-height: 1.55; color: var(--text-2);
+  padding-left: 22px; position: relative;
+}
+.advice-card-list li::before {
+  content: ""; position: absolute; left: 6px; top: 9px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}
+.advice-card-list li.advice-warn::before { background: #f59e0b; }
+.advice-card-list li.advice-good::before { background: #10b981; }
+.advice-card-list li strong { color: var(--text-1); font-weight: 700; }
+.advice-card-list li em { color: var(--accent); font-style: normal; font-weight: 600; }
+/* Data table improvements — color-coded engagement and bold totals row */
+.data-table .eng-good { color: #10b981; font-weight: 600; }
+.data-table .eng-mid  { color: #f59e0b; font-weight: 600; }
+.data-table .eng-low  { color: #ef4444; font-weight: 600; }
+.data-table .gain-pos { color: #10b981; font-weight: 600; }
+.data-table .gain-neg { color: #ef4444; font-weight: 600; }
+.data-table tfoot tr {
+  background: rgba(0,0,0,0.025); font-weight: 700;
+  border-top: 2px solid var(--border);
+}
+.data-table tfoot td { color: var(--text-1); padding: 12px 14px; }
+.data-table tfoot .tfoot-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); }
 
 /* Day × Hour heatmap (CSS grid only — no Chart.js plugin needed) */
 .heatmap {
@@ -2184,6 +2223,16 @@ button { font-family: inherit; cursor: pointer; }
           </div>
 
         </div>
+        <!-- Advice block: actionable interpretation of the time-series charts.
+             Populated by computeEvolutionAdvice() from /api/evolution data
+             already in memory (no extra fetch). -->
+        <div class="advice-card" id="adviceEvoCard" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">💡</span>
+            <h4 class="advice-card-title">Comment lire cette évolution</h4>
+          </div>
+          <ul class="advice-card-list" id="adviceEvoList"></ul>
+        </div>
       </div>
 
       <!-- ── Group 2: Répartition par plateforme ── -->
@@ -2243,6 +2292,14 @@ button { font-family: inherit; cursor: pointer; }
           </div>
 
         </div>
+        <!-- Advice block for platform mix — populated by computePlatformAdvice() -->
+        <div class="advice-card" id="advicePlatCard" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🎯</span>
+            <h4 class="advice-card-title">Où concentrer tes efforts</h4>
+          </div>
+          <ul class="advice-card-list" id="advicePlatList"></ul>
+        </div>
       </div>
 
       <!-- ── Group 3: Performance & insights ── -->
@@ -2295,6 +2352,14 @@ button { font-family: inherit; cursor: pointer; }
             </div>
           </div>
 
+        </div>
+        <!-- Advice block for performance patterns — populated by computePerfAdvice() -->
+        <div class="advice-card" id="advicePerfCard" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🏆</span>
+            <h4 class="advice-card-title">Tes patterns gagnants</h4>
+          </div>
+          <ul class="advice-card-list" id="advicePerfList"></ul>
         </div>
       </div>
 
@@ -3590,6 +3655,239 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     renderAdviceQuality(stats, evolution);
     renderAdviceContent(videos, evolution);
     renderAdviceWhen(videos);
+
+    // ── Actionable advice cards (one per section) ──
+    // Pure client-side derivation from data already in memory. Each card
+    // surfaces 2-4 concrete bullet points with real numbers + one
+    // recommended action — no generic "engage more" advice.
+    try { computeEvolutionAdvice(evolution, stats); } catch (e) { console.warn('[advice/evo]', e); }
+    try { computePlatformAdvice(stats, accs); }       catch (e) { console.warn('[advice/plat]', e); }
+    try { computePerfAdvice(videos, stats, accs); }   catch (e) { console.warn('[advice/perf]', e); }
+  }
+
+  // ─── Advice cards (actionable insights, computed client-side) ──────
+  // Each compute* fn populates one .advice-card under its chart group. All
+  // numbers come from already-fetched data (stats, evolution, videos, accs)
+  // so the cards add zero network cost.
+  const _PLAT_LBL = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn' };
+  function _bullet(type, html) {
+    const cls = type === 'good' ? 'advice-good' : type === 'warn' ? 'advice-warn' : '';
+    return `<li class="${cls}">${html}</li>`;
+  }
+
+  function computeEvolutionAdvice(evolution, stats) {
+    const card = document.getElementById('adviceEvoCard');
+    const list = document.getElementById('adviceEvoList');
+    if (!card || !list) return;
+    const tips = [];
+    const g = stats?.global || {};
+
+    // 1. Follower trajectory (sign + magnitude relative to base)
+    const followers = g.total_followers || 0;
+    const gain = g.follower_gain || 0;
+    if (followers > 0) {
+      const base = Math.max(followers - gain, 1);
+      const pct = (gain / base) * 100;
+      if (gain > 0) {
+        const flavor = pct >= 5
+          ? 'Trajectoire saine — continue le format actuel.'
+          : 'Croissance modérée. Tente un changement de hook ou de format pour passer la vitesse supérieure.';
+        tips.push({type:'good', html:`<strong>+${fmt(gain)} followers</strong> sur la période (+${pct.toFixed(1).replace('.',',')} % de ta base). ${flavor}`});
+      } else if (gain < 0) {
+        tips.push({type:'warn', html:`<strong>${fmt(gain)} followers</strong> sur la période (${pct.toFixed(1).replace('.',',')} %). Audit : qu'est-ce qui a changé dans tes derniers contenus ? Vérifie tes 3 dernières vidéos.`});
+      } else {
+        tips.push({type:'', html:`Solde followers stable. <em>Stagnation = signal pour tester un nouveau format ou un nouveau créneau.</em>`});
+      }
+    }
+
+    // 2. Engagement rate signal — diagnostic
+    const er = g.engagement_rate || 0;
+    if (er > 0) {
+      const t = er >= 3 ? 'good' : er >= 1 ? '' : 'warn';
+      const msg = er >= 3
+        ? 'Très sain — ton audience est qualifiée et active.'
+        : er >= 1
+        ? 'Correct pour une audience large. Pour passer ≥ 3 %, parle plus directement à un sous-segment.'
+        : 'Trop bas — soit ton audience est froide (trop large), soit le format ne résonne pas. Tente un sondage en story pour réengager.';
+      tips.push({type:t, html:`Taux d'engagement global : <strong>${er.toFixed(2).replace('.',',')} %</strong>. ${msg}`});
+    }
+
+    // 3. Daily-views trajectory: last-7 vs prev-7 (need ≥14 days of data)
+    if (Array.isArray(evolution) && evolution.length >= 14) {
+      // Group by date to collapse multi-platform rows on the same day
+      const byDate = {};
+      evolution.forEach(r => {
+        const d = String(r.snapshot_date || '').slice(0,10);
+        if (!d) return;
+        byDate[d] = (byDate[d] || 0) + (r.views_delta || r.total_views || 0);
+      });
+      const dates = Object.keys(byDate).sort();
+      if (dates.length >= 14) {
+        const last7 = dates.slice(-7).reduce((s,d) => s + byDate[d], 0);
+        const prev7 = dates.slice(-14, -7).reduce((s,d) => s + byDate[d], 0);
+        if (prev7 > 0) {
+          const delta = ((last7 - prev7) / prev7) * 100;
+          if (delta >= 15) tips.push({type:'good', html:`Tes <strong>vues quotidiennes accélèrent</strong> (+${delta.toFixed(0)} % vs 7 jours précédents). <em>Capitalise : double la fréquence sur 1-2 semaines.</em>`});
+          else if (delta <= -15) tips.push({type:'warn', html:`Vues quotidiennes en <strong>baisse de ${Math.abs(delta).toFixed(0)} %</strong> sur 7 jours. Souvent signe d'un format saturé — change d'angle ou de hook.`});
+        }
+      }
+    }
+
+    // 4. Average views per video — quality signal
+    const totalViews = g.total_views || 0;
+    const totalVideos = g.total_videos || 0;
+    if (totalViews > 0 && totalVideos > 0) {
+      const avg = totalViews / totalVideos;
+      const msg = avg < 1000
+        ? 'Sous le seuil viral — travaille les 3 premières secondes et la promesse du titre.'
+        : avg < 5000
+        ? 'Bonne base — analyse tes top 20 % pour identifier ce qui scale.'
+        : 'Excellent niveau — réplique le format de tes top performers sur tes autres comptes.';
+      tips.push({type:'', html:`<strong>${fmt(Math.round(avg))} vues/vidéo</strong> en moyenne. ${msg}`});
+    }
+
+    if (tips.length === 0) { card.hidden = true; return; }
+    list.innerHTML = tips.map(t => _bullet(t.type, t.html)).join('');
+    card.hidden = false;
+  }
+
+  function computePlatformAdvice(stats, accs) {
+    const card = document.getElementById('advicePlatCard');
+    const list = document.getElementById('advicePlatList');
+    if (!card || !list) return;
+    const tips = [];
+    const perAccount = stats?.per_account || [];
+
+    // Aggregate per-platform views/engagement from per_account
+    const byPlat = {};
+    perAccount.forEach(s => {
+      const p = s.platform || 'tiktok';
+      if (!byPlat[p]) byPlat[p] = { views:0, likes:0, comments:0, shares:0, followers:0 };
+      byPlat[p].views += s.total_views || 0;
+      byPlat[p].likes += s.total_likes || 0;
+      byPlat[p].comments += s.total_comments || 0;
+      byPlat[p].shares += s.total_shares || 0;
+    });
+    // Followers from accounts snapshot
+    (accs || []).forEach(a => {
+      const p = a.platform || 'tiktok';
+      if (!byPlat[p]) byPlat[p] = { views:0, likes:0, comments:0, shares:0, followers:0 };
+      byPlat[p].followers += a.followers || 0;
+    });
+
+    const plats = Object.keys(byPlat).filter(p => byPlat[p].views > 0 || byPlat[p].followers > 0);
+    if (plats.length === 0) { card.hidden = true; return; }
+
+    const totalViews = plats.reduce((s,p) => s + byPlat[p].views, 0);
+    const totalFollowers = plats.reduce((s,p) => s + byPlat[p].followers, 0);
+
+    // 1. Top-views platform — discovery vs conversion check
+    const topViews = plats.slice().sort((a,b) => byPlat[b].views - byPlat[a].views)[0];
+    if (topViews && totalViews > 0) {
+      const vPct = byPlat[topViews].views / totalViews * 100;
+      const fPct = totalFollowers > 0 ? byPlat[topViews].followers / totalFollowers * 100 : 0;
+      if (vPct >= 50 && fPct < vPct - 20) {
+        tips.push({type:'warn', html:`<strong>${_PLAT_LBL[topViews]||topViews} = ${vPct.toFixed(0)} % de tes vues</strong> mais seulement ${fPct.toFixed(0)} % de tes followers. Canal fort en découverte, faible en conversion — ajoute un CTA "Suis-moi pour [bénéfice]" en fin de vidéo, ou un teasing vers ton autre plateforme.`});
+      } else if (vPct >= 50) {
+        tips.push({type:'good', html:`<strong>${_PLAT_LBL[topViews]||topViews}</strong> domine (${vPct.toFixed(0)} % des vues, ${fPct.toFixed(0)} % des followers). <em>Continue d'y publier en priorité — ratio sain.</em>`});
+      }
+    }
+
+    // 2. Best engagement-rate platform (with min view threshold to avoid noise)
+    const platsER = plats.map(p => {
+      const v = byPlat[p].views;
+      const e = byPlat[p].likes + byPlat[p].comments + byPlat[p].shares;
+      return { p, er: v > 0 ? e / v * 100 : 0, views: v };
+    }).filter(x => x.views >= 100).sort((a,b) => b.er - a.er);
+    if (platsER.length >= 2 && platsER[1].er > 0 && platsER[0].er >= platsER[1].er * 1.5) {
+      const top = platsER[0];
+      tips.push({type:'good', html:`<strong>${_PLAT_LBL[top.p]||top.p}</strong> a ton meilleur taux d'engagement (${top.er.toFixed(2).replace('.',',')} %, soit ${(top.er / platsER[1].er).toFixed(1)}× ${_PLAT_LBL[platsER[1].p]||platsER[1].p}). Chaque vue y "compte plus" — poste-y tes contenus stratégiques (lancements, sondages, CTAs).`});
+    }
+
+    // 3. Dormant platforms (have followers but 0 views in period)
+    const dormant = plats.filter(p => byPlat[p].views === 0 && byPlat[p].followers > 0);
+    if (dormant.length > 0) {
+      const labels = dormant.map(p => _PLAT_LBL[p]||p).join(', ');
+      const fSum = dormant.reduce((s,p) => s + byPlat[p].followers, 0);
+      tips.push({type:'warn', html:`<strong>${labels}</strong> : 0 vue sur la période mais ${fmt(fSum)} followers cumulés dorment. Soit tu relances (3 posts/sem), soit tu arrêtes pour ne pas diluer ton attention.`});
+    }
+
+    if (tips.length === 0) { card.hidden = true; return; }
+    list.innerHTML = tips.map(t => _bullet(t.type, t.html)).join('');
+    card.hidden = false;
+  }
+
+  function computePerfAdvice(videos, stats, accs) {
+    const card = document.getElementById('advicePerfCard');
+    const list = document.getElementById('advicePerfList');
+    if (!card || !list) return;
+    const tips = [];
+
+    // 1. Top account by views (call out the outlier if it dominates)
+    const perAccount = stats?.per_account || [];
+    if (perAccount.length >= 2) {
+      const sorted = perAccount.slice().filter(a => (a.total_views||0) > 0).sort((a,b) => (b.total_views||0) - (a.total_views||0));
+      if (sorted.length >= 2) {
+        const top = sorted[0];
+        const others = sorted.slice(1);
+        const avgOthers = others.reduce((s,a) => s + (a.total_views||0), 0) / Math.max(others.length, 1);
+        if (avgOthers > 0 && top.total_views >= avgOthers * 2.5) {
+          tips.push({type:'good', html:`<strong>Top compte : @${top.account_username}</strong> (${_PLAT_LBL[top.platform]||top.platform}) — ${fmt(top.total_views)} vues, soit ${(top.total_views/avgOthers).toFixed(1)}× la moyenne de tes autres comptes. Analyse ses 3 dernières vidéos et adapte le format ailleurs.`});
+        }
+      }
+    }
+
+    // 2. Best posting time slots — derived from videos.create_time × views
+    if (Array.isArray(videos) && videos.length >= 10) {
+      const slots = new Map();   // key: "Day-Hour" → {sum, count}
+      const D = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+      videos.forEach(v => {
+        if (!v.create_time || !v.views) return;
+        const d = new Date(v.create_time);
+        if (isNaN(d)) return;
+        const key = `${D[d.getDay()]} ${d.getHours()}h`;
+        const cur = slots.get(key) || { sum:0, count:0 };
+        cur.sum += v.views; cur.count++;
+        slots.set(key, cur);
+      });
+      const slotArr = [...slots.entries()]
+        .map(([k,v]) => ({ k, avg: v.sum/v.count, n: v.count }))
+        .filter(s => s.n >= 2)   // ignore one-offs
+        .sort((a,b) => b.avg - a.avg);
+      if (slotArr.length >= 3) {
+        const best = slotArr.slice(0,2).map(s => `<em>${s.k}</em>`).join(' et ');
+        const bestAvg = slotArr[0].avg;
+        const globalAvg = videos.reduce((s,v) => s + (v.views||0), 0) / videos.length;
+        if (bestAvg >= globalAvg * 1.4) {
+          tips.push({type:'good', html:`<strong>Tes meilleurs créneaux</strong> : ${best} — ${(bestAvg/globalAvg).toFixed(1)}× les vues moyennes. Bloque ces fenêtres pour tes contenus phares.`});
+        }
+      }
+    }
+
+    // 3. Pareto / concentration check — what % of videos drive 80% of views?
+    if (Array.isArray(videos) && videos.length >= 20) {
+      const sorted = videos.slice().filter(v => v.views > 0).sort((a,b) => b.views - a.views);
+      const total = sorted.reduce((s,v) => s + v.views, 0);
+      if (total > 0) {
+        let running = 0;
+        let videosAt80 = 0;
+        for (const v of sorted) {
+          running += v.views;
+          videosAt80++;
+          if (running >= total * 0.8) break;
+        }
+        const pct = videosAt80 / sorted.length * 100;
+        if (pct <= 25) {
+          tips.push({type:'', html:`<strong>${pct.toFixed(0)} % de tes vidéos = 80 % de tes vues</strong> (Pareto inversé sain). Tu produis assez pour "spray and pray" — continue la consistance, l'algo récompense la cadence.`});
+        } else if (pct >= 60) {
+          tips.push({type:'warn', html:`Tes vues sont <strong>très étalées</strong> (${pct.toFixed(0)} % des vidéos = 80 % des vues). Aucun hit clair — analyse ce qui rend tes 5 meilleurs uniques, et amplifie ce levier.`});
+        }
+      }
+    }
+
+    if (tips.length === 0) { card.hidden = true; return; }
+    list.innerHTML = tips.map(t => _bullet(t.type, t.html)).join('');
+    card.hidden = false;
   }
 
   // ─── Advice chart helpers (called from renderTableCharts) ──────────
@@ -4042,6 +4340,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       ? (state.range === 1 ? 'Dernière 24 h' : `Derniers ${state.range} jours`)
       : `${state.date_from || ''} → ${state.date_to || ''}`);
 
+    // Always clear any prior tfoot before re-rendering — otherwise a filter
+    // change that drops the row count to 0 would leave a stale totals row.
+    const oldFootEarly = $('#dataTable tfoot');
+    if (oldFootEarly) oldFootEarly.remove();
+
     if (!accs.length) {
       tbody.innerHTML = '';
       empty.hidden = false;
@@ -4094,7 +4397,10 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       const eng = r.views > 0
         ? r.engagement.toFixed(2).replace('.', ',') + ' %'
         : '—';
-      const gainColor = r.gain > 0 ? 'var(--green)' : r.gain < 0 ? 'var(--red)' : 'var(--text-3)';
+      // Color-code engagement: ≥3% green (healthy/qualified audience),
+      // 1-3% orange (broad audience, room to specialize), <1% red.
+      const engClass = r.views === 0 ? '' : r.engagement >= 3 ? 'eng-good' : r.engagement >= 1 ? 'eng-mid' : 'eng-low';
+      const gainClass = r.gain > 0 ? 'gain-pos' : r.gain < 0 ? 'gain-neg' : '';
       const gainPrefix = r.gain > 0 ? '+' : '';
       return `
         <tr>
@@ -4108,14 +4414,45 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
           </td>
           <td><span class="platform-tag">${r.platform}</span></td>
           <td class="num">${fmt(r.followers)}</td>
-          <td class="num" style="color:${gainColor}; font-weight:600">${gainPrefix}${fmt(r.gain)}</td>
+          <td class="num ${gainClass}">${gainPrefix}${fmt(r.gain)}</td>
           <td class="num">${fmt(r.videos)}</td>
           <td class="num">${fmt(r.views)}</td>
           <td class="num">${fmt(r.avg)}</td>
-          <td class="num">${eng}</td>
+          <td class="num ${engClass}">${eng}</td>
           <td>${timeAgo(r.a.last_updated)}</td>
         </tr>`;
     }).join('');
+
+    // ── Totals row — gives instant aggregate read at the bottom of the
+    // table. Sums where additive (followers, gain, videos, views), weighted
+    // average where ratio-based (avg views/video, engagement rate). Skips
+    // last-update column (no meaningful aggregate). ──
+    const sumFollowers = rows.reduce((s, r) => s + r.followers, 0);
+    const sumGain      = rows.reduce((s, r) => s + r.gain, 0);
+    const sumVideos    = rows.reduce((s, r) => s + r.videos, 0);
+    const sumViews     = rows.reduce((s, r) => s + r.views, 0);
+    const sumInter     = rows.reduce((s, r) => s + ((r.s.total_likes||0)+(r.s.total_comments||0)+(r.s.total_shares||0)), 0);
+    const totalAvg = sumVideos > 0 ? Math.round(sumViews / sumVideos) : 0;
+    const totalEng = sumViews > 0 ? (sumInter / sumViews) * 100 : 0;
+    const totalEngClass = sumViews === 0 ? '' : totalEng >= 3 ? 'eng-good' : totalEng >= 1 ? 'eng-mid' : 'eng-low';
+    const totalGainClass = sumGain > 0 ? 'gain-pos' : sumGain < 0 ? 'gain-neg' : '';
+    const totalGainPrefix = sumGain > 0 ? '+' : '';
+    // Remove any prior tfoot before re-appending (table re-renders on filter change).
+    const oldFoot = $('#dataTable tfoot');
+    if (oldFoot) oldFoot.remove();
+    const tfoot = document.createElement('tfoot');
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="2"><span class="tfoot-label">Total · ${rows.length} compte${rows.length > 1 ? 's' : ''}</span></td>
+        <td class="num">${fmt(sumFollowers)}</td>
+        <td class="num ${totalGainClass}">${totalGainPrefix}${fmt(sumGain)}</td>
+        <td class="num">${fmt(sumVideos)}</td>
+        <td class="num">${fmt(sumViews)}</td>
+        <td class="num">${fmt(totalAvg)}</td>
+        <td class="num ${totalEngClass}">${sumViews > 0 ? totalEng.toFixed(2).replace('.', ',') + ' %' : '—'}</td>
+        <td></td>
+      </tr>`;
+    $('#dataTable').appendChild(tfoot);
   }
 
   // Wire header clicks once. Toggles direction on same column, switches
