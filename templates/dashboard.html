@@ -4108,19 +4108,25 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
   function computeVideoAnalysis(videos) {
     const group = document.getElementById('adviceVideoGroup');
     if (!group) return;
-    // Need at least 6 videos with views to draw a meaningful top/bottom split.
+    // Need at least 1 video with views to surface SOMETHING. Sub-cards
+    // (flops, recipe) gate themselves on their own minimum sample size
+    // below — recipe needs ≥6 to be statistically meaningful.
     const withFeatures = (videos || [])
       .filter(v => Number(v.views) > 0 && v.create_time)
       .map(_videoFeatures);
-    if (withFeatures.length < 6) { group.hidden = true; return; }
+    if (withFeatures.length < 1) { group.hidden = true; return; }
     group.hidden = false;
 
     // Sort by views, take top 3 and bottom 3 (within views > 0).
     const sorted = withFeatures.slice().sort((a, b) => b.views - a.views);
-    const top = sorted.slice(0, 3);
+    const top = sorted.slice(0, 3);              // 1, 2 or 3 cards depending on dataset
     const bottom = sorted.slice(-3).reverse();   // worst first
 
-    // Recipe = pattern across the top 25 % vs the rest.
+    // Recipe = pattern across the top 25 % vs the rest. Requires ≥6 videos
+    // (sample size needed for the mode/median to mean anything) — when below,
+    // we still render the top-videos card but skip the recipe + flops below.
+    const RECIPE_MIN = 6;
+    const hasRecipeSample = withFeatures.length >= RECIPE_MIN;
     const topCount = Math.max(3, Math.ceil(withFeatures.length * 0.25));
     const topQuart = sorted.slice(0, topCount);
     const restQuart = sorted.slice(topCount);
@@ -4144,25 +4150,45 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
       })(),
     };
 
-    // ── Render top videos ──
+    // ── Render top videos (always — even 1 video gets a card) ──
     const topList = document.getElementById('adviceTopVidsList');
+    const topCard = document.getElementById('adviceTopVidsCard');
     if (topList) topList.innerHTML = top.map((f, i) => _renderVideoCard(f, i + 1, false, recipe)).join('');
-
-    // ── Render flops (only if we have enough spread — worst < median / 4) ──
-    const median = sorted[Math.floor(sorted.length / 2)].views;
-    const flopCard = document.getElementById('adviceFlopVidsCard');
-    const flopList = document.getElementById('adviceFlopVidsList');
-    if (flopList && flopCard && bottom[0].views <= median / 4) {
-      flopList.innerHTML = bottom.map((f, i) => _renderVideoCard(f, i + 1, true, recipe)).join('');
-      flopCard.hidden = false;
-    } else if (flopCard) {
-      flopCard.hidden = true;   // performance is even — no clear "flops" to call out
+    // Adapt the card title + subtitle to the actual count so the framing
+    // makes sense whether there's 1 video or 10.
+    const topTitle = topCard ? topCard.querySelector('.advice-card-title') : null;
+    const topSub = topCard ? topCard.querySelector('.advice-card-sub') : null;
+    if (topTitle) {
+      topTitle.textContent = top.length === 1
+        ? 'Analyse de ta vidéo'
+        : 'Pourquoi ces vidéos cartonnent';
+    }
+    if (topSub) {
+      topSub.textContent = top.length === 1
+        ? 'Une seule vidéo sur la période · clic pour la voir'
+        : `Top ${top.length} vues sur la période · clic pour voir la vidéo`;
     }
 
-    // ── Render recipe (the formula) ──
+    // ── Render flops (need ≥6 videos AND real spread — worst ≤ median/4) ──
+    const flopCard = document.getElementById('adviceFlopVidsCard');
+    const flopList = document.getElementById('adviceFlopVidsList');
+    if (hasRecipeSample && flopList && flopCard) {
+      const median = sorted[Math.floor(sorted.length / 2)].views;
+      if (bottom[0].views <= median / 4) {
+        flopList.innerHTML = bottom.map((f, i) => _renderVideoCard(f, i + 1, true, recipe)).join('');
+        flopCard.hidden = false;
+      } else {
+        flopCard.hidden = true;
+      }
+    } else if (flopCard) {
+      flopCard.hidden = true;   // not enough sample for a "flop" callout
+    }
+
+    // ── Render recipe (the formula) — needs ≥6 videos for meaningful patterns ──
     const recipeCard = document.getElementById('adviceRecipeCard');
     const recipeList = document.getElementById('adviceRecipeList');
     if (!recipeCard || !recipeList) return;
+    if (!hasRecipeSample) { recipeCard.hidden = true; return; }
     const tips = [];
 
     // Duration pattern
