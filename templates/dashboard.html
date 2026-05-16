@@ -2500,7 +2500,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
-console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;font-weight:bold');
+console.log('%c[TL] dashboard build v=2026-05-16-advice-resilient', 'color:#FF69B4;font-weight:bold');
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -3754,9 +3754,11 @@ console.log('%c[TL] dashboard build v=2026-05-10-today-list', 'color:#FF69B4;fon
     // These were originally on a separate "Nos conseils" page, now merged
     // into the table view so all 10 audience charts live in one place
     // grouped by intent. Each fn reads from already-fetched data.
-    renderAdviceQuality(stats, evolution);
-    renderAdviceContent(videos, evolution);
-    renderAdviceWhen(videos);
+    // Each call is wrapped in its own try/catch so one bad render (e.g. a
+    // heatmap cell with malformed data) can't block the rest of the chain.
+    try { renderAdviceQuality(stats, evolution); } catch (e) { console.warn('[chart/quality]', e); }
+    try { renderAdviceContent(videos, evolution); } catch (e) { console.warn('[chart/content]', e); }
+    try { renderAdviceWhen(videos); }               catch (e) { console.warn('[chart/when]', e); }
 
     // ── Actionable advice cards (one per section) ──
     // Pure client-side derivation from data already in memory. Each card
