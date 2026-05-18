@@ -1588,6 +1588,24 @@ button { font-family: inherit; cursor: pointer; }
   transition: transform .12s, box-shadow .12s, border-color .12s;
   text-decoration: none; color: inherit;
 }
+.vid-analysis-card .vac-thumb {
+  width: 100%; aspect-ratio: 9 / 16;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin: 0 0 10px;
+  background: linear-gradient(135deg, #f5f5f7, #ebebee);
+  display: block;
+}
+.vid-analysis-card .vac-thumb-placeholder {
+  width: 100%; aspect-ratio: 9 / 16; max-height: 240px;
+  border-radius: 8px;
+  margin: 0 0 10px;
+  background: linear-gradient(135deg, #f5f5f7, #ebebee);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-4); font-size: 11px;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
 .vid-analysis-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow);
@@ -4224,9 +4242,16 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const aiBtn = AI_ANALYSIS_ENABLED
       ? `<button class="vac-ai-btn" data-vid="${escapeHTML(videoId)}" data-plat="${escapeHTML(platform)}" type="button">🔬 Analyser cette vidéo (IA)</button>`
       : `<button class="vac-ai-btn locked" type="button" title="Disponible sur l'offre Entreprises">🔒 Analyse IA · offre Entreprises</button>`;
+    // Thumbnail block — cover frame of the video, the visual hook. Falls back
+    // to a soft placeholder if the thumbnail_url wasn't captured at scrape time
+    // (older rows, transient CDN failure, etc.) so the layout stays consistent.
+    const thumb = f.v.thumbnail_url
+      ? `<img class="vac-thumb" src="${escapeHTML(f.v.thumbnail_url)}" alt="Cover @${escapeHTML(f.v.account_username || '')}" loading="lazy" onerror="this.outerHTML='<div class=&quot;vac-thumb-placeholder&quot;>aperçu indisponible</div>'">`
+      : `<div class="vac-thumb-placeholder">pas d'aperçu</div>`;
     return `
       <div class="vid-analysis-card ${isFlop ? 'flop' : ''}">
         <a class="vac-clickable" href="${escapeHTML(url)}" target="_blank" rel="noopener">
+          ${thumb}
           <div class="vac-top">
             <span class="vac-rank">${rank}</span>
             ${_platformAvatar(platform)}
