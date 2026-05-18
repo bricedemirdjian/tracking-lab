@@ -2351,6 +2351,42 @@ button { font-family: inherit; cursor: pointer; }
       <div id="vidEmptyBest" class="view-empty" hidden>
         <p>Aucune vidéo top à afficher pour ce filtre.</p>
       </div>
+
+      <!-- Same "Analyse vidéo par vidéo" block as the one inside viewTable
+           (IDs suffixed -v here so both live in the DOM without collision).
+           computeVideoAnalysis() iterates both containers so whichever view
+           is currently visible renders the right content. Lets users analyze
+           individual videos without leaving the Vidéos page. -->
+      <div class="advice-group" id="adviceVideoGroup-v" hidden style="margin-top: 32px;">
+        <div class="advice-group-head">
+          <h3 class="advice-group-title">Analyse vidéo par vidéo</h3>
+          <p class="advice-group-sub">Pourquoi certaines vidéos cartonnent et pas d'autres — pour reproduire ce qui marche.</p>
+        </div>
+        <div class="advice-card" id="adviceTopVidsCard-v">
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🚀</span>
+            <h4 class="advice-card-title">Pourquoi ces vidéos cartonnent</h4>
+            <p class="advice-card-sub">Top 3 vues sur la période · clic pour voir la vidéo</p>
+          </div>
+          <div class="vid-analysis-grid" id="adviceTopVidsList-v"></div>
+        </div>
+        <div class="advice-card" id="adviceRecipeCard-v" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">🧪</span>
+            <h4 class="advice-card-title">La recette de tes hits</h4>
+            <p class="advice-card-sub">Pattern dominant dans tes 25 % meilleures vidéos vs ton catalogue global</p>
+          </div>
+          <ul class="advice-card-list" id="adviceRecipeList-v"></ul>
+        </div>
+        <div class="advice-card" id="adviceFlopVidsCard-v" hidden>
+          <div class="advice-card-head">
+            <span class="advice-card-icon">⚠️</span>
+            <h4 class="advice-card-title">Ce qui n'a pas marché (et pourquoi)</h4>
+            <p class="advice-card-sub">3 vidéos sous-performantes pour comprendre les patterns à éviter</p>
+          </div>
+          <div class="vid-analysis-grid" id="adviceFlopVidsList-v"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ─── TABLE VIEW — full audience analysis: 10 charts in 3 groups + per-account table ─── -->
@@ -3284,6 +3320,21 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       } else {
         latestGrid.innerHTML = '';
         latestEmpty.hidden = false;
+      }
+
+      // Also populate the "Analyse vidéo par vidéo" block at the bottom
+      // of viewVideos. The block's duplicate IDs (suffix -v) are wired so
+      // computeVideoAnalysis updates both this copy and the viewTable one.
+      // We need a wider dataset than just best/latest for meaningful
+      // recipe patterns, so fetch the full filtered list (same cache that
+      // renderTableCharts uses — no double round-trip on cache hit).
+      try {
+        const allVideos = await cachedJSON(buildVideosAllURL(), []);
+        if (Array.isArray(allVideos)) {
+          computeVideoAnalysis(allVideos);
+        }
+      } catch (e) {
+        console.warn('[videos-view/analysis]', e);
       }
     } catch (e) {
       console.error(e);
@@ -4439,17 +4490,27 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     if (e.key === 'Escape') _aiModalClose();
   });
 
+  // Returns [el, elSuffixV] filtered to existing elements only. Lets the
+  // video-analysis section live in BOTH viewTable and viewVideos with
+  // unique IDs (suffix '-v' on the videos-page copy) but a single
+  // populate call updates both.
+  function _dualGet(baseId) {
+    const a = document.getElementById(baseId);
+    const b = document.getElementById(baseId + '-v');
+    return [a, b].filter(Boolean);
+  }
+
   function computeVideoAnalysis(videos) {
-    const group = document.getElementById('adviceVideoGroup');
-    if (!group) return;
+    const groups = _dualGet('adviceVideoGroup');
+    if (groups.length === 0) return;
     // Need at least 1 video with views to surface SOMETHING. Sub-cards
     // (flops, recipe) gate themselves on their own minimum sample size
     // below — recipe needs ≥6 to be statistically meaningful.
     const withFeatures = (videos || [])
       .filter(v => Number(v.views) > 0 && v.create_time)
       .map(_videoFeatures);
-    if (withFeatures.length < 1) { group.hidden = true; return; }
-    group.hidden = false;
+    if (withFeatures.length < 1) { groups.forEach(g => g.hidden = true); return; }
+    groups.forEach(g => g.hidden = false);
 
     // Sort by views, take top 3 and bottom 3 (within views > 0).
     const sorted = withFeatures.slice().sort((a, b) => b.views - a.views);
@@ -4485,44 +4546,42 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     };
 
     // ── Render top videos (always — even 1 video gets a card) ──
-    const topList = document.getElementById('adviceTopVidsList');
-    const topCard = document.getElementById('adviceTopVidsCard');
-    if (topList) topList.innerHTML = top.map((f, i) => _renderVideoCard(f, i + 1, false, recipe)).join('');
+    const topLists = _dualGet('adviceTopVidsList');
+    const topCards = _dualGet('adviceTopVidsCard');
+    const topHtml = top.map((f, i) => _renderVideoCard(f, i + 1, false, recipe)).join('');
+    topLists.forEach(el => { el.innerHTML = topHtml; });
     // Adapt the card title + subtitle to the actual count so the framing
     // makes sense whether there's 1 video or 10.
-    const topTitle = topCard ? topCard.querySelector('.advice-card-title') : null;
-    const topSub = topCard ? topCard.querySelector('.advice-card-sub') : null;
-    if (topTitle) {
-      topTitle.textContent = top.length === 1
-        ? 'Analyse de ta vidéo'
-        : 'Pourquoi ces vidéos cartonnent';
-    }
-    if (topSub) {
-      topSub.textContent = top.length === 1
+    topCards.forEach(card => {
+      const t = card.querySelector('.advice-card-title');
+      const s = card.querySelector('.advice-card-sub');
+      if (t) t.textContent = top.length === 1 ? 'Analyse de ta vidéo' : 'Pourquoi ces vidéos cartonnent';
+      if (s) s.textContent = top.length === 1
         ? 'Une seule vidéo sur la période · clic pour la voir'
         : `Top ${top.length} vues sur la période · clic pour voir la vidéo`;
-    }
+    });
 
     // ── Render flops (need ≥6 videos AND real spread — worst ≤ median/4) ──
-    const flopCard = document.getElementById('adviceFlopVidsCard');
-    const flopList = document.getElementById('adviceFlopVidsList');
-    if (hasRecipeSample && flopList && flopCard) {
+    const flopCards = _dualGet('adviceFlopVidsCard');
+    const flopLists = _dualGet('adviceFlopVidsList');
+    if (hasRecipeSample && flopLists.length && flopCards.length) {
       const median = sorted[Math.floor(sorted.length / 2)].views;
       if (bottom[0].views <= median / 4) {
-        flopList.innerHTML = bottom.map((f, i) => _renderVideoCard(f, i + 1, true, recipe)).join('');
-        flopCard.hidden = false;
+        const flopHtml = bottom.map((f, i) => _renderVideoCard(f, i + 1, true, recipe)).join('');
+        flopLists.forEach(el => { el.innerHTML = flopHtml; });
+        flopCards.forEach(el => { el.hidden = false; });
       } else {
-        flopCard.hidden = true;
+        flopCards.forEach(el => { el.hidden = true; });
       }
-    } else if (flopCard) {
-      flopCard.hidden = true;   // not enough sample for a "flop" callout
+    } else {
+      flopCards.forEach(el => { el.hidden = true; });
     }
 
     // ── Render recipe (the formula) — needs ≥6 videos for meaningful patterns ──
-    const recipeCard = document.getElementById('adviceRecipeCard');
-    const recipeList = document.getElementById('adviceRecipeList');
-    if (!recipeCard || !recipeList) return;
-    if (!hasRecipeSample) { recipeCard.hidden = true; return; }
+    const recipeCards = _dualGet('adviceRecipeCard');
+    const recipeLists = _dualGet('adviceRecipeList');
+    if (recipeCards.length === 0 || recipeLists.length === 0) return;
+    if (!hasRecipeSample) { recipeCards.forEach(el => { el.hidden = true; }); return; }
     const tips = [];
 
     // Duration pattern
@@ -4574,10 +4633,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     }
 
     if (tips.length === 0) {
-      recipeCard.hidden = true;
+      recipeCards.forEach(el => { el.hidden = true; });
     } else {
-      recipeList.innerHTML = tips.map(t => _bullet(t.type, t.html)).join('');
-      recipeCard.hidden = false;
+      const recipeHtml = tips.map(t => _bullet(t.type, t.html)).join('');
+      recipeLists.forEach(el => { el.innerHTML = recipeHtml; });
+      recipeCards.forEach(el => { el.hidden = false; });
     }
   }
 
