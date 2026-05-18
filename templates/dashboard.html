@@ -4271,6 +4271,12 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
   // ── Axis 1: when to post ── (chart A heatmap only) ──
   function renderAdviceWhen(videos) {
     // ── Chart A: heatmap day×hour with avg views per cell ──
+    // DAY_LABELS lives inside the function so an unrelated edit elsewhere
+    // can't accidentally orphan the heatmap render (that's how this broke
+    // for 2 days — a const declaration got dropped during a refactor of an
+    // adjacent block and the function silently threw "DAY_LABELS is not
+    // defined" inside the cell loop until the visible-fallback got added).
+    const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     const buckets = {};
     (videos || []).forEach(v => {
       if (!v.create_time) return;
