@@ -25,6 +25,9 @@ class User(UserMixin):
         self.role = user_dict.get('role', 'user')
         self.blocked = user_dict.get('blocked', False)
         self.created_at = user_dict.get('created_at')
+        # Plan is read in templates (e.g. agency-only feature gates like the
+        # AI video analysis modal). Default to starter if unset.
+        self.plan = user_dict.get('plan', 'starter') or 'starter'
 
     @property
     def is_admin(self):

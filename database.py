@@ -333,6 +333,8 @@ def init_db():
     _migrate_composite_indices(conn)
     # Migration: create default project for users without projects
     _migrate_default_projects(conn)
+    # Migration: per-video AI analysis cache (agency-only feature)
+    _migrate_video_analysis_table(conn)
 
     # Stamp the version so the next cold start hits the fast-path.
     _mark_schema_current(conn)
@@ -509,6 +511,84 @@ def record_scrape_failure(user_id, username, platform, error_msg):
             "last_error_msg = %s "
             "WHERE user_id = %s AND username = %s AND platform = %s",
             (msg, user_id, username, platform))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _migrate_video_analysis_table(conn):
+    """Create video_analysis cache table — keys per (video_id, platform).
+
+    Agency-only AI analysis pipeline writes here once per video so re-clicks
+    are free (no re-billing of the Gemini call, no re-download). Stores
+    analysis_json as TEXT — both Postgres TEXT and SQLite TEXT take it.
+    """
+    try:
+        if DATABASE_URL:
+            _execute(conn, """
+                CREATE TABLE IF NOT EXISTS video_analysis (
+                    id            SERIAL PRIMARY KEY,
+                    video_id      TEXT NOT NULL,
+                    platform      TEXT NOT NULL,
+                    analysis_json TEXT NOT NULL,
+                    model         TEXT NOT NULL,
+                    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+                    UNIQUE (video_id, platform)
+                )
+            """)
+            _execute(conn, "CREATE INDEX IF NOT EXISTS idx_video_analysis_lookup ON video_analysis (video_id, platform)")
+            print("[Migration] video_analysis table ensured (PostgreSQL)")
+        else:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS video_analysis (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    video_id      TEXT NOT NULL,
+                    platform      TEXT NOT NULL,
+                    analysis_json TEXT NOT NULL,
+                    model         TEXT NOT NULL,
+                    created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (video_id, platform)
+                )
+            """)
+            print("[Migration] video_analysis table ensured (SQLite)")
+    except Exception as e:
+        print(f"[Migration] video_analysis: {e}")
+
+
+def get_video_analysis(video_id, platform):
+    """Return cached analysis dict for (video_id, platform), or None if absent."""
+    import json
+    conn = get_connection()
+    try:
+        row = _fetchone(conn,
+            "SELECT analysis_json, model, created_at FROM video_analysis WHERE video_id = %s AND platform = %s",
+            (video_id, platform))
+    finally:
+        conn.close()
+    if not row:
+        return None
+    try:
+        data = json.loads(row.get("analysis_json") or "{}")
+    except Exception:
+        return None
+    data["_meta"] = {"model": row.get("model"), "cached_at": str(row.get("created_at"))}
+    return data
+
+
+def upsert_video_analysis(video_id, platform, analysis_dict, model):
+    """Store the analysis. ON CONFLICT replaces — fresh re-analysis overrides stale."""
+    import json
+    conn = get_connection()
+    try:
+        _execute(conn, """
+            INSERT INTO video_analysis (video_id, platform, analysis_json, model)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (video_id, platform) DO UPDATE SET
+                analysis_json = EXCLUDED.analysis_json,
+                model         = EXCLUDED.model,
+                created_at    = NOW()
+        """, (video_id, platform, json.dumps(analysis_dict), model))
         conn.commit()
     finally:
         conn.close()

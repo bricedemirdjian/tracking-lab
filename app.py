@@ -922,6 +922,176 @@ def _apply_platform_filter(user_id, platform_param, project_usernames):
     return plat_unames if plat_unames else ["__none__"]
 
 
+@app.route("/api/video/analyze", methods=["POST"])
+@login_required
+@limiter.limit("20 per day; 5 per minute", key_func=lambda: str(current_user.id) if current_user.is_authenticated else get_remote_address())
+def api_video_analyze():
+    """Per-video AI analysis — agency plan only, on-demand.
+
+    Reads video_id + platform from the request, looks up the cache, otherwise
+    fetches thumbnail + metadata via yt-dlp and asks Gemini Flash 2.0 (free
+    tier) for a structured analysis. Cached forever per (video_id, platform)
+    so re-clicks are free.
+
+    Cost: zero on cache hits; ~free-tier Gemini on misses. Rate-limited per
+    user so a runaway script can't burn through the daily quota.
+    """
+    # Plan gate — agency (Entreprises) only, admin always allowed.
+    plan = _current_plan()
+    if not (plan.get('ai_video_analysis') or current_user.is_admin):
+        return jsonify({
+            "error": "Disponible sur l'offre Entreprises",
+            "upgrade_required": True,
+            "current_plan": plan.get('name', 'starter'),
+        }), 403
+
+    if not request.is_json:
+        return jsonify({"error": "JSON requis"}), 400
+    body = request.get_json(silent=True) or {}
+    video_id = (body.get("video_id") or "").strip()
+    platform = (body.get("platform") or "tiktok").strip().lower()
+    if not video_id:
+        return jsonify({"error": "video_id requis"}), 400
+    if platform not in ("tiktok", "youtube", "instagram", "linkedin"):
+        return jsonify({"error": "plateforme invalide"}), 400
+
+    # Cache check — re-clicks are instant + free.
+    from database import get_video_analysis, upsert_video_analysis
+    cached = get_video_analysis(video_id, platform)
+    if cached:
+        cached["_cached"] = True
+        return jsonify(cached)
+
+    # API key check — graceful 503 if the env var is missing rather than a
+    # 500 crash. Surfaces a setup hint to the admin.
+    import os
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return jsonify({
+            "error": "AI vision désactivée (GEMINI_API_KEY non configuré sur Vercel)",
+            "setup_hint": "Crée une clé gratuite sur aistudio.google.com/apikey puis ajoute-la dans Vercel env vars",
+        }), 503
+
+    # Lookup the video row to get account_username + URL for the yt-dlp fetch
+    from database import get_connection, _fetchone
+    conn = get_connection()
+    try:
+        vrow = _fetchone(conn,
+            "SELECT account_username, description, duration, views, likes, comments, shares, video_url, create_time FROM videos WHERE video_id = %s AND platform = %s AND user_id = %s",
+            (video_id, platform, current_user.data_user_id))
+    finally:
+        conn.close()
+    if not vrow:
+        return jsonify({"error": "vidéo introuvable dans ton catalogue"}), 404
+
+    # Reconstruct the post URL if missing (defensive — should be filled per the
+    # bf61292 backfill but new accounts before that commit might still have NULL).
+    post_url = vrow.get("video_url")
+    if not post_url and platform == "tiktok":
+        post_url = f"https://www.tiktok.com/@{vrow['account_username']}/video/{video_id}"
+
+    # Fetch thumbnail + metadata via yt-dlp (no full video download — too slow
+    # for Vercel's 60s budget). The thumbnail = the cover frame = often the
+    # hook in TikTok-style content, which is what we want vision-analyzed.
+    try:
+        import yt_dlp
+        ydl_opts = {
+            "quiet": True, "no_warnings": True, "skip_download": True,
+            "socket_timeout": 20, "retries": 1,
+            "nocheckcertificate": True, "geo_bypass": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(post_url, download=False)
+    except Exception as e:
+        return jsonify({"error": f"impossible de récupérer la vidéo via yt-dlp: {str(e)[:120]}"}), 502
+
+    thumb_url = info.get("thumbnail") or (info.get("thumbnails") or [{}])[-1].get("url")
+    if not thumb_url:
+        return jsonify({"error": "aucune image de couverture disponible"}), 502
+
+    # Download thumbnail bytes (we send inline base64 to Gemini — its URL
+    # input mode requires the File API which has cleanup overhead we don't need).
+    try:
+        r = requests.get(thumb_url, timeout=10)
+        r.raise_for_status()
+        img_bytes = r.content
+    except Exception as e:
+        return jsonify({"error": f"téléchargement thumbnail échoué: {str(e)[:120]}"}), 502
+
+    # Build the prompt — French because the user is, and structured JSON so
+    # the frontend can render predictably.
+    desc = vrow.get("description") or info.get("description") or ""
+    duration = vrow.get("duration") or info.get("duration") or 0
+    views = vrow.get("views") or 0
+    likes = vrow.get("likes") or 0
+    comments = vrow.get("comments") or 0
+    shares = vrow.get("shares") or 0
+    eng_rate = ((likes + comments + shares) / views * 100) if views else 0
+
+    prompt = f"""Tu es un coach en création de contenu social media. Tu vas analyser une vidéo {platform} via son image de couverture (cover frame) et sa metadata, puis donner un retour détaillé et actionable au créateur.
+
+CONTEXTE de la vidéo :
+- Compte : @{vrow.get('account_username')}
+- Durée : {duration}s
+- Description : "{desc[:280]}"
+- Performance : {views:,} vues · {likes:,} likes · {comments:,} commentaires · {shares:,} partages · {eng_rate:.2f}% engagement
+
+À FAIRE :
+Analyse l'image (souvent le 1er frame, donc LE hook visuel sur TikTok/Reels) ET la description, puis renvoie UNIQUEMENT un JSON conforme à ce schéma exact (pas de texte avant/après, pas de markdown) :
+
+{{
+  "hook_quality": "excellent" | "bon" | "moyen" | "faible",
+  "hook_observation": "ce que tu vois sur la cover et pourquoi ça stoppe (ou pas) le scroll, 1-2 phrases",
+  "visual_style": "description courte du style visuel (cadrage, lumière, ambiance, personnage si présent)",
+  "content_type": "humour" | "tuto" | "lifestyle" | "témoignage" | "publicité" | "actualité" | "challenge" | "autre",
+  "target_audience": "qui regarde probablement ça, 1 phrase",
+  "strengths": ["3 max — chaque point concret et observable depuis l'image/description"],
+  "weaknesses": ["2 max — soyez honnête, signaler ce qui pourrait expliquer une sous-perf si la perf est faible"],
+  "why_it_performed": "pourquoi cette vidéo a fait {views:,} vues (ou n'en a pas fait), en lien avec ton observation visuelle, 2-3 phrases",
+  "recommendations": ["3 max — actions concrètes pour reproduire le succès ou corriger les faiblesses, formulées à la 2e personne ('Garde…', 'Évite…', 'Teste…')"]
+}}
+
+Sois direct, concret, basé sur ce que tu VOIS et sur la perf chiffrée. Pas de banalités. Réponse en français."""
+
+    # Call Gemini Flash 2.0 (free tier — 1500 req/jour, 15 RPM, plenty for
+    # on-demand per-video analysis). Using the google-genai SDK with inline
+    # base64 image input. Response asked as JSON via response_mime_type.
+    import base64, json as jsonmod
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+        client = genai.Client(api_key=api_key)
+        # Detect image MIME from first bytes — JPEGs start with 0xFFD8, PNGs with 0x89504E47.
+        mime = "image/jpeg" if img_bytes[:2] == b"\xff\xd8" else "image/png" if img_bytes[:4] == b"\x89PNG" else "image/jpeg"
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001",
+            contents=[
+                gtypes.Part.from_bytes(data=img_bytes, mime_type=mime),
+                prompt,
+            ],
+            config=gtypes.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.6,
+                max_output_tokens=1500,
+            ),
+        )
+        raw = response.text or "{}"
+        analysis = jsonmod.loads(raw)
+    except Exception as e:
+        app.logger.exception("video_analyze_gemini_failed")
+        return jsonify({"error": f"analyse IA échouée: {str(e)[:160]}"}), 502
+
+    # Persist + return.
+    try:
+        upsert_video_analysis(video_id, platform, analysis, "gemini-2.0-flash-001")
+    except Exception as e:
+        # Cache write is non-blocking — return the analysis even if persist fails.
+        app.logger.warning(f"video_analysis cache write failed: {e}")
+    analysis["_cached"] = False
+    analysis["_meta"] = {"model": "gemini-2.0-flash-001"}
+    return jsonify(analysis)
+
+
 @app.route("/api/videos")
 @login_required
 def api_videos():

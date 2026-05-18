@@ -23,6 +23,7 @@ PLANS = {
         'import_csv': False,
         'competitor_access': False,
         'analytics_full': False,
+        'ai_video_analysis': False,
         'scrape_cadence_hours': 6,
     },
     'pro': {
@@ -42,6 +43,7 @@ PLANS = {
         'import_csv': False,
         'competitor_access': False,
         'analytics_full': False,
+        'ai_video_analysis': False,
         'scrape_cadence_hours': 4,
     },
     'agency': {
@@ -61,6 +63,7 @@ PLANS = {
         'import_csv': True,
         'competitor_access': True,
         'analytics_full': True,
+        'ai_video_analysis': True,
         'scrape_cadence_hours': 1,
     },
 }

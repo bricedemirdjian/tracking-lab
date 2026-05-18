@@ -1633,6 +1633,111 @@ button { font-family: inherit; cursor: pointer; }
 }
 .vid-analysis-card .vac-tag.good { background: rgba(16, 185, 129, 0.1); color: #047857; }
 .vid-analysis-card .vac-tag.bad  { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
+/* AI-analysis button — agency-only feature, locked teaser otherwise */
+.vid-analysis-card .vac-clickable { display: contents; }
+.vid-analysis-card .vac-ai-btn {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, transform .08s;
+  width: 100%;
+}
+.vid-analysis-card .vac-ai-btn:hover { background: var(--accent-hover); }
+.vid-analysis-card .vac-ai-btn:active { transform: scale(0.98); }
+.vid-analysis-card .vac-ai-btn.locked {
+  background: var(--bg-soft, #f5f5f7);
+  color: var(--text-3);
+  cursor: not-allowed;
+  border: 1px dashed var(--border);
+}
+.vid-analysis-card .vac-ai-btn.locked:hover { background: var(--bg-soft, #f5f5f7); }
+/* AI analysis modal */
+.ai-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: fadeIn .15s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.ai-modal {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+  max-width: 680px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 28px 32px;
+  position: relative;
+}
+.ai-modal-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px;
+  background: var(--bg-soft, #f5f5f7);
+  border: none; border-radius: 50%;
+  font-size: 18px; cursor: pointer;
+  color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-modal-close:hover { color: var(--text-1); background: rgba(0,0,0,0.08); }
+.ai-modal-header { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; }
+.ai-modal-icon { font-size: 24px; }
+.ai-modal-title { font-size: 18px; font-weight: 700; color: var(--text-1); margin: 0; }
+.ai-modal-sub { font-size: 13px; color: var(--text-3); margin: 0 0 20px; }
+.ai-modal-body { font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.ai-modal-section { margin: 0 0 16px; }
+.ai-modal-section h4 {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-3);
+  margin: 0 0 6px;
+}
+.ai-modal-section p { margin: 0; color: var(--text-1); }
+.ai-modal-section ul { margin: 0; padding-left: 18px; }
+.ai-modal-section li { margin: 4px 0; }
+.ai-modal-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.ai-modal-badge {
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--bg-soft, #f5f5f7);
+  font-size: 12px; font-weight: 600;
+  color: var(--text-1);
+}
+.ai-modal-badge.hook-excellent { background: rgba(16,185,129,0.15); color: #047857; }
+.ai-modal-badge.hook-bon       { background: rgba(16,185,129,0.1);  color: #047857; }
+.ai-modal-badge.hook-moyen     { background: rgba(245,158,11,0.15); color: #b45309; }
+.ai-modal-badge.hook-faible    { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+.ai-modal-spinner {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 40px 0;
+  color: var(--text-3); font-size: 13px;
+}
+.ai-modal-spinner::before {
+  content: ''; width: 32px; height: 32px;
+  border: 3px solid var(--bg-soft, #f5f5f7);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ai-modal-error {
+  padding: 16px;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 10px;
+  color: #b91c1c; font-size: 13px;
+}
+.ai-modal-cached {
+  display: inline-block;
+  font-size: 11px; color: var(--text-4);
+  margin-left: 8px;
+}
 
 /* Day × Hour heatmap (CSS grid only — no Chart.js plugin needed)
    Sparse-data fix: previously the grid had so much white space (empty cells
@@ -2503,6 +2608,22 @@ button { font-family: inherit; cursor: pointer; }
 </div>
 
 <a href="mailto:brice.demirdjian@gmail.com?subject=Support%20Tracking%20Lab" class="chat-float" title="Aide & support">💬</a>
+
+<!-- AI video analysis modal — populated by openAiAnalysisModal() with results
+     from /api/video/analyze. Hidden by default, revealed on demand. -->
+<div id="aiAnalysisBackdrop" class="ai-modal-backdrop" hidden>
+  <div class="ai-modal" role="dialog" aria-labelledby="aiAnalysisTitle" aria-modal="true">
+    <button class="ai-modal-close" id="aiAnalysisClose" aria-label="Fermer">×</button>
+    <div class="ai-modal-header">
+      <span class="ai-modal-icon">🔬</span>
+      <h3 class="ai-modal-title" id="aiAnalysisTitle">Analyse de la vidéo</h3>
+    </div>
+    <p class="ai-modal-sub" id="aiAnalysisSub">Pourquoi cette vidéo a marché (ou pas) — analyse IA basée sur le visuel + les données.</p>
+    <div class="ai-modal-body" id="aiAnalysisBody">
+      <div class="ai-modal-spinner">Analyse en cours… (~10-20 s)</div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── Self-contained data binding (does not depend on the legacy app.js) ──
@@ -4084,23 +4205,36 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     return tags;
   }
 
+  // Plan + admin flag from Jinja so the AI-analysis button knows when to
+  // render the locked variant vs the active one.
+  const USER_PLAN = {{ user.plan | tojson }};
+  const USER_IS_ADMIN = {{ ('true' if user.is_admin else 'false') | safe }};
+  const AI_ANALYSIS_ENABLED = USER_PLAN === 'agency' || USER_IS_ADMIN;
+
   function _renderVideoCard(f, rank, isFlop, recipe) {
     const url = _vidUrl(f.v);
     const tags = _videoTags(f, recipe);
     const desc = f.desc || '<em style="opacity:0.5">Pas de description</em>';
     const platform = f.v.platform || 'tiktok';
+    const videoId = f.v.video_id || '';
+    const aiBtn = AI_ANALYSIS_ENABLED
+      ? `<button class="vac-ai-btn" data-vid="${escapeHTML(videoId)}" data-plat="${escapeHTML(platform)}" type="button">🔬 Analyser cette vidéo (IA)</button>`
+      : `<button class="vac-ai-btn locked" type="button" title="Disponible sur l'offre Entreprises">🔒 Analyse IA · offre Entreprises</button>`;
     return `
-      <a class="vid-analysis-card ${isFlop ? 'flop' : ''}" href="${escapeHTML(url)}" target="_blank" rel="noopener">
-        <div class="vac-top">
-          <span class="vac-rank">${rank}</span>
-          ${_platformAvatar(platform)}
-          @${escapeHTML(f.v.account_username || '')}
-        </div>
-        <div class="vac-views">${fmt(f.views)} vues</div>
-        <div class="vac-views-sub">${fmt(f.likes)} likes · ${fmt(f.comments)} comm. · ${f.engRate.toFixed(2).replace('.', ',')} % engagement</div>
-        <div class="vac-desc">${escapeHTML(desc).slice(0, 140)}${desc.length > 140 ? '…' : ''}</div>
-        <div class="vac-tags">${tags.map(t => `<span class="vac-tag ${t.kind}">${t.label}</span>`).join('')}</div>
-      </a>`;
+      <div class="vid-analysis-card ${isFlop ? 'flop' : ''}">
+        <a class="vac-clickable" href="${escapeHTML(url)}" target="_blank" rel="noopener">
+          <div class="vac-top">
+            <span class="vac-rank">${rank}</span>
+            ${_platformAvatar(platform)}
+            @${escapeHTML(f.v.account_username || '')}
+          </div>
+          <div class="vac-views">${fmt(f.views)} vues</div>
+          <div class="vac-views-sub">${fmt(f.likes)} likes · ${fmt(f.comments)} comm. · ${f.engRate.toFixed(2).replace('.', ',')} % engagement</div>
+          <div class="vac-desc">${escapeHTML(desc).slice(0, 140)}${desc.length > 140 ? '…' : ''}</div>
+          <div class="vac-tags">${tags.map(t => `<span class="vac-tag ${t.kind}">${t.label}</span>`).join('')}</div>
+        </a>
+        ${aiBtn}
+      </div>`;
   }
 
   // Mode (most common value) helper for pattern detection.
@@ -4112,6 +4246,126 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     for (const [k, c] of counts) { if (c > bestC) { bestK = k; bestC = c; } }
     return { value: bestK, count: bestC, share: bestC / arr.length };
   }
+
+  // ── AI Video Analysis modal (agency plan only) ──
+  // Click handler delegated at document level since cards re-render on every
+  // data refresh. The button has data-vid + data-plat so we know which video
+  // to analyze on click. Backend gates on plan; if user is non-agency they
+  // see the locked variant which doesn't carry these attrs.
+  function _aiModalOpen() {
+    const bd = document.getElementById('aiAnalysisBackdrop');
+    if (bd) bd.hidden = false;
+  }
+  function _aiModalClose() {
+    const bd = document.getElementById('aiAnalysisBackdrop');
+    if (bd) bd.hidden = true;
+  }
+  function _aiModalShowSpinner(msg) {
+    const body = document.getElementById('aiAnalysisBody');
+    if (body) body.innerHTML = `<div class="ai-modal-spinner">${escapeHTML(msg || 'Analyse en cours…')}</div>`;
+  }
+  function _aiModalShowError(html) {
+    const body = document.getElementById('aiAnalysisBody');
+    if (body) body.innerHTML = `<div class="ai-modal-error">${html}</div>`;
+  }
+  function _renderAiAnalysis(a) {
+    // Map the JSON back to readable French sections. Defensive about missing
+    // fields — Gemini occasionally truncates, we want the modal to degrade
+    // gracefully rather than blow up.
+    const hookKey = (a.hook_quality || '').toLowerCase();
+    const hookBadgeCls = ['excellent','bon','moyen','faible'].includes(hookKey)
+      ? `hook-${hookKey}` : '';
+    const cachedTag = a._cached
+      ? `<span class="ai-modal-cached">⚡ depuis cache</span>` : '';
+    const html = `
+      <div class="ai-modal-badges">
+        ${a.hook_quality ? `<span class="ai-modal-badge ${hookBadgeCls}">Hook : ${escapeHTML(a.hook_quality)}</span>` : ''}
+        ${a.content_type ? `<span class="ai-modal-badge">Type : ${escapeHTML(a.content_type)}</span>` : ''}
+        ${cachedTag}
+      </div>
+      ${a.hook_observation ? `
+        <div class="ai-modal-section">
+          <h4>🎣 Le hook</h4>
+          <p>${escapeHTML(a.hook_observation)}</p>
+        </div>` : ''}
+      ${a.visual_style ? `
+        <div class="ai-modal-section">
+          <h4>🎨 Style visuel</h4>
+          <p>${escapeHTML(a.visual_style)}</p>
+        </div>` : ''}
+      ${a.target_audience ? `
+        <div class="ai-modal-section">
+          <h4>👥 Audience cible</h4>
+          <p>${escapeHTML(a.target_audience)}</p>
+        </div>` : ''}
+      ${a.why_it_performed ? `
+        <div class="ai-modal-section">
+          <h4>📊 Pourquoi ça a marché (ou pas)</h4>
+          <p>${escapeHTML(a.why_it_performed)}</p>
+        </div>` : ''}
+      ${Array.isArray(a.strengths) && a.strengths.length ? `
+        <div class="ai-modal-section">
+          <h4>💪 Points forts</h4>
+          <ul>${a.strengths.map(s => `<li>${escapeHTML(s)}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${Array.isArray(a.weaknesses) && a.weaknesses.length ? `
+        <div class="ai-modal-section">
+          <h4>⚠️ Points faibles</h4>
+          <ul>${a.weaknesses.map(s => `<li>${escapeHTML(s)}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${Array.isArray(a.recommendations) && a.recommendations.length ? `
+        <div class="ai-modal-section">
+          <h4>🚀 Recommandations actionnables</h4>
+          <ul>${a.recommendations.map(s => `<li>${escapeHTML(s)}</li>`).join('')}</ul>
+        </div>` : ''}
+    `;
+    const body = document.getElementById('aiAnalysisBody');
+    if (body) body.innerHTML = html;
+  }
+  async function _runAiAnalysis(videoId, platform) {
+    _aiModalOpen();
+    _aiModalShowSpinner('Analyse en cours… (~10-20 s sur premier appel, instantané ensuite)');
+    try {
+      const res = await fetch('/api/video/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, platform: platform }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 403 && data.upgrade_required) {
+          _aiModalShowError(`<strong>Disponible sur l'offre Entreprises.</strong><br>Ton plan actuel : <em>${escapeHTML(data.current_plan || 'starter')}</em>. <a href="/billing" style="color:var(--accent);font-weight:600">Passer à Entreprises →</a>`);
+        } else if (res.status === 503) {
+          _aiModalShowError(`<strong>AI vision désactivée.</strong><br>${escapeHTML(data.error || '')}<br><br><em style="font-size:12px">${escapeHTML(data.setup_hint || '')}</em>`);
+        } else {
+          _aiModalShowError(`<strong>Erreur</strong><br>${escapeHTML(data.error || 'Échec de l\'analyse')}`);
+        }
+        return;
+      }
+      _renderAiAnalysis(data);
+    } catch (e) {
+      _aiModalShowError(`<strong>Erreur réseau</strong><br>${escapeHTML(String(e.message || e))}`);
+    }
+  }
+  // Delegated click — works even on re-rendered cards.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.vac-ai-btn');
+    if (!btn || btn.classList.contains('locked')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const videoId = btn.dataset.vid || '';
+    const platform = btn.dataset.plat || 'tiktok';
+    if (!videoId) return;
+    _runAiAnalysis(videoId, platform);
+  });
+  // Close on backdrop click + close button + Escape key
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'aiAnalysisBackdrop') _aiModalClose();
+    if (e.target && e.target.id === 'aiAnalysisClose')    _aiModalClose();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') _aiModalClose();
+  });
 
   function computeVideoAnalysis(videos) {
     const group = document.getElementById('adviceVideoGroup');
