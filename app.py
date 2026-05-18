@@ -1082,11 +1082,24 @@ Sois direct, concret, basé sur ce que tu VOIS et sur la perf chiffrée. Pas de 
                     config=gtypes.GenerateContentConfig(
                         response_mime_type="application/json",
                         temperature=0.6,
-                        max_output_tokens=1500,
+                        # Bumped from 1500 — was truncating mid-string on
+                        # videos with richer analyses (3 recos + strengths +
+                        # weaknesses + why_it_performed multi-sentence). 4000
+                        # is enough headroom for the most verbose output we've
+                        # seen, still well under the model's ceiling.
+                        max_output_tokens=4000,
                     ),
                 )
                 raw = response.text or "{}"
-                analysis = jsonmod.loads(raw)
+                try:
+                    analysis = jsonmod.loads(raw)
+                except jsonmod.JSONDecodeError as je:
+                    # Log the malformed payload so we can see what shape
+                    # Gemini actually returned (truncation, markdown wrap,
+                    # extra prose, etc.) — then fail explicitly rather than
+                    # surface the cryptic "Unterminated string" trace.
+                    app.logger.warning(f"video_analyze_json_parse_failed: {je}; raw[:500]={raw[:500]!r}")
+                    raise RuntimeError(f"Gemini a renvoyé du JSON invalide ({je.msg} à la position {je.pos}). Réessaie — il peut hallucinier le format.")
                 break
             except Exception as inner:
                 last_err = inner
