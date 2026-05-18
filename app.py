@@ -973,42 +973,43 @@ def api_video_analyze():
             "setup_hint": "Crée une clé gratuite sur aistudio.google.com/apikey puis ajoute-la dans Vercel env vars",
         }), 503
 
-    # Lookup the video row to get account_username + URL for the yt-dlp fetch
+    # Lookup the video row to get account_username + thumbnail_url + the
+    # context metadata we'll feed to Gemini's prompt.
     from database import get_connection, _fetchone
     conn = get_connection()
     try:
         vrow = _fetchone(conn,
-            "SELECT account_username, description, duration, views, likes, comments, shares, video_url, create_time FROM videos WHERE video_id = %s AND platform = %s AND user_id = %s",
+            "SELECT account_username, description, duration, views, likes, comments, shares, video_url, thumbnail_url, create_time FROM videos WHERE video_id = %s AND platform = %s AND user_id = %s",
             (video_id, platform, current_user.data_user_id))
     finally:
         conn.close()
     if not vrow:
         return jsonify({"error": "vidéo introuvable dans ton catalogue"}), 404
 
-    # Reconstruct the post URL if missing (defensive — should be filled per the
-    # bf61292 backfill but new accounts before that commit might still have NULL).
-    post_url = vrow.get("video_url")
-    if not post_url and platform == "tiktok":
-        post_url = f"https://www.tiktok.com/@{vrow['account_username']}/video/{video_id}"
-
-    # Fetch thumbnail + metadata via yt-dlp (no full video download — too slow
-    # for Vercel's 60s budget). The thumbnail = the cover frame = often the
-    # hook in TikTok-style content, which is what we want vision-analyzed.
-    try:
-        import yt_dlp
-        ydl_opts = {
-            "quiet": True, "no_warnings": True, "skip_download": True,
-            "socket_timeout": 20, "retries": 1,
-            "nocheckcertificate": True, "geo_bypass": True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(post_url, download=False)
-    except Exception as e:
-        return jsonify({"error": f"impossible de récupérer la vidéo via yt-dlp: {str(e)[:120]}"}), 502
-
-    thumb_url = info.get("thumbnail") or (info.get("thumbnails") or [{}])[-1].get("url")
+    # Use the thumbnail we already stored at scrape time — skips a slow,
+    # rate-limit-prone yt-dlp round-trip. This was the original blocker on
+    # Instagram videos: yt-dlp's IG extractor needs cookies or a logged-in
+    # session, so a public fetch returned "rate-limit reached or login
+    # required" and the whole analysis failed. We already have the cover
+    # image URL in DB (populated for every platform during the regular
+    # scrape pipeline) — use it directly.
+    thumb_url = vrow.get("thumbnail_url")
     if not thumb_url:
-        return jsonify({"error": "aucune image de couverture disponible"}), 502
+        # Final fallback: try yt-dlp only when DB is empty (very old rows).
+        post_url = vrow.get("video_url")
+        if not post_url and platform == "tiktok":
+            post_url = f"https://www.tiktok.com/@{vrow['account_username']}/video/{video_id}"
+        if not post_url:
+            return jsonify({"error": "aucune image de couverture en DB ni URL de fallback"}), 404
+        try:
+            import yt_dlp
+            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "socket_timeout": 15, "retries": 1, "nocheckcertificate": True, "geo_bypass": True}) as ydl:
+                info = ydl.extract_info(post_url, download=False)
+            thumb_url = info.get("thumbnail") or (info.get("thumbnails") or [{}])[-1].get("url")
+        except Exception as e:
+            return jsonify({"error": f"pas de thumbnail en DB et fallback yt-dlp KO ({platform}): {str(e)[:120]}"}), 502
+        if not thumb_url:
+            return jsonify({"error": "aucune image de couverture disponible"}), 502
 
     # Download thumbnail bytes (we send inline base64 to Gemini — its URL
     # input mode requires the File API which has cleanup overhead we don't need).
