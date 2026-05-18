@@ -1665,6 +1665,10 @@ button { font-family: inherit; cursor: pointer; }
   padding: 20px;
   animation: fadeIn .15s ease-out;
 }
+/* Without this, .ai-modal-backdrop's display:flex wins over the UA
+   [hidden] { display:none } rule, so the modal flashed on every page
+   load — same trap as .health-banner / .chart-card-empty / .advice-card. */
+.ai-modal-backdrop[hidden] { display: none !important; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .ai-modal {
   background: #fff;
