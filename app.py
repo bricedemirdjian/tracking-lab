@@ -1054,33 +1054,59 @@ Analyse l'image (souvent le 1er frame, donc LE hook visuel sur TikTok/Reels) ET 
 
 Sois direct, concret, basé sur ce que tu VOIS et sur la perf chiffrée. Pas de banalités. Réponse en français."""
 
-    # Call Gemini Flash 2.0 (free tier — 1500 req/jour, 15 RPM, plenty for
-    # on-demand per-video analysis). Using the google-genai SDK with inline
-    # base64 image input. Response asked as JSON via response_mime_type.
-    import base64, json as jsonmod
+    # Call Gemini (free tier on newer models — switched from 2.0-flash to
+    # gemini-2.5-flash after seeing 429 RESOURCE_EXHAUSTED on the user's
+    # brand-new key, which seems to start with a tighter per-key warmup
+    # quota on 2.0-flash). 2.5-flash has the most generous free tier as of
+    # 2026-05 + still supports vision + structured JSON output.
+    import base64, json as jsonmod, time as _time
+    last_err = None
+    analysis = None
     try:
         from google import genai
         from google.genai import types as gtypes
         client = genai.Client(api_key=api_key)
         # Detect image MIME from first bytes — JPEGs start with 0xFFD8, PNGs with 0x89504E47.
         mime = "image/jpeg" if img_bytes[:2] == b"\xff\xd8" else "image/png" if img_bytes[:4] == b"\x89PNG" else "image/jpeg"
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-001",
-            contents=[
-                gtypes.Part.from_bytes(data=img_bytes, mime_type=mime),
-                prompt,
-            ],
-            config=gtypes.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.6,
-                max_output_tokens=1500,
-            ),
-        )
-        raw = response.text or "{}"
-        analysis = jsonmod.loads(raw)
+        # Retry once on transient 429 — Gemini free tier sometimes throttles
+        # the first request from a cold IP. Wait 2s then try one more time.
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        gtypes.Part.from_bytes(data=img_bytes, mime_type=mime),
+                        prompt,
+                    ],
+                    config=gtypes.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.6,
+                        max_output_tokens=1500,
+                    ),
+                )
+                raw = response.text or "{}"
+                analysis = jsonmod.loads(raw)
+                break
+            except Exception as inner:
+                last_err = inner
+                msg = str(inner)
+                if attempt == 0 and ("429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower()):
+                    _time.sleep(2)
+                    continue
+                raise
     except Exception as e:
         app.logger.exception("video_analyze_gemini_failed")
-        return jsonify({"error": f"analyse IA échouée: {str(e)[:160]}"}), 502
+        msg = str(e)
+        # Detect the common error shapes and surface a UX-friendly message
+        # rather than the raw JSON-stringified API response.
+        if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+            return jsonify({
+                "error": "Quota Gemini dépassé — réessaie dans 1 min (free tier limite à 15 req/min)",
+                "raw": msg[:200],
+            }), 429
+        if "400" in msg and "API key" in msg:
+            return jsonify({"error": "Clé Gemini invalide — vérifie GEMINI_API_KEY sur Vercel"}), 400
+        return jsonify({"error": f"analyse IA échouée: {msg[:200]}"}), 502
 
     # Persist + return.
     try:
