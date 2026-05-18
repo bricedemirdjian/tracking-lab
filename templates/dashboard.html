@@ -1169,29 +1169,33 @@ button { font-family: inherit; cursor: pointer; }
   display: flex; flex-direction: column;
 }
 .video-card:hover { border-color: var(--text-4); box-shadow: var(--shadow); transform: translateY(-2px); }
-/* Wrap around .video-card + AI analysis button so both stay stacked. The
-   wrap is the grid item, not the <a> — lets us put a <button> next to the
-   <a> without nesting them (interactive-inside-interactive is invalid). */
-.video-card-wrap { display: flex; flex-direction: column; }
-.video-card-ai {
-  margin-top: 6px;
-  padding: 7px 10px;
+/* AI analysis pill — absolutely positioned over the thumbnail's
+   bottom-right corner. Doesn't break the .videos-swipe flex layout
+   (which targets .video-card directly) since the pill lives inside
+   the thumbnail. */
+.video-card-ai-pill {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  padding: 5px 10px;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 12px; font-weight: 600;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700;
   cursor: pointer;
-  transition: background .12s;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: transform .1s, background .12s;
 }
-.video-card-ai:hover { background: var(--accent-hover); }
-.video-card-ai.locked {
-  background: var(--bg-soft, #f5f5f7);
-  color: var(--text-3);
+.video-card-ai-pill:hover { background: var(--accent-hover); transform: scale(1.05); }
+.video-card-ai-pill.locked {
+  background: rgba(0,0,0,0.6);
+  color: #fff;
   cursor: not-allowed;
-  border: 1px dashed var(--border);
+  font-size: 13px;
+  padding: 5px 8px;
 }
-.video-card-ai.locked:hover { background: var(--bg-soft, #f5f5f7); }
+.video-card-ai-pill.locked:hover { background: rgba(0,0,0,0.6); transform: none; }
 .video-thumb {
   aspect-ratio: 9 / 16;
   background: var(--bg-sidebar) center/cover no-repeat;
@@ -3210,35 +3214,38 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const url = v.url || v.video_url || '#';
     const postedAt = fmtPostDate(v.create_time, !!opts.withTime);
     const videoId = v.video_id || '';
-    // AI button — agency/admin only. We render this OUTSIDE the <a> so it
-    // doesn't trigger the parent link's navigation when clicked. Renders
-    // even for non-agency users as a locked teaser (clearer upgrade signal
-    // than hiding the affordance entirely).
-    const aiBtn = (typeof AI_ANALYSIS_ENABLED !== 'undefined' && AI_ANALYSIS_ENABLED && videoId)
-      ? `<button class="video-card-ai vac-ai-btn" data-vid="${escapeHTML(videoId)}" data-plat="${escapeHTML(p)}" type="button" title="Analyser cette vidéo avec l'IA">🔬 Analyser (IA)</button>`
-      : (videoId
-          ? `<button class="video-card-ai vac-ai-btn locked" type="button" title="Disponible sur l'offre Entreprises">🔒 IA · Entreprises</button>`
-          : '');
+    // AI pill — absolutely positioned over the thumbnail's bottom-right
+    // corner. Click bubbles up; we intercept via stopPropagation in the
+    // global click handler. Render even for non-agency as a locked teaser
+    // for upgrade visibility. Putting it INSIDE the <a> rather than
+    // breaking the card into a wrap keeps the .videos-swipe carousel
+    // CSS targeting .video-card (flex: 0 0 ...) working unchanged.
+    let aiPill = '';
+    if (videoId && typeof AI_ANALYSIS_ENABLED !== 'undefined') {
+      if (AI_ANALYSIS_ENABLED) {
+        aiPill = `<button class="video-card-ai-pill vac-ai-btn" data-vid="${escapeHTML(videoId)}" data-plat="${escapeHTML(p)}" type="button" title="Analyser cette vidéo avec l'IA">🔬 IA</button>`;
+      } else {
+        aiPill = `<button class="video-card-ai-pill vac-ai-btn locked" type="button" title="Disponible sur l'offre Entreprises">🔒</button>`;
+      }
+    }
     return `
-      <div class="video-card-wrap">
-        <a class="video-card" href="${escapeHTML(url)}" target="_blank" rel="noopener">
-          <div class="video-thumb" style="${thumb ? `background-image:url('${escapeHTML(thumb)}')` : ''}">
-            ${!thumb ? '<div class="video-thumb-fallback">▶</div>' : ''}
-            <span class="video-thumb-platform">${PLATFORM_SVG_INLINE[p] || ''}</span>
+      <a class="video-card" href="${escapeHTML(url)}" target="_blank" rel="noopener">
+        <div class="video-thumb" style="${thumb ? `background-image:url('${escapeHTML(thumb)}')` : ''}">
+          ${!thumb ? '<div class="video-thumb-fallback">▶</div>' : ''}
+          <span class="video-thumb-platform">${PLATFORM_SVG_INLINE[p] || ''}</span>
+          ${aiPill}
+        </div>
+        <div class="video-body">
+          <div class="video-title">${escapeHTML(title.slice(0, 120))}</div>
+          <div class="video-author">${escapeHTML(author)}</div>
+          ${postedAt ? `<div class="video-date">${escapeHTML(postedAt)}</div>` : ''}
+          <div class="video-stats">
+            <span title="Vues">▶ ${fmt(v.view_count || v.views || 0)}</span>
+            <span title="Likes">♥ ${fmt(v.like_count || v.likes || 0)}</span>
+            <span title="Commentaires">💬 ${fmt(v.comment_count || v.comments || 0)}</span>
           </div>
-          <div class="video-body">
-            <div class="video-title">${escapeHTML(title.slice(0, 120))}</div>
-            <div class="video-author">${escapeHTML(author)}</div>
-            ${postedAt ? `<div class="video-date">${escapeHTML(postedAt)}</div>` : ''}
-            <div class="video-stats">
-              <span title="Vues">▶ ${fmt(v.view_count || v.views || 0)}</span>
-              <span title="Likes">♥ ${fmt(v.like_count || v.likes || 0)}</span>
-              <span title="Commentaires">💬 ${fmt(v.comment_count || v.comments || 0)}</span>
-            </div>
-          </div>
-        </a>
-        ${aiBtn}
-      </div>`;
+        </div>
+      </a>`;
   }
 
   async function renderVideosView() {
