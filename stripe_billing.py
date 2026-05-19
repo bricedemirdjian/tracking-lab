@@ -3,18 +3,26 @@ import stripe
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
+# Pricing collapsed on 2026-05-20 to a single offer with two billing
+# cadences (full feature parity, no gated tiers):
+#   - 'pro' = formule mensuelle (29,99€ TTC/mois)
+#   - 'agency' = formule annuelle (79,99€ TTC/an, soit ~6,67€/mois)
+# Plan keys are kept as 'pro'/'agency' to avoid migrating the users.plan
+# column; the user-facing names are 'Mensuel' / 'Annuel'. 'starter' is the
+# legacy free tier — no longer sold, but kept as a no-op fallback for any
+# pre-existing rows (and the auth.py default when a user is created before
+# they pick a plan).
 PLANS = {
     'starter': {
-        'name': 'Starter',
-        'price': 19,
-        'price_annual': 15,
-        'price_id': os.environ.get('STRIPE_STARTER_PRICE_ID'),
-        'price_id_annual': os.environ.get('STRIPE_STARTER_ANNUAL_PRICE_ID'),
+        'name': 'Starter (legacy)',
+        'price': 0,
+        'price_annual': 0,
+        'price_id': None,
+        'price_id_annual': None,
+        # Legacy free tier: keep the original limits so existing rows
+        # don't suddenly gain unlimited access without paying. Anyone new
+        # is routed to 'pro' or 'agency' on signup.
         'max_accounts': 1,
-        # No video-count cap on any plan — marketing copy still mentions
-        # "100 vidéos" as a friendly anchor, but the scraper is now uncapped
-        # (see SCRAPER_TIKTOK_LIMIT / SCRAPER_YOUTUBE_LIMIT in scraper_async).
-        # The gauge in account.html uses this for visual headroom only.
         'max_videos': 999999,
         'max_projects': 1,
         'max_shared_users': 0,
@@ -29,31 +37,33 @@ PLANS = {
         'scrape_cadence_hours': 6,
     },
     'pro': {
-        'name': 'Pro',
-        'price': 29,
-        'price_annual': 23,
-        'price_id': os.environ.get('STRIPE_PRO_PRICE_ID'),
-        'price_id_annual': os.environ.get('STRIPE_PRO_ANNUAL_PRICE_ID'),
-        'max_accounts': 5,
-        'max_videos': 999999,  # see starter — caps removed plan-wide
-        'max_projects': 5,
-        'max_shared_users': 2,
+        'name': 'Mensuel',
+        'price': 29.99,
+        'price_annual': 29.99,  # legacy field, kept = price for back-compat
+        'price_id': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
+        'price_id_annual': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
+        # Full feature parity with the annual plan — only difference is
+        # the Stripe billing cadence.
+        'max_accounts': 9999,
+        'max_videos': 999999,
+        'max_projects': 9999,
+        'max_shared_users': 9999,
         'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
         'instagram': True,
         'linkedin': True,
         'export_csv': True,
-        'import_csv': False,
-        'competitor_access': False,
-        'analytics_full': False,
-        'ai_video_analysis': False,
-        'scrape_cadence_hours': 4,
+        'import_csv': True,
+        'competitor_access': True,
+        'analytics_full': True,
+        'ai_video_analysis': True,
+        'scrape_cadence_hours': 1,
     },
     'agency': {
-        'name': 'Entreprises',
-        'price': 79,
-        'price_annual': 63,
-        'price_id': os.environ.get('STRIPE_AGENCY_PRICE_ID'),
-        'price_id_annual': os.environ.get('STRIPE_AGENCY_ANNUAL_PRICE_ID'),
+        'name': 'Annuel',
+        'price': 79.99,
+        'price_annual': 79.99,
+        'price_id': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
+        'price_id_annual': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
         'max_accounts': 9999,
         'max_videos': 999999,
         'max_projects': 9999,
