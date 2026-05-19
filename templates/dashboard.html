@@ -1334,14 +1334,96 @@ button { font-family: inherit; cursor: pointer; }
 }
 .preview-banner a { text-decoration: underline; }
 
+/* ─── Mobile responsive: hamburger + slide-in sidebar ─── */
+/* The hamburger button is HIDDEN on desktop and only shows on ≤900px,
+   pinned to the top-left for easy thumb reach. The sidebar slides in
+   from the left over a backdrop instead of taking vertical space. */
+.sb-hamburger {
+  display: none;
+  position: fixed; top: 14px; left: 14px;
+  z-index: 100;
+  width: 44px; height: 44px;
+  align-items: center; justify-content: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: background .12s, transform .08s;
+}
+.sb-hamburger:hover { background: var(--bg-sidebar); }
+.sb-hamburger:active { transform: scale(0.95); }
+.sb-hamburger span {
+  display: block;
+  width: 20px; height: 2px;
+  background: var(--text-1);
+  border-radius: 2px;
+  position: relative;
+}
+.sb-hamburger span::before,
+.sb-hamburger span::after {
+  content: ''; position: absolute; left: 0;
+  width: 20px; height: 2px;
+  background: var(--text-1); border-radius: 2px;
+}
+.sb-hamburger span::before { top: -7px; }
+.sb-hamburger span::after  { top:  7px; }
+/* Backdrop that dims main content while the sidebar drawer is open. */
+.sb-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 90;
+  animation: sbFadeIn .18s ease-out;
+}
+@keyframes sbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sb-backdrop[hidden] { display: none !important; }
+
 @media (max-width: 900px) {
-  .layout { flex-direction: column; }
-  .sb { width: 100%; height: auto; position: relative;
-        border-right: none; border-bottom: 1px solid var(--border); }
-  .main { padding: 20px 16px 60px; }
+  .sb-hamburger { display: flex; }
+  /* Sidebar becomes a drawer: fixed, full-height, off-screen by default,
+     slides in when .is-open is toggled by the hamburger JS. */
+  .sb {
+    position: fixed;
+    top: 0; left: 0;
+    width: 280px; max-width: 85vw;
+    height: 100vh;
+    z-index: 95;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.2,0,0,1);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.12);
+    border-right: 1px solid var(--border);
+  }
+  .sb.is-open { transform: translateX(0); }
+  .sb-backdrop.is-open { display: block; }
+  /* Lock body scroll when drawer is open to prevent dual-scroll. */
+  body.sb-drawer-open { overflow: hidden; }
+  /* Main content gets full width since sidebar is overlaid. */
+  .main { padding: 64px 16px 60px; }   /* top-padding leaves room for hamburger */
   .header { flex-direction: column; align-items: stretch; }
   .toolbar { align-items: flex-start; }
-  .h-title { font-size: 36px; letter-spacing: -1px; }
+  .h-title { font-size: 32px; letter-spacing: -1px; }
+  .h-eyebrow { font-size: 11px; }
+  /* Make filter bar wrap cleanly on narrow widths instead of overflowing. */
+  .filter-bar { flex-wrap: wrap; gap: 8px; }
+  /* Charts go single-column on mobile for readability. */
+  .charts-grid { grid-template-columns: 1fr !important; }
+  /* Tighten card padding so content gets more space. */
+  .kpi-card { padding: 14px; }
+  .chart-card { padding: 14px; }
+  /* Data table horizontal scroll instead of squished columns. */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { min-width: 720px; }
+  /* Float chat button so it doesn't overlap hamburger. */
+  .chat-float { bottom: 16px; right: 16px; }
+  /* Hide the modal close X smaller on tap to be finger-friendly. */
+  .ai-modal { padding: 20px 18px; max-height: 90vh; }
+  .ai-modal-close { width: 36px; height: 36px; top: 12px; right: 12px; }
+}
+/* Very narrow phones: even tighter spacing. */
+@media (max-width: 480px) {
+  .h-title { font-size: 28px; }
+  .videos-swipe .video-card { flex-basis: calc((100% - 14px) / 1.4); }
 }
 
 /* ─────────────────────── Audience charts (Tableau view) ─────────────────────── */
@@ -1878,8 +1960,16 @@ button { font-family: inherit; cursor: pointer; }
 
 <div class="layout">
 
+  <!-- Hamburger button — fixed top-left, shows only on ≤900px viewports.
+       Toggles .is-open on .sb (slide-in drawer) and .sb-backdrop. -->
+  <button class="sb-hamburger" id="sbHamburger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mobileSidebar">
+    <span></span>
+  </button>
+  <!-- Backdrop overlay — clicking it closes the drawer. -->
+  <div class="sb-backdrop" id="sbBackdrop" hidden aria-hidden="true"></div>
+
   <!-- ═══════ SIDEBAR ═══════ -->
-  <aside class="sb">
+  <aside class="sb" id="mobileSidebar">
     <div class="sb-brand">
       <!-- Same SVG as the landing page nav (templates/landing.html) -->
       <svg class="sb-brand-logo" width="32" height="32" viewBox="0 0 40 40" fill="none">
@@ -2716,6 +2806,51 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
+
+  // ── Mobile sidebar drawer (hamburger) ──────────────────────────────
+  // The .sb-hamburger button is only visible on ≤900px viewports (CSS).
+  // Click toggles .is-open on the sidebar + backdrop, and locks body scroll
+  // so the drawer feels like a real overlay. ESC + backdrop tap + any
+  // sidebar link click all close it (so nav doesn't feel sticky).
+  (() => {
+    const ham = document.getElementById('sbHamburger');
+    const sb = document.getElementById('mobileSidebar');
+    const bd = document.getElementById('sbBackdrop');
+    if (!ham || !sb || !bd) return;
+    const open = () => {
+      sb.classList.add('is-open');
+      bd.classList.add('is-open');
+      bd.hidden = false;
+      document.body.classList.add('sb-drawer-open');
+      ham.setAttribute('aria-expanded', 'true');
+    };
+    const close = () => {
+      sb.classList.remove('is-open');
+      bd.classList.remove('is-open');
+      bd.hidden = true;
+      document.body.classList.remove('sb-drawer-open');
+      ham.setAttribute('aria-expanded', 'false');
+    };
+    ham.addEventListener('click', () => {
+      sb.classList.contains('is-open') ? close() : open();
+    });
+    bd.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sb.classList.contains('is-open')) close();
+    });
+    // Close on any nav link click inside the drawer (mobile UX expectation:
+    // tapping a destination dismisses the drawer automatically).
+    sb.addEventListener('click', (e) => {
+      const link = e.target.closest && e.target.closest('a[href], a[data-platform-nav]');
+      if (link && window.innerWidth <= 900) close();
+    });
+    // If the user resizes from mobile to desktop while the drawer is open,
+    // reset state so the desktop layout isn't stuck in the open animation.
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 900 && sb.classList.contains('is-open')) close();
+    });
+  })();
+
   const fmt = n => {
     if (n == null || isNaN(n)) return '—';
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + ' M';
