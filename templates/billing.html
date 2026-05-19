@@ -61,107 +61,111 @@
 
         .plan-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 40px;
+        /* Pricing — identical visual to landing page (_body.html) */
+        .pricing {
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 20px; max-width: 1080px; margin: 0 auto 40px;
+            align-items: stretch;
         }
-        .pricing-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 28px 24px;
-            position: relative;
-            transition: all 0.2s;
-            box-shadow: var(--shadow);
+        .price-card {
+            background: #fff; border-radius: 28px;
+            padding: 40px 28px; position: relative;
+            border: 1.5px solid #e0e0e5;
+            transition: all .3s cubic-bezier(.2,0,0,1);
+            display: flex; flex-direction: column;
         }
-        .pricing-card:hover { border-color: #ccc; transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .pricing-card.current { border-color: var(--accent); }
-        .pricing-card.featured {
-            border-color: var(--accent);
-            box-shadow: 0 4px 24px rgba(255,105,180,0.12);
+        .price-card:hover { transform: translateY(-4px); border-color: #ccc; }
+        .price-card.current { border-color: #FF69B4; }
+        .price-card.pop {
+            background: linear-gradient(180deg, #FF69B4 0%, #f05aa0 100%);
+            border-color: #FF69B4;
+            box-shadow: 0 24px 60px rgba(255,105,180,.35), 0 8px 22px rgba(255,105,180,.18);
+            z-index: 2;
         }
-        .featured-badge {
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--text-primary);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 14px;
-            border-radius: 100px;
-            white-space: nowrap;
+        .price-card.pop:hover {
+            transform: translateY(-6px); border-color: #FF69B4;
+            box-shadow: 0 32px 70px rgba(255,105,180,.42), 0 10px 26px rgba(255,105,180,.22);
         }
-        .current-badge {
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--accent);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 14px;
-            border-radius: 100px;
-            white-space: nowrap;
+        .price-card.pop::after {
+            content: ''; position: absolute;
+            top: 12px; right: 18px; width: 60px; height: 60px;
+            background: radial-gradient(circle, rgba(255,255,255,.25), transparent 65%);
+            border-radius: 50%; pointer-events: none;
         }
-        .plan-name {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
+        .price-tag {
+            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+            background: #fff; color: #FF69B4;
+            font-size: 11px; font-weight: 800;
+            padding: 6px 18px; border-radius: 980px;
+            box-shadow: 0 6px 18px rgba(0,0,0,.12);
+            letter-spacing: 0.4px;
         }
-        .plan-price {
-            font-size: 42px;
-            font-weight: 900;
-            letter-spacing: -2px;
-            margin-bottom: 4px;
-            color: var(--text-primary);
+        .current-tag {
+            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+            background: #FF69B4; color: #fff;
+            font-size: 11px; font-weight: 800;
+            padding: 6px 18px; border-radius: 980px;
+            box-shadow: 0 6px 18px rgba(255,105,180,.3);
+            letter-spacing: 0.4px; z-index: 3;
         }
-        .plan-price span { font-size: 16px; font-weight: 600; color: var(--text-muted); }
-        .plan-period { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
-        .plan-divider { height: 1px; background: var(--border); margin-bottom: 16px; }
-        .plan-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-        .plan-features li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); }
-        .plan-features li .ok { color: var(--success); }
-        .plan-features li .no { color: var(--text-muted); }
-        .plan-features li.dim { color: var(--text-muted); }
+        .price-card.pop .current-tag { background: #fff; color: #FF69B4; }
+        .price-name {
+            font-size: 12px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: #86868b; margin-bottom: 16px;
+        }
+        .price-card.pop .price-name { color: rgba(255,255,255,.85); }
+        .price-val {
+            font-size: 52px; font-weight: 900;
+            letter-spacing: -0.04em; line-height: 1; margin-bottom: 4px;
+            color: #0d0d0d;
+        }
+        .price-card.pop .price-val { color: #fff; }
+        .price-val span { font-size: 15px; font-weight: 600; color: #86868b; letter-spacing: 0; }
+        .price-card.pop .price-val span { color: rgba(255,255,255,.8); }
+        .price-sub { font-size: 14px; color: #86868b; margin-bottom: 28px; font-weight: 500; }
+        .price-card.pop .price-sub { color: rgba(255,255,255,.92); font-weight: 600; }
+        .price-sep { height: 1px; background: #e0e0e5; margin-bottom: 24px; }
+        .price-card.pop .price-sep { background: rgba(255,255,255,.25); }
+        .price-list {
+            list-style: none; display: flex; flex-direction: column;
+            gap: 12px; margin-bottom: 32px; flex: 1; padding: 0;
+        }
+        .price-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: #1d1d1f; }
+        .price-list .ok { color: #FF69B4; }
+        .price-list .no { color: #e0e0e5; }
+        .price-list li.dim { color: #86868b; font-weight: 500; }
+        .price-card.pop .price-list li { color: #fff; }
+        .price-card.pop .price-list .ok { color: #fff; }
 
-        .btn-plan {
-            width: 100%;
-            padding: 12px;
-            border-radius: 100px;
+        /* CTA buttons inside the price cards */
+        .price-card .btn {
+            width: 100%; padding: 12px;
+            border-radius: 980px;
             font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 700;
-            text-align: center;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
+            font-size: 14px; font-weight: 700;
+            text-align: center; cursor: pointer;
+            border: none; transition: all 0.2s;
+            text-decoration: none;
+            display: flex; align-items: center; justify-content: center;
         }
-        .btn-plan-outline {
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            color: var(--text-muted);
-            cursor: default;
+        .price-card .btn-primary { background: #0d0d0d; color: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+        .price-card .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+        .price-card .btn-outline { border: 1.5px solid #e0e0e5; background: #fff; color: #1d1d1f; }
+        .price-card .btn-outline:hover { background: #fafafa; border-color: #ccc; }
+        .price-card .btn-disabled { border: 1.5px solid #e0e0e5; background: #fafafa; color: #86868b; cursor: default; }
+        .price-card.pop .btn-primary { background: #fff; color: #FF69B4; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+        .price-card.pop .btn-primary:hover { background: #fff; color: #FF69B4; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+        .price-card.pop .btn-outline { background: #fff; color: #FF69B4; border-color: #fff; }
+        .price-card.pop .btn-outline:hover { background: #fff; color: #FF69B4; }
+        .price-card.pop .btn-disabled { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.3); color: rgba(255,255,255,.9); }
+
+        .price-trial {
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-top: 14px;
+            font-size: 12px; font-weight: 600; color: #86868b;
+            letter-spacing: 0.1px;
         }
-        .btn-plan-primary {
-            background: var(--text-primary);
-            color: white;
-            box-shadow: var(--shadow-md);
-        }
-        .btn-plan-primary:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
-        .btn-plan-secondary {
-            border: 1.5px solid var(--border);
-            background: var(--white);
-            color: var(--text-primary);
-        }
-        .btn-plan-secondary:hover { background: var(--bg-secondary); }
+        .price-card.pop .price-trial { color: rgba(255,255,255,.92); }
 
         .back-link {
             display: inline-flex;
@@ -185,68 +189,47 @@
         .alert-success { background: rgba(52,199,89,0.08); border: 1px solid rgba(52,199,89,0.2); color: var(--success); }
         .alert-info { background: rgba(255,105,180,0.08); border: 1px solid rgba(255,105,180,0.2); color: var(--accent); }
 
-        /* Pricing toggle + price strike-through, mirrors landing page */
+        /* Pricing toggle — mirrors landing */
         .pricing-toggle {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            margin: 0 0 32px;
-            flex-wrap: wrap;
+            display: flex; align-items: center; justify-content: center;
+            gap: 16px; margin: 0 0 48px; flex-wrap: wrap;
         }
         .pricing-toggle-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
+            font-size: 15px; font-weight: 600; color: #86868b;
+            cursor: pointer; user-select: none; transition: color .3s;
         }
-        .pricing-toggle-label.active { color: var(--text-primary); }
+        .pricing-toggle-label.active { color: #0d0d0d; }
         .pricing-toggle-switch {
-            width: 44px;
-            height: 24px;
-            border-radius: 100px;
-            background: #e5e5e5;
-            position: relative;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .pricing-toggle-switch::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
+            position: relative; width: 52px; height: 28px;
+            background: #e0e0e5; border-radius: 14px;
+            cursor: pointer; transition: background .3s;
+            flex-shrink: 0;
         }
         .pricing-toggle-switch.on { background: #FF69B4; }
-        .pricing-toggle-switch.on::after { transform: translateX(20px); }
+        .pricing-toggle-switch::after {
+            content: ''; position: absolute;
+            top: 3px; left: 3px; width: 22px; height: 22px;
+            background: #fff; border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
+            transition: transform .3s cubic-bezier(.2,0,0,1);
+        }
+        .pricing-toggle-switch.on::after { transform: translateX(24px); }
         .pricing-badge {
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.6px;
-            color: #FF69B4;
-            background: rgba(255,105,180,0.1);
-            padding: 4px 10px;
-            border-radius: 100px;
-            text-transform: uppercase;
+            background: linear-gradient(135deg, #FF69B4, #f05aa0);
+            color: #fff; font-size: 11px; font-weight: 800;
+            padding: 5px 12px; border-radius: 980px;
+            letter-spacing: 0.3px; white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(255,105,180,.3);
         }
-        .plan-price .price-old {
-            font-size: 22px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-decoration: line-through;
-            margin-right: 10px;
-            letter-spacing: -0.5px;
+        .price-old {
+            font-size: 18px; font-weight: 600; color: #86868b;
+            text-decoration: line-through; margin-right: 6px;
+            display: none;
         }
-        .plan-price[data-flat] .price-old { display: none; }
+        .price-card.pop .price-old { color: rgba(255,255,255,.6); }
 
         @media (max-width: 700px) {
-            .pricing-grid { grid-template-columns: 1fr; }
+            .pricing { grid-template-columns: 1fr; }
             .current-plan-card { flex-direction: column; align-items: flex-start; }
         }
     </style>
@@ -299,7 +282,7 @@
     </div>
 
     <!-- Plans -->
-    <h2 style="font-size:22px;font-weight:700;margin-bottom:16px;letter-spacing:-0.3px" id="plans-section">Changer de plan</h2>
+    <h2 style="font-size:24px;font-weight:800;margin-bottom:16px;letter-spacing:-0.5px;text-align:center" id="plans-section">Changer de plan</h2>
 
     <div class="pricing-toggle">
         <span class="pricing-toggle-label" data-period="monthly">Mensuel</span>
@@ -308,91 +291,87 @@
         <span class="pricing-badge">-20% DE RÉDUCTION</span>
     </div>
 
-    <div class="pricing-grid">
+    <div class="pricing">
 
         <!-- Starter -->
-        <div class="pricing-card {% if sub.plan == 'starter' %}current{% endif %}">
-            {% if sub.plan == 'starter' %}<div class="current-badge">Plan actuel</div>{% endif %}
-            <div class="plan-name">Starter</div>
-            <div class="plan-price" data-monthly="19" data-annual="15"><span class="price-old">19€</span>15€ <span>HT/mois</span></div>
-            <div class="plan-period">Découverte de l'outil</div>
-            <div class="plan-divider"></div>
-            <ul class="plan-features">
-                <li><span class="ok">✓</span> 1 compte TikTok ou YouTube</li>
-                <li><span class="ok">✓</span> Dashboard de base</li>
-                <li><span class="ok">✓</span> 1 Mise à jour des statistiques quotidienne</li>
-                <li><span class="ok">✓</span> 100 photos & vidéos trackées</li>
-                <li><span class="ok">✓</span> 1 projet</li>
-                <li class="dim"><span class="no">×</span> Accès aux concurrents</li>
-                <li class="dim"><span class="no">×</span> Accès partagés</li>
-                <li class="dim"><span class="no">×</span> Import / Export CSV</li>
-                <li class="dim"><span class="no">×</span> Instagram & LinkedIn</li>
-                <li class="dim"><span class="no">×</span> Analyse vidéo par l'IA</li>
+        <div class="price-card{% if sub.plan == 'starter' %} current{% endif %}">
+            {% if sub.plan == 'starter' %}<div class="current-tag">Plan actuel</div>{% endif %}
+            <div class="price-name">Starter</div>
+            <div class="price-val" data-monthly="19" data-annual="15"><span class="price-old" style="display:inline">19&#8364;</span>15&#8364; <span>HT/mois</span></div>
+            <div class="price-sub">Découverte de l'outil</div>
+            <div class="price-sep"></div>
+            <ul class="price-list">
+                <li><span class="ok">&#x2713;</span> 1 compte TikTok ou YouTube</li>
+                <li><span class="ok">&#x2713;</span> Dashboard de base</li>
+                <li><span class="ok">&#x2713;</span> 1 Mise à jour des statistiques quotidienne</li>
+                <li><span class="ok">&#x2713;</span> 100 photos &amp; vidéos trackées</li>
+                <li><span class="ok">&#x2713;</span> 1 projet</li>
+                <li class="dim"><span class="no">&times;</span> Accès aux concurrents</li>
+                <li class="dim"><span class="no">&times;</span> Accès partagés</li>
+                <li class="dim"><span class="no">&times;</span> Import / Export CSV</li>
+                <li class="dim"><span class="no">&times;</span> Instagram &amp; LinkedIn</li>
+                <li class="dim"><span class="no">&times;</span> Analyse vidéo par l'IA</li>
             </ul>
             {% if sub.plan == 'starter' %}
-            <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
+            <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn-plan btn-plan-secondary" onclick="checkout('starter')">Passer au Starter</button>
+            <button class="btn btn-outline" onclick="checkout('starter')">Passer au Starter</button>
             {% endif %}
         </div>
 
         <!-- Pro -->
-        <div class="pricing-card featured {% if sub.plan == 'pro' %}current{% endif %}">
-            {% if sub.plan == 'pro' %}
-            <div class="current-badge">Plan actuel</div>
-            {% else %}
-            <div class="featured-badge">⭐ Le plus populaire</div>
-            {% endif %}
-            <div class="plan-name">Pro</div>
-            <div class="plan-price" data-monthly="29" data-annual="23"><span class="price-old">29€</span>23€ <span>HT/mois</span></div>
-            <div class="plan-period">Pour optimiser vos performances</div>
-            <div class="plan-divider"></div>
-            <ul class="plan-features">
-                <li><span class="ok">✓</span> 2 accès partagés</li>
-                <li><span class="ok">✓</span> 5 comptes</li>
-                <li><span class="ok">✓</span> Dashboard complet</li>
-                <li><span class="ok">✓</span> Export CSV</li>
-                <li><span class="ok">✓</span> Instagram, TikTok & YouTube</li>
-                <li><span class="ok">✓</span> 1 000 photos & vidéos trackées</li>
-                <li><span class="ok">✓</span> 5 projets</li>
-                <li class="dim"><span class="no">×</span> Accès aux concurrents</li>
-                <li class="dim"><span class="no">×</span> Analytic complet</li>
-                <li class="dim"><span class="no">×</span> Import CSV</li>
-                <li class="dim"><span class="no">×</span> LinkedIn</li>
-                <li class="dim"><span class="no">×</span> Analyse vidéo par l'IA</li>
+        <div class="price-card pop{% if sub.plan == 'pro' %} current{% endif %}">
+            {% if sub.plan == 'pro' %}<div class="current-tag">Plan actuel</div>{% else %}<div class="price-tag">Populaire</div>{% endif %}
+            <div class="price-name">Pro</div>
+            <div class="price-val" data-monthly="29" data-annual="23"><span class="price-old" style="display:inline">29&#8364;</span>23&#8364; <span>HT/mois</span></div>
+            <div class="price-sub">Pour optimiser vos performances</div>
+            <div class="price-sep"></div>
+            <ul class="price-list">
+                <li><span class="ok">&#x2713;</span> 2 accès partagés</li>
+                <li><span class="ok">&#x2713;</span> 5 comptes</li>
+                <li><span class="ok">&#x2713;</span> Dashboard complet</li>
+                <li><span class="ok">&#x2713;</span> Export CSV</li>
+                <li><span class="ok">&#x2713;</span> Instagram, TikTok &amp; YouTube</li>
+                <li><span class="ok">&#x2713;</span> 1 000 photos &amp; vidéos trackées</li>
+                <li><span class="ok">&#x2713;</span> 5 projets</li>
+                <li class="dim"><span class="no">&times;</span> Accès aux concurrents</li>
+                <li class="dim"><span class="no">&times;</span> Analytic complet</li>
+                <li class="dim"><span class="no">&times;</span> Import CSV</li>
+                <li class="dim"><span class="no">&times;</span> LinkedIn</li>
+                <li class="dim"><span class="no">&times;</span> Analyse vidéo par l'IA</li>
             </ul>
             {% if sub.plan == 'pro' %}
-            <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
+            <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn-plan btn-plan-primary" onclick="checkout('pro')">
-                {% if sub.plan == 'agency' %}Passer au Pro{% else %}Essai gratuit{% endif %}
-            </button>
+            <button class="btn btn-primary" onclick="checkout('pro')">{% if sub.plan == 'agency' %}Passer au Pro{% else %}Essai gratuit{% endif %}</button>
+            <div class="price-trial">Payez 0&#8364; aujourd'hui &middot; Annulez à tout moment</div>
             {% endif %}
         </div>
 
-        <!-- ENTREPRISE -->
-        <div class="pricing-card {% if sub.plan == 'agency' %}current{% endif %}">
-            {% if sub.plan == 'agency' %}<div class="current-badge">Plan actuel</div>{% endif %}
-            <div class="plan-name">Entreprises</div>
-            <div class="plan-price" data-monthly="79" data-annual="63"><span class="price-old">79€</span>63€ <span>HT/mois</span></div>
-            <div class="plan-period">Pour un pilotage complet</div>
-            <div class="plan-divider"></div>
-            <ul class="plan-features">
-                <li><span class="ok">✓</span> Analyse vidéo par l'IA</li>
-                <li><span class="ok">✓</span> Accès à l'analyse des concurrents</li>
-                <li><span class="ok">✓</span> Accès illimités</li>
-                <li><span class="ok">✓</span> Comptes illimités</li>
-                <li><span class="ok">✓</span> Dashboard + analytic complet</li>
-                <li><span class="ok">✓</span> Import / Export CSV</li>
-                <li><span class="ok">✓</span> Photos + vidéos illimités trackés</li>
-                <li><span class="ok">✓</span> Projets illimités</li>
-                <li><span class="ok">✓</span> Support prioritaire</li>
-                <li><span class="ok">✓</span> Toutes les plateformes</li>
+        <!-- Entreprises -->
+        <div class="price-card{% if sub.plan == 'agency' %} current{% endif %}">
+            {% if sub.plan == 'agency' %}<div class="current-tag">Plan actuel</div>{% endif %}
+            <div class="price-name">Entreprises</div>
+            <div class="price-val" data-monthly="79" data-annual="63"><span class="price-old" style="display:inline">79&#8364;</span>63&#8364; <span>HT/mois</span></div>
+            <div class="price-sub">Pour un pilotage complet</div>
+            <div class="price-sep"></div>
+            <ul class="price-list">
+                <li><span class="ok">&#x2713;</span> Analyse vidéo par l'IA</li>
+                <li><span class="ok">&#x2713;</span> Accès à l'analyse des concurrents</li>
+                <li><span class="ok">&#x2713;</span> Accès illimités</li>
+                <li><span class="ok">&#x2713;</span> Comptes illimités</li>
+                <li><span class="ok">&#x2713;</span> Dashboard + analytic complet</li>
+                <li><span class="ok">&#x2713;</span> Import / Export CSV</li>
+                <li><span class="ok">&#x2713;</span> Photos + vidéos illimités trackés</li>
+                <li><span class="ok">&#x2713;</span> Projets illimités</li>
+                <li><span class="ok">&#x2713;</span> Support prioritaire</li>
+                <li><span class="ok">&#x2713;</span> Toutes les plateformes</li>
             </ul>
             {% if sub.plan == 'agency' %}
-            <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
+            <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn-plan btn-plan-secondary" onclick="checkout('agency')">Essai gratuit</button>
+            <button class="btn btn-outline" onclick="checkout('agency')">Essai gratuit</button>
+            <div class="price-trial">Payez 0&#8364; aujourd'hui &middot; Annulez à tout moment</div>
             {% endif %}
         </div>
     </div>
@@ -401,8 +380,9 @@
 
 <script>
 // ── Pricing toggle (Mensuel / Annuel) ──────────────────────────
-// Mirrors the landing page behavior so prices and active label flip
-// together. Annual prices are -20% across all plans.
+// Mirrors the landing page behavior. Prices flip to monthly when user
+// toggles off the Annuel switch; checkout() reads `isAnnual` and sends
+// it as `period` so the backend picks the right Stripe price ID.
 let isAnnual = true;
 
 function updatePricingDisplay() {
@@ -414,12 +394,11 @@ function updatePricingDisplay() {
         l.classList.toggle('active',
             (isAnnual && period === 'annual') || (!isAnnual && period === 'monthly'));
     });
-    document.querySelectorAll('.plan-price[data-monthly]').forEach(el => {
+    document.querySelectorAll('.price-val[data-monthly]').forEach(el => {
         const m = el.dataset.monthly;
         const a = el.dataset.annual;
         const oldEl = el.querySelector('.price-old');
         const suffix = el.querySelector('span:last-child');
-        // Walk text children to update the visible main price node.
         el.childNodes.forEach(n => {
             if (n.nodeType === 3 && n.textContent && n.textContent.trim()) {
                 n.textContent = (isAnnual ? a : m) + '€ ';
