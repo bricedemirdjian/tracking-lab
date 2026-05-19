@@ -1,8 +1,15 @@
 # Stripe setup runbook — Tracking Lab
 
-**Status:** À configurer (commits `7b3a48b` → `8a434de` ont posé le code, il reste la conf Stripe Dashboard + les env vars Vercel).
+**Status:** À configurer. Pricing simplifié au commit `17787a5` (2026-05-20) : un seul produit "Tracking Lab", deux prix (mensuel + annuel), zéro essai gratuit, plus de tiers gated.
 
-**Goal:** Activer le paiement réel des 3 plans (Starter 19€ / 15€, Pro 29€ / 23€, Entreprises 79€ / 63€) sur `trackinglab.online`, avec upsell fluide via le Stripe Customer Portal pour les utilisateurs déjà abonnés.
+**Goal:** Activer le paiement réel sur `trackinglab.online` pour les 2 cadences :
+
+| Formule | Prix affiché | Stripe `unit_amount` | Stripe `recurring.interval` |
+|---|---|---|---|
+| Mensuel | 29,99 € TTC/mois | 2999 (centimes) | `month` |
+| Annuel | 79,99 € TTC/an (≈ 6,67 €/mois) | 7999 | `year` |
+
+Les deux formules **débloquent les mêmes fonctionnalités** — aucun gating entre mensuel et annuel.
 
 ---
 
@@ -12,61 +19,59 @@
 Anonymous visitor                    Authenticated subscriber
        │                                       │
        ▼                                       ▼
- /tarifs ou /                            /billing
-   Payment Link URLs                       │
-   (data-stripe-monthly/annual)            │ click "Passer au Pro"
-       │                                   │
+ / ou /tarifs                            /billing
+   2 Payment Link URLs                     │
+   (data-stripe-monthly/annual)            │ click "Commencer en mensuel"
+       │                                   │              ou "...annuel"
        ▼                                   ▼
  Stripe Payment Link               /api/billing/checkout
  → Stripe Checkout (new sub)             │
                                          ├─ has subscription_id? ─yes─▶ Stripe Portal
                                          │                              (subscription_update_confirm)
-                                         │                              → modifie la sub existante
+                                         │                              → bascule mensuel ↔ annuel
                                          │                              → prorata auto
                                          │
                                          └─ no sub? ─▶ Stripe Checkout (new sub)
 ```
 
-Deux flows distincts, deux jeux d'env vars différents.
+Deux flows distincts, deux jeux d'env vars différents (cf. section 5).
 
 ---
 
-## 1. Produits & Prix Stripe Dashboard
+## 1. Produit & Prix Stripe Dashboard
 
-Dashboard → **Catalog → Products**. Créer 3 produits, chacun avec 2 prices (mensuel et annuel).
+Dashboard → **Catalog → Products** → créer **un seul produit** "Tracking Lab" (ou "Tracking Lab Pro").
 
-**Convention** : le prix annuel affiché est **par mois** (15€/mo, facturé 180€/an). Donc côté Stripe : `recurring.interval = year`, `unit_amount = 12 × (prix annuel affiché)`.
+Ajouter **2 prices** à ce produit :
 
-| Produit | Cadence | Stripe interval | Unit amount (centimes) | Env var (Flask) | Env var (Payment Link URL) |
-|---|---|---|---|---|---|
-| Starter | Mensuel | month | 1900 (19€) | `STRIPE_STARTER_PRICE_ID` | `STRIPE_STARTER_MONTHLY_URL` |
-| Starter | Annuel | year | 18000 (180€ = 15€×12) | `STRIPE_STARTER_ANNUAL_PRICE_ID` | `STRIPE_STARTER_ANNUAL_URL` |
-| Pro | Mensuel | month | 2900 (29€) | `STRIPE_PRO_PRICE_ID` | `STRIPE_PRO_MONTHLY_URL` |
-| Pro | Annuel | year | 27600 (276€ = 23€×12) | `STRIPE_PRO_ANNUAL_PRICE_ID` | `STRIPE_PRO_ANNUAL_URL` |
-| Entreprises | Mensuel | month | 7900 (79€) | `STRIPE_AGENCY_PRICE_ID` | `STRIPE_ENTERPRISE_MONTHLY_URL` |
-| Entreprises | Annuel | year | 75600 (756€ = 63€×12) | `STRIPE_AGENCY_ANNUAL_PRICE_ID` | `STRIPE_ENTERPRISE_ANNUAL_URL` |
+| Cadence | `unit_amount` (centimes) | `recurring.interval` | Devise | Tax behavior |
+|---|---|---|---|---|
+| Mensuel | `2999` | `month` | EUR | `inclusive` (TTC) |
+| Annuel | `7999` | `year` | EUR | `inclusive` (TTC) |
 
-Pour chaque price, copier le `price_xxx` ID et l'URL du Payment Link (si tu en crées un — voir section 4).
+Pour chaque price créé, copier le `price_xxx` ID. Tu en auras besoin section 5.
+
+Le `tax_behavior: inclusive` indique à Stripe que le prix affiché inclut déjà la TVA. C'est important — les prix landing sont **TTC**, donc on dit à Stripe la même chose pour qu'il ne rajoute pas 20% au moment du paiement.
 
 ---
 
-## 2. Customer Portal (essentiel pour les upsells)
+## 2. Customer Portal (essentiel pour switcher mensuel ↔ annuel)
 
 Dashboard → **Settings → Billing → Customer Portal** → Activer.
 
-Sans cette config, le flow `/api/billing/checkout` retombera silencieusement sur un nouveau Checkout (le user créera une 2e subscription parallèle au lieu de modifier l'existante).
+Sans cette config, `/api/billing/checkout` retombera silencieusement sur un nouveau Checkout (le user créera une 2e subscription parallèle au lieu de basculer entre mensuel et annuel).
 
 **Sections à activer :**
 
-- **Customer information** : laisser cocher "Customers can update email/billing address" (les utilisateurs en B2B en ont besoin pour les factures).
-- **Invoice history** : activer (montre les factures passées).
-- **Payment methods** : activer (changer de CB).
+- **Customer information** : laisser cocher "Customers can update email/billing address".
+- **Invoice history** : activer.
+- **Payment methods** : activer.
 - **Subscriptions** :
   - ✅ **Customers can switch plans** ← obligatoire
-  - **Proration behavior** : `Always invoice` (Stripe facture le prorata immédiatement à l'upgrade ; meilleur UX que `Create prorations`)
-  - **Products** : ajouter **les 6 prices** créés en section 1. Sans ça le `flow_data.subscription_update_confirm` retournera 400.
+  - **Proration behavior** : `Always invoice`
+  - **Products** : ajouter **les 2 prices** créés section 1. Sans ça le `flow_data.subscription_update_confirm` retournera 400.
   - **Cancellation** : optionnel — activer "Customers can cancel" pour réduire le support load.
-- **Business information** : raison sociale, email support (`brice.demirdjian@gmail.com`), URL ToS, URL Privacy.
+- **Business information** : raison sociale, email support (`brice.demirdjian@gmail.com`), URL ToS (`https://trackinglab.online/cgv`), URL Privacy.
 
 Sauvegarder. La conf vit en mode Test ET en mode Live séparément — refaire les deux quand tu passes en prod.
 
@@ -79,58 +84,55 @@ Dashboard → **Developers → Webhooks → Add endpoint**.
 | Champ | Valeur |
 |---|---|
 | URL | `https://trackinglab.online/webhook/stripe` |
-| Events à écouter | `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed` |
+| Events | `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed` |
 
 Après création, cliquer **"Reveal signing secret"** → copier le `whsec_xxx` → c'est `STRIPE_WEBHOOK_SECRET`.
 
-Sans ce secret côté serveur, `app.py` REFUSE tous les webhooks (cf. lignes 583-586) — pas de fallback "trust but verify", l'event est jeté.
+Sans ce secret côté serveur, `app.py` REFUSE tous les webhooks (lignes 583-586) — pas de fallback, l'event est jeté.
 
 ---
 
 ## 4. Payment Links pour la landing (anonymes)
 
-Dashboard → **Payment Links → New**.
+Dashboard → **Payment Links → New** → créer **2 Payment Links** :
 
-Créer **6 Payment Links** (un par price ID de la section 1). Pour chaque :
+1. **Mensuel** : sélectionner le price Mensuel (2999 centimes / month)
+2. **Annuel** : sélectionner le price Annuel (7999 centimes / year)
 
-- **Product** : choisir le price correspondant.
-- **After payment** : "Show confirmation page" suffit, ou redirect vers `https://trackinglab.online/login` pour qu'ils créent leur compte après paiement.
-- **Tax collection** : Activer **automatic tax** (Stripe Tax) si tu collectes la TVA, sinon laisser off.
-- **Save and copy link**.
+Pour chaque :
+- **After payment** : "Show confirmation page" suffit, ou redirect vers `https://trackinglab.online/login`
+- **Tax collection** : si tu collectes la TVA via Stripe Tax, activer **automatic tax**. Sinon laisser off (le prix est déjà TTC).
+- **Save and copy link** → URL `https://buy.stripe.com/xxx_xxx`
 
-Les 6 URLs (qui ressemblent à `https://buy.stripe.com/xxx_xxx`) servent côté **Next.js landing** (`tracking-lab-v2` Vercel project) dans les data-attributs des CTAs Pro/Entreprises/Starter. Pas utilisés côté Flask.
+Ces 2 URLs servent côté Next.js landing (`tracking-lab-v2` Vercel project).
 
 ---
 
 ## 5. Env vars Vercel — TWO projects
 
-### A) `tracking-lab` (Flask) — utilisé par `/api/billing/checkout`, `/webhook/stripe`, `stripe_billing.py`
+### A) `tracking-lab` (Flask) — `/api/billing/checkout`, `/webhook/stripe`
 
-Vercel Dashboard → projet `tracking-lab` → Settings → Environment Variables. Ajouter pour **Production** :
+Vercel Dashboard → projet `tracking-lab` → Settings → Environment Variables → **Production** :
 
 ```
 STRIPE_SECRET_KEY=sk_live_...                # Dashboard → Developers → API keys (mode Live)
 STRIPE_WEBHOOK_SECRET=whsec_...              # Section 3
-STRIPE_STARTER_PRICE_ID=price_...
-STRIPE_STARTER_ANNUAL_PRICE_ID=price_...
-STRIPE_PRO_PRICE_ID=price_...
-STRIPE_PRO_ANNUAL_PRICE_ID=price_...
-STRIPE_AGENCY_PRICE_ID=price_...
-STRIPE_AGENCY_ANNUAL_PRICE_ID=price_...
+STRIPE_MONTHLY_PRICE_ID=price_...            # Section 1, mensuel
+STRIPE_ANNUAL_PRICE_ID=price_...             # Section 1, annuel
 ```
 
-### B) `tracking-lab-v2` (Next.js landing) — utilisé par `page.tsx` (substitution des `{{STRIPE_X}}` tokens)
+**Note :** les anciennes vars (`STRIPE_STARTER_PRICE_ID`, `STRIPE_PRO_PRICE_ID`, `STRIPE_AGENCY_PRICE_ID`, `*_ANNUAL_PRICE_ID`) sont obsolètes — `stripe_billing.PLANS` ne les lit plus. Tu peux les supprimer du Dashboard Vercel pour ne pas confusionner.
 
-Vercel Dashboard → projet `tracking-lab-v2` → Settings → Environment Variables. Ajouter pour **Production** :
+### B) `tracking-lab-v2` (Next.js landing) — `page.tsx` (substitution des `{{STRIPE_X}}` tokens)
+
+Vercel Dashboard → projet `tracking-lab-v2` → Settings → Environment Variables → **Production** :
 
 ```
-STRIPE_STARTER_MONTHLY_URL=https://buy.stripe.com/...
-STRIPE_STARTER_ANNUAL_URL=https://buy.stripe.com/...
-STRIPE_PRO_MONTHLY_URL=https://buy.stripe.com/...
-STRIPE_PRO_ANNUAL_URL=https://buy.stripe.com/...
-STRIPE_ENTERPRISE_MONTHLY_URL=https://buy.stripe.com/...
-STRIPE_ENTERPRISE_ANNUAL_URL=https://buy.stripe.com/...
+STRIPE_MONTHLY_URL=https://buy.stripe.com/...    # Payment Link mensuel
+STRIPE_ANNUAL_URL=https://buy.stripe.com/...     # Payment Link annuel
 ```
+
+**Note :** les anciennes vars `STRIPE_STARTER_MONTHLY_URL`, `STRIPE_PRO_MONTHLY_URL`, `STRIPE_PRO_ANNUAL_URL`, `STRIPE_ENTERPRISE_MONTHLY_URL`, `STRIPE_ENTERPRISE_ANNUAL_URL`, `STRIPE_STARTER_ANNUAL_URL` sont obsolètes — `page.tsx` ne les lit plus. Tu peux les supprimer.
 
 Après chaque ajout : **Redeploy** depuis l'onglet Deployments du projet (les env vars ne sont injectées qu'aux nouveaux deploys).
 
@@ -143,20 +145,20 @@ Après chaque ajout : **Redeploy** depuis l'onglet Deployments du projet (les en
 ### Test mode setup
 1. Dashboard → toggle "Test mode" (haut à droite) → ON.
 2. Refaire sections 1, 2, 3, 4 en mode Test (les configs sont séparées).
-3. Sur Vercel, créer un environnement **Preview** ou un projet de test avec les `sk_test_...` / `whsec_test_...` / `price_test_...`.
+3. Sur Vercel, créer un environnement **Preview** ou utiliser temporairement les `sk_test_...` / `whsec_test_...` / `price_test_...` sur Production.
 4. Sur les Payment Links de test, utiliser la carte `4242 4242 4242 4242` / expiry future / CVC quelconque.
 
-### Test cases (à passer un par un)
+### Test cases
 
 | # | Scénario | URL de départ | Action | Attendu |
 |---|---|---|---|---|
-| 1 | Nouveau signup Pro | `/tarifs` (anonyme) | Click "Essai gratuit" sur Pro card | Redirect Stripe Payment Link → checkout → succès → sub Pro créée |
-| 2 | Webhook reçu | (idem) | (auto après checkout) | DB `subscriptions.plan = 'pro'`, `stripe_customer_id` + `stripe_subscription_id` peuplés |
-| 3 | Upsell Pro → Entreprises | `/billing` (logged-in Pro) | Click "Passer à Entreprises" | Redirect Stripe Portal `subscription_update_confirm` → confirmer → retour `/billing?success=1` → DB plan = 'agency' |
-| 4 | Downgrade Pro → Starter | `/billing` (logged-in Pro) | Click "Passer au Starter" | Idem Portal flow, plan = 'starter' |
-| 5 | Toggle Mensuel/Annuel | `/billing` | Toggle, click "Passer au Pro" | `/api/billing/checkout` reçoit `period: 'monthly'`, utilise `STRIPE_PRO_PRICE_ID` |
-| 6 | Subscription cancelled in Stripe | `/billing` (sub canceled manuellement dans Dashboard) | Click "Passer au Pro" | Portal retourne `InvalidRequestError` → fallback Checkout → nouvelle sub créée |
-| 7 | Annulation depuis Portal | `/billing` | Click "Gérer la facturation" → Cancel | Webhook `customer.subscription.deleted` reçu → DB plan retombe à 'starter' |
+| 1 | Signup en mensuel | `/tarifs` (anonyme) | Click "Commencer en mensuel" | Redirect Payment Link mensuel → checkout → sub Mensuel créée |
+| 2 | Signup en annuel | `/tarifs` (anonyme) | Click "Commencer en annuel" | Redirect Payment Link annuel → checkout → sub Annuel créée |
+| 3 | Webhook reçu | (idem) | (auto après checkout) | DB `subscriptions.plan = 'pro'` (mensuel) ou `'agency'` (annuel), `stripe_customer_id` + `stripe_subscription_id` peuplés |
+| 4 | Bascule Mensuel → Annuel | `/billing` (logged-in Mensuel) | Click "Commencer en annuel" | Redirect Portal `subscription_update_confirm` → confirm → retour `/billing?success=1` → DB plan = 'agency' |
+| 5 | Bascule Annuel → Mensuel | `/billing` (logged-in Annuel) | Click "Commencer en mensuel" | Idem Portal flow, plan = 'pro' |
+| 6 | Subscription cancelled in Stripe | `/billing` (sub canceled manuellement) | Click "Commencer en annuel" | Portal retourne `InvalidRequestError` → fallback Checkout → nouvelle sub |
+| 7 | Annulation depuis Portal | `/billing` | Click "Gérer la facturation" → Cancel | Webhook `customer.subscription.deleted` → DB plan retombe à 'starter' (legacy fallback) |
 
 Si **6** échoue : le Customer Portal n'accepte pas `flow_data.subscription_update_confirm` sans la conf "Customers can switch plans" + prices ajoutés. Re-check section 2.
 
@@ -164,17 +166,17 @@ Si **6** échoue : le Customer Portal n'accepte pas `flow_data.subscription_upda
 
 Une fois les 7 cas verts en Test :
 1. Refaire **toutes** les sections 1-4 en mode **Live** (Dashboard toggle OFF "Test mode").
-2. Update les env vars Vercel : `sk_live_...`, `whsec_live...`, `price_live_...`.
+2. Update les env vars Vercel : `sk_live_...`, `whsec_live...`, `price_live_...`, et les 2 nouvelles `STRIPE_*_URL`.
 3. Redeploy les 2 projets.
-4. Refaire les cases 1 et 3 avec **une vraie CB** (montant test minimum, refund après).
+4. Refaire les cases 1, 2, 4 avec une vraie CB (montant minimum, refund après).
 
 ---
 
 ## 7. Comportement actuel sans config
 
-État au commit `8a434de` (déployé) :
+État au commit `17787a5` (déployé) :
 
-- `/api/billing/checkout` → essaie le Stripe Portal flow, échoue avec `InvalidRequestError` ("No such price"), bascule sur `create_checkout_session`, qui à son tour échoue avec "Prix non configuré" si l'env var price_id n'est pas set → renvoie 500 + message d'erreur au frontend.
+- `/api/billing/checkout` → essaie le Stripe Portal flow, échoue avec `InvalidRequestError` ("No such price"), bascule sur `create_checkout_session`, qui à son tour échoue avec "Prix non configuré" si les env vars price_id ne sont pas set → renvoie 500 + message d'erreur au frontend.
 - `/tarifs` et `/` Payment Links → fallback sur `https://app.trackinglab.online/login` (cf. `LandingScripts.tsx` `syncStripeHrefs`) — le user atterrit sur le login Flask au lieu d'un checkout.
 - `/webhook/stripe` → refuse tout payload puisque `STRIPE_WEBHOOK_SECRET` est missing.
 
@@ -184,9 +186,10 @@ Donc rien ne crash, mais aucun paiement n'est possible tant que les sections 1-5
 
 ## 8. Pitfalls connus
 
-- **Mode Test vs Live** : facile de mélanger. Les `price_xxx` ne sont PAS interchangeables. Si tu as une `STRIPE_SECRET_KEY` en `sk_live_...` mais des `STRIPE_PRO_PRICE_ID` en `price_test_...`, Stripe renverra `No such price` au checkout.
-- **Customer Portal config oubliée** : c'est la cause #1 de fallback silencieux vers Checkout. Test case #3 le détecte.
-- **Annual price `unit_amount`** : c'est le total annuel en centimes, pas le mensuel. 23€/mo annual = 27600 centimes, pas 2300.
+- **Mode Test vs Live** : facile de mélanger. Les `price_xxx` ne sont PAS interchangeables. Si tu as `STRIPE_SECRET_KEY=sk_live_...` mais `STRIPE_MONTHLY_PRICE_ID=price_test_...`, Stripe renverra `No such price` au checkout.
+- **Customer Portal config oubliée** : cause #1 de fallback silencieux vers Checkout. Test case #4 le détecte.
+- **TTC vs HT** : les prix annoncés sur la landing (29,99 € et 79,99 €) sont **TTC**. Le Stripe price doit avoir `tax_behavior: inclusive` sinon Stripe rajoute 20% au paiement et l'utilisateur paie ~36 €/mois au lieu de 29,99.
 - **Webhook secret mode-specific** : Test mode et Live mode ont des `whsec_xxx` différents. Faire 2 webhooks séparés sur le Dashboard.
-- **Vercel env vars ne propagent pas automatiquement** : il faut un **Redeploy** après chaque modif. Les anciens deploys gardent les anciennes valeurs.
-- **`stripe.Subscription.retrieve` peut renvoyer une sub annulée** : si l'utilisateur a annulé son abonnement mais que la sub est encore en mode `canceled` dans Stripe (pas supprimée), le portal flow retournera l'erreur "Can't modify a canceled subscription". Le fallback Checkout gère ça.
+- **Vercel env vars ne propagent pas automatiquement** : il faut un **Redeploy** après chaque modif.
+- **`stripe.Subscription.retrieve` peut renvoyer une sub annulée** : si l'utilisateur a annulé son abonnement mais que la sub est en mode `canceled` dans Stripe (pas supprimée), le portal flow retourne "Can't modify a canceled subscription". Le fallback Checkout gère ça.
+- **Anciennes env vars (3 tiers)** : si tu en avais déjà set (`STRIPE_PRO_PRICE_ID`, etc.), elles sont maintenant ignorées par le code. Supprime-les du Dashboard Vercel pour éviter la confusion future.
