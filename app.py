@@ -544,15 +544,66 @@ def api_billing_checkout():
         price_id = plan_cfg.get('price_id') or plan_cfg.get('price_id_annual')
     if not price_id:
         return jsonify({"error": "Prix non configuré"}), 500
+
     sub = get_user_subscription(current_user.id)
     customer_id = sub.get('stripe_customer_id')
+    subscription_id = sub.get('stripe_subscription_id')
     base_url = request.host_url.rstrip('/')
+    success_url = f"{base_url}/billing?success=1"
+    cancel_url = f"{base_url}/billing?cancelled=1"
+
+    # Upsell path — user already has an active Stripe subscription. Open the
+    # Customer Portal in the "confirm subscription update" flow with the
+    # target price pre-populated. Stripe shows a single confirmation screen,
+    # modifies the EXISTING subscription (no parallel billing), and applies
+    # proration automatically. User lands back on /billing on completion.
+    #
+    # Requires the Customer Portal to be configured in Stripe Dashboard
+    # (Settings → Billing → Customer portal) with all 6 prices (3 plans × 2
+    # cadences) added to the allowed products list.
+    if customer_id and subscription_id:
+        try:
+            existing = stripe.Subscription.retrieve(subscription_id)
+            item_id = existing['items']['data'][0]['id']
+            portal = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=success_url,
+                flow_data={
+                    'type': 'subscription_update_confirm',
+                    'after_completion': {
+                        'type': 'redirect',
+                        'redirect': {'return_url': success_url},
+                    },
+                    'subscription_update_confirm': {
+                        'subscription': subscription_id,
+                        'items': [{
+                            'id': item_id,
+                            'price': price_id,
+                            'quantity': 1,
+                        }],
+                    },
+                },
+            )
+            return jsonify({"url": portal.url})
+        except stripe.error.InvalidRequestError as e:
+            # Common causes: subscription was cancelled in Stripe but the DB
+            # still has the ID, or the portal isn't configured to allow this
+            # price. Fall through to a fresh Checkout Session — worst case
+            # user creates a new sub instead of editing, which is recoverable.
+            print(f"[STRIPE] portal upsell flow failed, falling back to checkout: {e}")
+        except Exception as e:
+            print(f"[STRIPE ERROR] portal upsell: {e}")
+            # Don't fall through on unknown errors — surface them so we notice.
+            return jsonify({"error": str(e)}), 500
+
+    # Signup path — no active Stripe subscription (or portal flow failed).
+    # Create a fresh Checkout Session.
     try:
         session = create_checkout_session(
             user_email=current_user.email,
             price_id=price_id,
-            success_url=f"{base_url}/billing?success=1",
-            cancel_url=f"{base_url}/billing?cancelled=1",
+            success_url=success_url,
+            cancel_url=cancel_url,
             customer_id=customer_id,
         )
         return jsonify({"url": session.url})
