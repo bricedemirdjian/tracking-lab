@@ -8,8 +8,13 @@
     <link rel="stylesheet" href="/static/css/style.css?v=20260409">
     <script src="https://js.stripe.com/v3/"></script>
     <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
         .billing-container {
-            max-width: 900px;
+            max-width: 1080px;
             margin: 80px auto;
             padding: 0 24px;
         }
@@ -180,6 +185,66 @@
         .alert-success { background: rgba(52,199,89,0.08); border: 1px solid rgba(52,199,89,0.2); color: var(--success); }
         .alert-info { background: rgba(255,105,180,0.08); border: 1px solid rgba(255,105,180,0.2); color: var(--accent); }
 
+        /* Pricing toggle + price strike-through, mirrors landing page */
+        .pricing-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin: 0 0 32px;
+            flex-wrap: wrap;
+        }
+        .pricing-toggle-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+        .pricing-toggle-label.active { color: var(--text-primary); }
+        .pricing-toggle-switch {
+            width: 44px;
+            height: 24px;
+            border-radius: 100px;
+            background: #e5e5e5;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .pricing-toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .pricing-toggle-switch.on { background: #FF69B4; }
+        .pricing-toggle-switch.on::after { transform: translateX(20px); }
+        .pricing-badge {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            color: #FF69B4;
+            background: rgba(255,105,180,0.1);
+            padding: 4px 10px;
+            border-radius: 100px;
+            text-transform: uppercase;
+        }
+        .plan-price .price-old {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-decoration: line-through;
+            margin-right: 10px;
+            letter-spacing: -0.5px;
+        }
+        .plan-price[data-flat] .price-old { display: none; }
+
         @media (max-width: 700px) {
             .pricing-grid { grid-template-columns: 1fr; }
             .current-plan-card { flex-direction: column; align-items: flex-start; }
@@ -213,7 +278,7 @@
             <h2>{{ plan.name }}</h2>
             <p>
                 {% if sub.plan == 'starter' %}
-                    Vous utilisez le plan gratuit. Passez au Pro pour débloquer Instagram et plus de comptes.
+                    Plan Starter actif. Passez au Pro pour débloquer Instagram et plus de comptes, ou à Entreprises pour l'analyse vidéo par l'IA.
                 {% else %}
                     {% if sub.current_period_end %}
                         Votre abonnement se renouvelle le {{ sub.current_period_end[:10] }}.
@@ -234,27 +299,41 @@
     </div>
 
     <!-- Plans -->
-    <h2 style="font-size:22px;font-weight:700;margin-bottom:24px;letter-spacing:-0.3px" id="plans-section">Changer de plan</h2>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:16px;letter-spacing:-0.3px" id="plans-section">Changer de plan</h2>
+
+    <div class="pricing-toggle">
+        <span class="pricing-toggle-label" data-period="monthly">Mensuel</span>
+        <div class="pricing-toggle-switch on" id="pricingToggle"></div>
+        <span class="pricing-toggle-label active" data-period="annual">Annuel</span>
+        <span class="pricing-badge">-20% DE RÉDUCTION</span>
+    </div>
+
     <div class="pricing-grid">
 
         <!-- Starter -->
         <div class="pricing-card {% if sub.plan == 'starter' %}current{% endif %}">
             {% if sub.plan == 'starter' %}<div class="current-badge">Plan actuel</div>{% endif %}
             <div class="plan-name">Starter</div>
-            <div class="plan-price">19€ <span>HT/mois</span></div>
-            <div class="plan-period">Pour découvrir l'outil</div>
+            <div class="plan-price" data-monthly="19" data-annual="15"><span class="price-old">19€</span>15€ <span>HT/mois</span></div>
+            <div class="plan-period">Découverte de l'outil</div>
             <div class="plan-divider"></div>
             <ul class="plan-features">
-                <li><span class="ok">✓</span> 5 comptes maximum</li>
-                <li><span class="ok">✓</span> Dashboard analytics</li>
+                <li><span class="ok">✓</span> 1 compte TikTok ou YouTube</li>
+                <li><span class="ok">✓</span> Dashboard de base</li>
+                <li><span class="ok">✓</span> 1 Mise à jour des statistiques quotidienne</li>
+                <li><span class="ok">✓</span> 100 photos & vidéos trackées</li>
                 <li><span class="ok">✓</span> 1 projet</li>
-                <li><span class="ok">✓</span> TikTok + YouTube Shorts</li>
+                <li class="dim"><span class="no">×</span> Accès aux concurrents</li>
                 <li class="dim"><span class="no">×</span> Accès partagés</li>
-                <li class="dim"><span class="no">×</span> Export CSV</li>
-                <li class="dim"><span class="no">×</span> Instagram Reels</li>
+                <li class="dim"><span class="no">×</span> Import / Export CSV</li>
+                <li class="dim"><span class="no">×</span> Instagram & LinkedIn</li>
                 <li class="dim"><span class="no">×</span> Analyse vidéo par l'IA</li>
             </ul>
-            <button class="btn-plan btn-plan-outline" disabled>Plan Starter</button>
+            {% if sub.plan == 'starter' %}
+            <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
+            {% else %}
+            <button class="btn-plan btn-plan-secondary" onclick="checkout('starter')">Passer au Starter</button>
+            {% endif %}
         </div>
 
         <!-- Pro -->
@@ -265,24 +344,28 @@
             <div class="featured-badge">⭐ Le plus populaire</div>
             {% endif %}
             <div class="plan-name">Pro</div>
-            <div class="plan-price">29€ <span>HT/mois</span></div>
-            <div class="plan-period">Pour les créateurs sérieux</div>
+            <div class="plan-price" data-monthly="29" data-annual="23"><span class="price-old">29€</span>23€ <span>HT/mois</span></div>
+            <div class="plan-period">Pour optimiser vos performances</div>
             <div class="plan-divider"></div>
             <ul class="plan-features">
                 <li><span class="ok">✓</span> 2 accès partagés</li>
-                <li><span class="ok">✓</span> 20 comptes maximum</li>
-                <li><span class="ok">✓</span> Dashboard analytics complet</li>
+                <li><span class="ok">✓</span> 5 comptes</li>
+                <li><span class="ok">✓</span> Dashboard complet</li>
                 <li><span class="ok">✓</span> Export CSV</li>
+                <li><span class="ok">✓</span> Instagram, TikTok & YouTube</li>
+                <li><span class="ok">✓</span> 1 000 photos & vidéos trackées</li>
                 <li><span class="ok">✓</span> 5 projets</li>
-                <li><span class="ok">✓</span> TikTok + YouTube + Instagram</li>
-                <li class="dim"><span class="no">×</span> Accès illimités</li>
+                <li class="dim"><span class="no">×</span> Accès aux concurrents</li>
+                <li class="dim"><span class="no">×</span> Analytic complet</li>
+                <li class="dim"><span class="no">×</span> Import CSV</li>
+                <li class="dim"><span class="no">×</span> LinkedIn</li>
                 <li class="dim"><span class="no">×</span> Analyse vidéo par l'IA</li>
             </ul>
             {% if sub.plan == 'pro' %}
             <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
             {% else %}
             <button class="btn-plan btn-plan-primary" onclick="checkout('pro')">
-                {% if sub.plan == 'agency' %}Passer au Pro{% else %}Démarrer — 29€ HT/mois{% endif %}
+                {% if sub.plan == 'agency' %}Passer au Pro{% else %}Essai gratuit{% endif %}
             </button>
             {% endif %}
         </div>
@@ -290,16 +373,18 @@
         <!-- ENTREPRISE -->
         <div class="pricing-card {% if sub.plan == 'agency' %}current{% endif %}">
             {% if sub.plan == 'agency' %}<div class="current-badge">Plan actuel</div>{% endif %}
-            <div class="plan-name">ENTREPRISE</div>
-            <div class="plan-price">79€ <span>HT/mois</span></div>
-            <div class="plan-period">Pour les agences et labs</div>
+            <div class="plan-name">Entreprises</div>
+            <div class="plan-price" data-monthly="79" data-annual="63"><span class="price-old">79€</span>63€ <span>HT/mois</span></div>
+            <div class="plan-period">Pour un pilotage complet</div>
             <div class="plan-divider"></div>
             <ul class="plan-features">
                 <li><span class="ok">✓</span> Analyse vidéo par l'IA</li>
-                <li><span class="ok">✓</span> Accès partagés illimités</li>
+                <li><span class="ok">✓</span> Accès à l'analyse des concurrents</li>
+                <li><span class="ok">✓</span> Accès illimités</li>
                 <li><span class="ok">✓</span> Comptes illimités</li>
-                <li><span class="ok">✓</span> Dashboard analytics complet</li>
-                <li><span class="ok">✓</span> Export CSV</li>
+                <li><span class="ok">✓</span> Dashboard + analytic complet</li>
+                <li><span class="ok">✓</span> Import / Export CSV</li>
+                <li><span class="ok">✓</span> Photos + vidéos illimités trackés</li>
                 <li><span class="ok">✓</span> Projets illimités</li>
                 <li><span class="ok">✓</span> Support prioritaire</li>
                 <li><span class="ok">✓</span> Toutes les plateformes</li>
@@ -307,7 +392,7 @@
             {% if sub.plan == 'agency' %}
             <button class="btn-plan btn-plan-outline" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn-plan btn-plan-secondary" onclick="checkout('agency')">Passer à ENTREPRISE — 79€ HT/mois</button>
+            <button class="btn-plan btn-plan-secondary" onclick="checkout('agency')">Essai gratuit</button>
             {% endif %}
         </div>
     </div>
@@ -315,11 +400,59 @@
 </div>
 
 <script>
+// ── Pricing toggle (Mensuel / Annuel) ──────────────────────────
+// Mirrors the landing page behavior so prices and active label flip
+// together. Annual prices are -20% across all plans.
+let isAnnual = true;
+
+function updatePricingDisplay() {
+    const toggle = document.getElementById('pricingToggle');
+    if (!toggle) return;
+    toggle.classList.toggle('on', isAnnual);
+    document.querySelectorAll('.pricing-toggle-label').forEach(l => {
+        const period = l.dataset.period;
+        l.classList.toggle('active',
+            (isAnnual && period === 'annual') || (!isAnnual && period === 'monthly'));
+    });
+    document.querySelectorAll('.plan-price[data-monthly]').forEach(el => {
+        const m = el.dataset.monthly;
+        const a = el.dataset.annual;
+        const oldEl = el.querySelector('.price-old');
+        const suffix = el.querySelector('span:last-child');
+        // Walk text children to update the visible main price node.
+        el.childNodes.forEach(n => {
+            if (n.nodeType === 3 && n.textContent && n.textContent.trim()) {
+                n.textContent = (isAnnual ? a : m) + '€ ';
+            }
+        });
+        if (oldEl) {
+            oldEl.style.display = isAnnual ? 'inline' : 'none';
+            oldEl.textContent = m + '€';
+        }
+        if (suffix) suffix.textContent = 'HT/mois';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('pricingToggle');
+    if (toggle) {
+        toggle.addEventListener('click', () => { isAnnual = !isAnnual; updatePricingDisplay(); });
+    }
+    document.querySelectorAll('.pricing-toggle-label').forEach(l => {
+        l.addEventListener('click', () => {
+            isAnnual = l.dataset.period === 'annual';
+            updatePricingDisplay();
+        });
+    });
+    updatePricingDisplay();
+});
+
 async function checkout(plan) {
+    const period = isAnnual ? 'annual' : 'monthly';
     const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan })
+        body: JSON.stringify({ plan, period })
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;
