@@ -528,10 +528,20 @@ def account():
 @app.route("/api/billing/checkout", methods=["POST"])
 @login_required
 def api_billing_checkout():
-    plan_name = request.json.get("plan") if request.json else None
-    if plan_name not in ('pro', 'agency'):
+    body = request.json or {}
+    plan_name = body.get("plan")
+    period = body.get("period", "annual")  # default to annual — matches landing UX
+    if plan_name not in ('starter', 'pro', 'agency'):
         return jsonify({"error": "Plan invalide"}), 400
-    price_id = PLANS[plan_name].get('price_id')
+    if period not in ('monthly', 'annual'):
+        return jsonify({"error": "Période invalide"}), 400
+    # Annual price IDs live under 'price_id_annual'. Fall back to monthly if
+    # the annual env var isn't set, so the checkout still works during the
+    # transition window when only one of the two has been wired in Stripe.
+    plan_cfg = PLANS[plan_name]
+    price_id = plan_cfg.get('price_id_annual') if period == 'annual' else plan_cfg.get('price_id')
+    if not price_id:
+        price_id = plan_cfg.get('price_id') or plan_cfg.get('price_id_annual')
     if not price_id:
         return jsonify({"error": "Prix non configuré"}), 500
     sub = get_user_subscription(current_user.id)
