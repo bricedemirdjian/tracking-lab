@@ -6,8 +6,10 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 PLANS = {
     'starter': {
         'name': 'Starter',
-        'price': 0,
-        'price_annual': 0,
+        'price': 19,
+        'price_annual': 19,
+        'price_id': os.environ.get('STRIPE_STARTER_PRICE_ID'),
+        'price_id_annual': os.environ.get('STRIPE_STARTER_ANNUAL_PRICE_ID'),
         'max_accounts': 1,
         # No video-count cap on any plan — marketing copy still mentions
         # "100 vidéos" as a friendly anchor, but the scraper is now uncapped
