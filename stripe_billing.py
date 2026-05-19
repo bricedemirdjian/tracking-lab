@@ -7,7 +7,7 @@ PLANS = {
     'starter': {
         'name': 'Starter',
         'price': 19,
-        'price_annual': 19,
+        'price_annual': 15,
         'price_id': os.environ.get('STRIPE_STARTER_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_STARTER_ANNUAL_PRICE_ID'),
         'max_accounts': 1,
