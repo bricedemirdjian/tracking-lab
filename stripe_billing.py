@@ -5,8 +5,8 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 # Pricing collapsed on 2026-05-20 to a single offer with two billing
 # cadences (full feature parity, no gated tiers):
-#   - 'pro' = formule mensuelle (29,99€ TTC/mois)
-#   - 'agency' = formule annuelle (79,99€ TTC/an, soit ~6,67€/mois)
+#   - 'pro' = formule mensuelle (29€ TTC/mois)
+#   - 'agency' = formule annuelle (79€ TTC/an, soit ~6,58€/mois)
 # Plan keys are kept as 'pro'/'agency' to avoid migrating the users.plan
 # column; the user-facing names are 'Mensuel' / 'Annuel'. 'starter' is the
 # legacy free tier — no longer sold, but kept as a no-op fallback for any
@@ -38,8 +38,8 @@ PLANS = {
     },
     'pro': {
         'name': 'Mensuel',
-        'price': 29.99,
-        'price_annual': 29.99,  # legacy field, kept = price for back-compat
+        'price': 29,
+        'price_annual': 29,  # legacy field, kept = price for back-compat
         'price_id': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
         # Full feature parity with the annual plan — only difference is
@@ -60,8 +60,8 @@ PLANS = {
     },
     'agency': {
         'name': 'Annuel',
-        'price': 79.99,
-        'price_annual': 79.99,
+        'price': 79,
+        'price_annual': 79,
         'price_id': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
         'max_accounts': 9999,

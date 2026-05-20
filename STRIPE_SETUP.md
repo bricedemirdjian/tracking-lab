@@ -6,8 +6,8 @@
 
 | Formule | Prix affiché | Stripe `unit_amount` | Stripe `recurring.interval` |
 |---|---|---|---|
-| Mensuel | 29,99 € TTC/mois | 2999 (centimes) | `month` |
-| Annuel | 79,99 € TTC/an (≈ 6,67 €/mois) | 7999 | `year` |
+| Mensuel | 29 € TTC/mois | 2900 (centimes) | `month` |
+| Annuel | 79 € TTC/an (≈ 6,58 €/mois) | 7900 | `year` |
 
 Les deux formules **débloquent les mêmes fonctionnalités** — aucun gating entre mensuel et annuel.
 
@@ -46,8 +46,8 @@ Ajouter **2 prices** à ce produit :
 
 | Cadence | `unit_amount` (centimes) | `recurring.interval` | Devise | Tax behavior |
 |---|---|---|---|---|
-| Mensuel | `2999` | `month` | EUR | `inclusive` (TTC) |
-| Annuel | `7999` | `year` | EUR | `inclusive` (TTC) |
+| Mensuel | `2900` | `month` | EUR | `inclusive` (TTC) |
+| Annuel | `7900` | `year` | EUR | `inclusive` (TTC) |
 
 Pour chaque price créé, copier le `price_xxx` ID. Tu en auras besoin section 5.
 
@@ -96,8 +96,8 @@ Sans ce secret côté serveur, `app.py` REFUSE tous les webhooks (lignes 583-586
 
 Dashboard → **Payment Links → New** → créer **2 Payment Links** :
 
-1. **Mensuel** : sélectionner le price Mensuel (2999 centimes / month)
-2. **Annuel** : sélectionner le price Annuel (7999 centimes / year)
+1. **Mensuel** : sélectionner le price Mensuel (2900 centimes / month)
+2. **Annuel** : sélectionner le price Annuel (7900 centimes / year)
 
 Pour chaque :
 - **After payment** : "Show confirmation page" suffit, ou redirect vers `https://trackinglab.online/login`
@@ -188,7 +188,7 @@ Donc rien ne crash, mais aucun paiement n'est possible tant que les sections 1-5
 
 - **Mode Test vs Live** : facile de mélanger. Les `price_xxx` ne sont PAS interchangeables. Si tu as `STRIPE_SECRET_KEY=sk_live_...` mais `STRIPE_MONTHLY_PRICE_ID=price_test_...`, Stripe renverra `No such price` au checkout.
 - **Customer Portal config oubliée** : cause #1 de fallback silencieux vers Checkout. Test case #4 le détecte.
-- **TTC vs HT** : les prix annoncés sur la landing (29,99 € et 79,99 €) sont **TTC**. Le Stripe price doit avoir `tax_behavior: inclusive` sinon Stripe rajoute 20% au paiement et l'utilisateur paie ~36 €/mois au lieu de 29,99.
+- **TTC vs HT** : les prix annoncés sur la landing (29 € et 79 €) sont **TTC**. Le Stripe price doit avoir `tax_behavior: inclusive` sinon Stripe rajoute 20% au paiement et l'utilisateur paie ~36 €/mois au lieu de 29.
 - **Webhook secret mode-specific** : Test mode et Live mode ont des `whsec_xxx` différents. Faire 2 webhooks séparés sur le Dashboard.
 - **Vercel env vars ne propagent pas automatiquement** : il faut un **Redeploy** après chaque modif.
 - **`stripe.Subscription.retrieve` peut renvoyer une sub annulée** : si l'utilisateur a annulé son abonnement mais que la sub est en mode `canceled` dans Stripe (pas supprimée), le portal flow retourne "Can't modify a canceled subscription". Le fallback Checkout gère ça.

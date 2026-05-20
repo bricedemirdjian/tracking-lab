@@ -265,7 +265,7 @@
             <h2>{{ plan.name }}</h2>
             <p>
                 {% if sub.plan == 'starter' %}
-                    Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 78% d'économies.
+                    Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 77% d'économies.
                 {% else %}
                     {% if sub.current_period_end %}
                         Votre abonnement se renouvelle le {{ sub.current_period_end[:10] }}.
@@ -294,7 +294,7 @@
         <div class="price-card{% if sub.plan == 'pro' %} current{% endif %}">
             {% if sub.plan == 'pro' %}<div class="current-tag">Plan actuel</div>{% endif %}
             <div class="price-name">Mensuel</div>
-            <div class="price-val">29,99&#8364; <span>TTC/mois</span></div>
+            <div class="price-val">29&#8364; <span>TTC/mois</span></div>
             <div class="price-sub">Flexibilité maximale, sans engagement</div>
             <div class="price-sep"></div>
             <ul class="price-list">
@@ -319,10 +319,10 @@
 
         <!-- Annuel (key: agency) -->
         <div class="price-card pop{% if sub.plan == 'agency' %} current{% endif %}">
-            {% if sub.plan == 'agency' %}<div class="current-tag">Plan actuel</div>{% else %}<div class="price-tag">Économisez 78%</div>{% endif %}
+            {% if sub.plan == 'agency' %}<div class="current-tag">Plan actuel</div>{% else %}<div class="price-tag">Économisez 77%</div>{% endif %}
             <div class="price-name">Annuel</div>
-            <div class="price-val">79,99&#8364; <span>TTC/an</span></div>
-            <div class="price-sub">Soit 6,67&#8364; TTC/mois &middot; 280&#8364; d'économies vs mensuel</div>
+            <div class="price-val">79&#8364; <span>TTC/an</span></div>
+            <div class="price-sub">Soit 6,58&#8364; TTC/mois &middot; 269&#8364; d'économies vs mensuel</div>
             <div class="price-sep"></div>
             <ul class="price-list">
                 <li><span class="ok">&#x2713;</span> Analyse vidéo par l'IA</li>
