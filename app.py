@@ -669,11 +669,14 @@ def stripe_webhook():
             _so_get(session, 'customer_email')
             or _so_get(details, 'email')
         )
+        print(f"[Stripe DEBUG] checkout.session.completed: customer_id={customer_id} sub_id={subscription_id} email={customer_email}")
         if subscription_id:
             try:
+                print(f"[Stripe DEBUG] step1: stripe.Subscription.retrieve({subscription_id})")
                 sub = stripe.Subscription.retrieve(subscription_id)
                 price_id = sub['items']['data'][0]['price']['id']
                 plan_name = get_price_plan(price_id)
+                print(f"[Stripe DEBUG] step2: price_id={price_id} plan_name={plan_name}")
                 # Stripe API 2024-09+: current_period_end moved to items.data[0].
                 # Use 'in' check (StripeObject.get can collide with dict-style access).
                 _item = sub['items']['data'][0]
@@ -686,18 +689,23 @@ def stripe_webhook():
                 period_end = datetime.fromtimestamp(period_end_ts).isoformat()
                 from database import get_connection, _fetchone
                 conn = get_connection()
+                # Case-insensitive lookup to defeat Gmail/OAuth case-normalization
+                # mismatches (Stripe lowercases, our DB might have mixed case).
                 user = _fetchone(
-                    conn, "SELECT id, name, email FROM users WHERE email = %s",
+                    conn, "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
                     (customer_email,),
                 )
                 conn.close()
+                print(f"[Stripe DEBUG] step3: user_lookup result = {('user_id=' + str(user['id'])) if user else 'NONE'} for email={customer_email}")
                 if user:
+                    print(f"[Stripe DEBUG] step4: calling upsert_subscription(user_id={user['id']}, plan={plan_name})")
                     upsert_subscription(
                         user['id'], plan_name, 'active',
                         stripe_customer_id=customer_id,
                         stripe_subscription_id=subscription_id,
                         current_period_end=period_end,
                     )
+                    print(f"[Stripe DEBUG] step5: upsert OK")
                     # Fire welcome/confirmation emails (best-effort, non-blocking)
                     try:
                         from emailer import send_payment_confirmation
