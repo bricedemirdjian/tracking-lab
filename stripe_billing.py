@@ -14,7 +14,7 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 # they pick a plan).
 PLANS = {
     'starter': {
-        'name': 'Starter (legacy)',
+        'name': 'Gratuit',
         'price': 0,
         'price_annual': 0,
         'price_id': None,

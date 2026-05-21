@@ -148,15 +148,15 @@
             </div>
             <div class="admin-stat-card">
                 <div class="admin-stat-value" id="planStarter">-</div>
-                <div class="admin-stat-label">Starter</div>
+                <div class="admin-stat-label">Gratuit</div>
             </div>
             <div class="admin-stat-card">
                 <div class="admin-stat-value" id="planPro">-</div>
-                <div class="admin-stat-label">Pro</div>
+                <div class="admin-stat-label">Mensuel</div>
             </div>
             <div class="admin-stat-card">
                 <div class="admin-stat-value" id="planAgency">-</div>
-                <div class="admin-stat-label">Entreprises</div>
+                <div class="admin-stat-label">Annuel</div>
             </div>
             <div class="admin-stat-card">
                 <div class="admin-stat-value" id="totalAccounts">-</div>
@@ -187,7 +187,7 @@
     </div>
 
     <script>
-        const PLAN_LABELS = { starter: 'Starter', pro: 'Pro', agency: 'Entreprises' };
+        const PLAN_LABELS = { starter: 'Gratuit', pro: 'Mensuel', agency: 'Annuel' };
         const PLAN_CLASSES = { starter: 'badge-plan-starter', pro: 'badge-plan-pro', agency: 'badge-plan-agency' };
 
         async function loadUsers() {

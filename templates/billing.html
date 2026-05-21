@@ -259,7 +259,7 @@
     <div class="current-plan-card">
         <div class="plan-info">
             <div class="plan-badge {{ sub.plan }}">
-                {% if sub.plan == 'starter' %}⭐{% elif sub.plan == 'pro' %}🚀{% else %}🏢{% endif %}
+                {% if sub.plan == 'pro' %}🚀{% elif sub.plan == 'agency' %}🏢{% else %}⭐{% endif %}
                 {{ plan.name }}
             </div>
             <h2>{{ plan.name }}</h2>
@@ -268,7 +268,7 @@
                     Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 77% d'économies.
                 {% else %}
                     {% if sub.current_period_end %}
-                        Votre abonnement se renouvelle le {{ sub.current_period_end[:10] }}.
+                        Votre abonnement se renouvelle le {{ (sub.current_period_end|string)[:10] }}.
                     {% else %}
                         Abonnement actif.
                     {% endif %}

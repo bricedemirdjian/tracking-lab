@@ -124,9 +124,9 @@ def send_payment_confirmation(
 ) -> bool:
     """Sent after checkout.session.completed."""
     plan_label = {
-        "pro": "Pro (29€/mois)",
-        "agency": "Entreprises (79€/mois)",
-    }.get(plan_name, plan_name.title())
+        "pro": "Mensuel (29€ TTC/mois)",
+        "agency": "Annuel (79€ TTC/an)",
+    }.get(plan_name, "Mensuel" if plan_name == "pro" else "Annuel" if plan_name == "agency" else plan_name.title())
 
     first = (user_name or to_email.split("@")[0]).split()[0]
     renew_line = ""

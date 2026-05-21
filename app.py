@@ -660,13 +660,6 @@ def stripe_webhook():
         except Exception:
             return default
 
-    # DEBUG: collect breadcrumbs so we can return them in the response body.
-    # Stripe Dashboard stores the response, so we can read this directly there.
-    _debug = []
-    def _dbg(msg):
-        _debug.append(msg)
-        print(f"[Stripe DEBUG] {msg}")
-
     if event.type == 'checkout.session.completed':
         session = event.data.object
         customer_id = _so_get(session, 'customer')
@@ -676,14 +669,11 @@ def stripe_webhook():
             _so_get(session, 'customer_email')
             or _so_get(details, 'email')
         )
-        _dbg(f"event=checkout.session.completed customer_id={customer_id} sub_id={subscription_id} email={customer_email}")
         if subscription_id:
             try:
-                _dbg(f"step1: stripe.Subscription.retrieve({subscription_id})")
                 sub = stripe.Subscription.retrieve(subscription_id)
                 price_id = sub['items']['data'][0]['price']['id']
                 plan_name = get_price_plan(price_id)
-                _dbg(f"step2: price_id={price_id} plan_name={plan_name}")
                 # Stripe API 2024-09+: current_period_end moved to items.data[0].
                 # Use 'in' check (StripeObject.get can collide with dict-style access).
                 _item = sub['items']['data'][0]
@@ -703,16 +693,13 @@ def stripe_webhook():
                     (customer_email,),
                 )
                 conn.close()
-                _dbg(f"step3: user_lookup result = {('user_id=' + str(user['id'])) if user else 'NONE'} for email={customer_email}")
                 if user:
-                    _dbg(f"step4: calling upsert_subscription(user_id={user['id']}, plan={plan_name})")
                     upsert_subscription(
                         user['id'], plan_name, 'active',
                         stripe_customer_id=customer_id,
                         stripe_subscription_id=subscription_id,
                         current_period_end=period_end,
                     )
-                    _dbg("step5: upsert OK")
                     # Fire welcome/confirmation emails (best-effort, non-blocking)
                     try:
                         from emailer import send_payment_confirmation
@@ -730,9 +717,6 @@ def stripe_webhook():
                     print(f"[Stripe] subscription for unknown email {customer_email} — "
                           f"will claim on first login")
             except Exception as e:
-                import traceback
-                _dbg(f"EXCEPTION: {type(e).__name__}: {str(e)[:200]}")
-                _dbg(f"TRACEBACK: {traceback.format_exc()[:500]}")
                 print(f"[Stripe] checkout.session.completed handler error: {e}")
 
     elif event.type in ('customer.subscription.updated', 'customer.subscription.deleted'):
@@ -763,7 +747,7 @@ def stripe_webhook():
                 current_period_end=period_end,
             )
 
-    return jsonify({"status": "ok", "debug": _debug})
+    return jsonify({"status": "ok"})
 
 
 # ==================== Project routes ====================
