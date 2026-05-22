@@ -488,8 +488,47 @@ def _resolve_project_usernames(user_id, project_id):
 def billing():
     sub = get_user_subscription(current_user.id)
     plan = get_plan(sub.get('plan', 'starter'))
+
+    # Detect a pending cadence switch (Stripe SubscriptionSchedule) so the
+    # template can show "Vous passez à l'annuel le YYYY-MM-DD" instead of
+    # the normal renewal line. Failure is silent — the page still renders,
+    # just without the pending-switch indicator.
+    pending_switch = None
+    sub_id = sub.get('stripe_subscription_id')
+    if sub_id:
+        try:
+            stripe_sub = stripe.Subscription.retrieve(sub_id)
+            sched_id = stripe_sub.get('schedule')
+            if sched_id and stripe_sub.status in ('active', 'trialing'):
+                sched = stripe.SubscriptionSchedule.retrieve(sched_id)
+                current_period_end = stripe_sub.current_period_end
+                future_phase = next(
+                    (p for p in sched['phases']
+                     if p.get('start_date', 0) >= current_period_end),
+                    None,
+                )
+                if future_phase:
+                    target_price = future_phase['items'][0]['price']
+                    if isinstance(target_price, dict):
+                        target_price = target_price.get('id')
+                    target_plan = get_price_plan(target_price)
+                    from datetime import datetime
+                    months_fr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                                 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+                    dt = datetime.utcfromtimestamp(current_period_end)
+                    switch_date_human = f"{dt.day} {months_fr[dt.month - 1]} {dt.year}"
+                    pending_switch = {
+                        'switch_at': current_period_end,
+                        'switch_at_human': switch_date_human,
+                        'target_plan': target_plan,
+                        'target_label': PLANS.get(target_plan, {}).get('name'),
+                    }
+        except Exception as e:
+            print(f"[billing] could not load pending schedule for sub {sub_id}: {e}")
+
     return render_template("billing.html", user=current_user, sub=sub, plan=plan,
                            plans=PLANS,
+                           pending_switch=pending_switch,
                            stripe_pub_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
 
 
@@ -552,48 +591,92 @@ def api_billing_checkout():
     success_url = f"{base_url}/billing?success=1"
     cancel_url = f"{base_url}/billing?cancelled=1"
 
-    # Upsell path — user already has an active Stripe subscription. Open the
-    # Customer Portal in the "confirm subscription update" flow with the
-    # target price pre-populated. Stripe shows a single confirmation screen,
-    # modifies the EXISTING subscription (no parallel billing), and applies
-    # proration automatically. User lands back on /billing on completion.
+    # Cadence-switch path — user already has an active Stripe subscription
+    # and is switching between monthly ↔ annual. We do NOT proration-switch
+    # immediately (Stripe Portal's default behavior): instead we create a
+    # SubscriptionSchedule that keeps the user on their current price until
+    # the end of the period they've already paid for, then auto-transitions
+    # to the new price at the next renewal.
     #
-    # Requires the Customer Portal to be configured in Stripe Dashboard
-    # (Settings → Billing → Customer portal) with all 6 prices (3 plans × 2
-    # cadences) added to the allowed products list.
+    # Concrete example: user paid 29€ on day 1, clicks "Annuel" on day 10.
+    # They keep their monthly sub until day 30, no extra debit. On day 30
+    # the schedule fires phase 2 → Stripe charges 79€ and starts the annual
+    # cycle. Net cost over the year: 29 + 79 = 108€. No credits, no prorata.
     if customer_id and subscription_id:
         try:
             existing = stripe.Subscription.retrieve(subscription_id)
-            item_id = existing['items']['data'][0]['id']
-            portal = stripe.billing_portal.Session.create(
-                customer=customer_id,
-                return_url=success_url,
-                flow_data={
-                    'type': 'subscription_update_confirm',
-                    'after_completion': {
-                        'type': 'redirect',
-                        'redirect': {'return_url': success_url},
-                    },
-                    'subscription_update_confirm': {
-                        'subscription': subscription_id,
+            if existing.status not in ('active', 'trialing'):
+                # Sub exists in DB but Stripe says it's cancelled/incomplete.
+                # Treat as no sub — fall through to fresh checkout.
+                raise stripe.error.InvalidRequestError(
+                    f"subscription not active (status={existing.status})", None
+                )
+
+            current_price_id = existing['items']['data'][0]['price']['id']
+            if current_price_id == price_id:
+                return jsonify({"error": "Vous êtes déjà sur cette formule."}), 400
+
+            # If a schedule already exists on this sub, the user already
+            # asked for the switch — just report it back idempotently.
+            existing_schedule_id = existing.get('schedule')
+            if existing_schedule_id:
+                sched = stripe.SubscriptionSchedule.retrieve(existing_schedule_id)
+                # Find the future phase (the one starting at period_end).
+                future_phase = next(
+                    (p for p in sched['phases'] if p.get('start_date', 0) >= existing.current_period_end),
+                    None,
+                )
+                return jsonify({
+                    "scheduled": True,
+                    "already_scheduled": True,
+                    "switch_date": existing.current_period_end,
+                    "target_price_id": (future_phase or {}).get('items', [{}])[0].get('price'),
+                })
+
+            # Create a schedule mirroring the current sub, then rewrite the
+            # phases: phase 1 = current price until period_end, phase 2 =
+            # target price for 1 iteration (then renews indefinitely after
+            # release). proration_behavior='none' on both phases is the
+            # safety belt that prevents any mid-period credit/charge.
+            schedule = stripe.SubscriptionSchedule.create(from_subscription=subscription_id)
+            current_phase = schedule['phases'][0]
+            stripe.SubscriptionSchedule.modify(
+                schedule.id,
+                end_behavior='release',
+                phases=[
+                    {
                         'items': [{
-                            'id': item_id,
+                            'price': current_phase['items'][0]['price'],
+                            'quantity': 1,
+                        }],
+                        'start_date': current_phase['start_date'],
+                        'end_date': current_phase['end_date'],
+                        'proration_behavior': 'none',
+                    },
+                    {
+                        'items': [{
                             'price': price_id,
                             'quantity': 1,
                         }],
+                        'iterations': 1,
+                        'proration_behavior': 'none',
                     },
-                },
+                ],
             )
-            return jsonify({"url": portal.url})
+
+            return jsonify({
+                "scheduled": True,
+                "switch_date": existing.current_period_end,
+                "target_price_id": price_id,
+            })
         except stripe.error.InvalidRequestError as e:
-            # Common causes: subscription was cancelled in Stripe but the DB
-            # still has the ID, or the portal isn't configured to allow this
-            # price. Fall through to a fresh Checkout Session — worst case
-            # user creates a new sub instead of editing, which is recoverable.
-            print(f"[STRIPE] portal upsell flow failed, falling back to checkout: {e}")
+            # Sub doesn't exist in Stripe anymore (or is cancelled). Fall
+            # through to a fresh Checkout Session — user creates a new sub.
+            print(f"[STRIPE] cadence-switch path skipped, falling back to checkout: {e}")
         except Exception as e:
-            print(f"[STRIPE ERROR] portal upsell: {e}")
-            # Don't fall through on unknown errors — surface them so we notice.
+            print(f"[STRIPE ERROR] cadence-switch: {e}")
+            # Don't fall through on unknown errors — surface them so we
+            # don't silently double-bill or skip the schedule.
             return jsonify({"error": str(e)}), 500
 
     # Signup path — no active Stripe subscription (or portal flow failed).

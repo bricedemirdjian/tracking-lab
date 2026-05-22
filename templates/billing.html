@@ -335,6 +335,9 @@
             <p>
                 {% if sub.plan == 'starter' %}
                     Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 77% d'économies.
+                {% elif pending_switch %}
+                    Vous passez automatiquement en <strong>{{ pending_switch.target_label }}</strong> le <strong>{{ pending_switch.switch_at_human }}</strong>.
+                    Vous restez sur l'offre {{ plan.name }} jusqu'à cette date — aucun débit supplémentaire d'ici là.
                 {% else %}
                     {% if sub.current_period_end %}
                         Votre abonnement se renouvelle le {{ (sub.current_period_end|string)[:10] }}.
@@ -394,7 +397,7 @@
             <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
             <button class="btn btn-outline" onclick="checkout('pro')">Commencer en mensuel</button>
-            <div class="price-trial">Activation immédiate &middot; Prorata sur le mois en cours</div>
+            <div class="price-trial">{% if sub.plan == 'starter' %}Activation immédiate &middot; Sans engagement{% else %}Démarre à la fin de votre abonnement actuel &middot; Aucun prorata{% endif %}</div>
             {% endif %}
         </div>
 
@@ -421,7 +424,7 @@
             <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
             <button class="btn btn-primary" onclick="checkout('agency')">Commencer en annuel</button>
-            <div class="price-trial">Activation immédiate &middot; Prorata sur le mois en cours</div>
+            <div class="price-trial">{% if sub.plan == 'starter' %}Activation immédiate &middot; Sans engagement{% else %}Démarre à la fin de votre abonnement actuel &middot; Aucun prorata{% endif %}</div>
             {% endif %}
         </div>
     </div>
@@ -484,8 +487,56 @@ async function checkout(plan) {
         body: JSON.stringify({ plan, period })
     });
     const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else alert(data.error || 'Erreur');
+
+    // Cadence switch — backend created a Stripe SubscriptionSchedule.
+    // No redirect: user stays on their current plan until period_end,
+    // then auto-switches. Show an inline confirmation banner and
+    // reload so the new badge / disabled buttons reflect reality.
+    if (data.scheduled) {
+        const ts = data.switch_date * 1000;
+        const dateStr = new Intl.DateTimeFormat('fr-FR', {
+            day: '2-digit', month: 'long', year: 'numeric'
+        }).format(new Date(ts));
+        const targetIsAnnual = plan === 'agency';
+        const targetLabel = targetIsAnnual ? 'annuel' : 'mensuel';
+        const targetPrice = targetIsAnnual ? '79€ TTC/an' : '29€ TTC/mois';
+        const alreadyNote = data.already_scheduled
+            ? ' (déjà programmé précédemment)'
+            : '';
+        showScheduleConfirmation(targetLabel, targetPrice, dateStr, alreadyNote);
+        return;
+    }
+
+    if (data.url) { window.location.href = data.url; return; }
+    alert(data.error || 'Erreur');
+}
+
+function showScheduleConfirmation(targetLabel, targetPrice, dateStr, alreadyNote) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;animation:fadeIn .2s ease;';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:18px;padding:32px 28px;max-width:440px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.25);font-family:'Inter',-apple-system,sans-serif;animation:popIn .25s cubic-bezier(.2,0,0,1);">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#FF69B4,#f05aa0);display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <h3 style="font-size:22px;font-weight:800;letter-spacing:-.4px;margin:0 0 10px;">Passage à l'${targetLabel} programmé${alreadyNote}</h3>
+            <p style="font-size:15px;color:#3a3a40;line-height:1.55;margin:0 0 8px;">
+                Votre abonnement <strong>${targetLabel}</strong> (${targetPrice}) démarrera automatiquement le <strong>${dateStr}</strong>.
+            </p>
+            <p style="font-size:14px;color:#6e6e76;line-height:1.55;margin:0 0 22px;">
+                D'ici là vous restez sur votre offre actuelle. Aucun débit supplémentaire avant cette date, aucune perte d'accès.
+            </p>
+            <button id="scheduleOkBtn" style="width:100%;background:#0d0d0d;color:#fff;border:none;padding:14px;border-radius:12px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit;transition:transform .15s;">Compris</button>
+        </div>
+        <style>@keyframes fadeIn { from { opacity:0 } } @keyframes popIn { from { opacity:0; transform:scale(.95) } }</style>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('scheduleOkBtn').addEventListener('click', () => {
+        window.location.href = '/billing?scheduled=1';
+    });
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) window.location.href = '/billing?scheduled=1';
+    });
 }
 
 async function openPortal() {
