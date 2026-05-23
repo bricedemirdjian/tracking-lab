@@ -177,49 +177,6 @@
         }
         .price-card.pop .price-trial { color: rgba(255,255,255,.92); }
 
-        /* ─── Cancel-by-email block ─────────────────────────────────
-           The hero action on the current-plan card. Self-service Stripe
-           Portal access was removed by product decision — cancellation
-           now requires emailing support so the team can attempt save
-           conversations before the cancel goes through. (Note: French
-           law L. 215-1 requires online subscriptions be cancellable as
-           easily as they were signed up for — a self-service path will
-           likely need to come back to stay DGCCRF-compliant.) */
-        .cancel-by-email {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
-            text-align: right;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        .cancel-by-email-label {
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-            color: #86868b;
-        }
-        .cancel-by-email-link {
-            font-size: 15px;
-            font-weight: 600;
-            color: #FF69B4;
-            text-decoration: none;
-            padding: 4px 0;
-            transition: color .15s;
-            word-break: break-all;
-        }
-        .cancel-by-email-link:hover { color: #d83a8b; text-decoration: underline; }
-        .cancel-by-email-sub {
-            font-size: 12px;
-            color: #86868b;
-            max-width: 260px;
-            line-height: 1.4;
-        }
-        @media (max-width: 700px) {
-            .cancel-by-email { align-items: flex-start; text-align: left; }
-            .cancel-by-email-sub { max-width: none; }
-        }
 
         .back-link {
             display: inline-flex;
@@ -329,16 +286,6 @@
             </p>
         </div>
         <div class="plan-actions">
-            {% if sub.plan != 'starter' and sub.stripe_customer_id %}
-            <div class="cancel-by-email">
-                <div class="cancel-by-email-label">Annuler l'abonnement</div>
-                <a class="cancel-by-email-link"
-                   href="mailto:brice.demirdjian@gmail.com?subject=Demande%20d%27annulation%20d%27abonnement%20Tracking%20Lab&body=Bonjour%2C%0A%0AJe%20souhaite%20annuler%20mon%20abonnement%20Tracking%20Lab.%0A%0AEmail%20du%20compte%20%3A%20{{ user.email | urlencode }}%0AFormule%20actuelle%20%3A%20{{ plan.name }}%0A%0AMerci%20de%20confirmer%20la%20prise%20en%20compte.%0A%0ACordialement%2C">
-                    brice.demirdjian@gmail.com
-                </a>
-                <div class="cancel-by-email-sub">L'annulation s'effectue uniquement par email auprès du support.</div>
-            </div>
-            {% endif %}
             {% if sub.plan == 'starter' %}
             <button class="btn btn-primary" onclick="document.getElementById('plans-section').scrollIntoView({behavior:'smooth'})">Activer l'abonnement →</button>
             {% endif %}
