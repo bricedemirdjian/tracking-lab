@@ -15,26 +15,26 @@
         }
         .billing-container {
             max-width: 1080px;
-            margin: 80px auto;
+            margin: 32px auto 64px;
             padding: 0 24px;
         }
         .billing-header {
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
         .billing-header h1 {
-            font-size: 32px;
+            font-size: 30px;
             font-weight: 800;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             letter-spacing: -0.5px;
         }
-        .billing-header p { color: var(--text-muted); }
+        .billing-header p { color: var(--text-muted); margin: 0; }
 
         .current-plan-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 32px;
-            margin-bottom: 40px;
+            padding: 24px 28px;
+            margin-bottom: 28px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -56,7 +56,7 @@
         .plan-badge.pro { background: rgba(255,105,180,0.1); color: #FF69B4; }
         .plan-badge.agency { background: rgba(88,86,214,0.1); color: #5856d6; }
 
-        .plan-info h2 { font-size: 24px; font-weight: 700; margin: 12px 0 6px; letter-spacing: -0.3px; }
+        .plan-info h2 { font-size: 22px; font-weight: 700; margin: 6px 0 2px; letter-spacing: -0.3px; }
         .plan-info p { color: var(--text-muted); font-size: 14px; }
 
         .plan-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -187,7 +187,7 @@
             color: var(--text-muted);
             text-decoration: none;
             font-size: 14px;
-            margin-bottom: 32px;
+            margin-bottom: 16px;
             transition: color 0.2s;
         }
         .back-link:hover { color: var(--text-primary); }
@@ -295,7 +295,7 @@
     </div>
 
     <!-- Plans -->
-    <h2 style="font-size:24px;font-weight:800;margin-bottom:24px;letter-spacing:-0.5px;text-align:center" id="plans-section">{% if sub.plan == 'starter' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
+    <h2 style="font-size:22px;font-weight:800;margin:0 0 16px;letter-spacing:-0.5px;text-align:center" id="plans-section">{% if sub.plan == 'starter' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
 
     <div class="pricing pricing-2col">
 
