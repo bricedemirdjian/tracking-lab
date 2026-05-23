@@ -43,6 +43,13 @@ IS_PRODUCTION = bool(
     os.environ.get('RENDER') or os.environ.get('PRODUCTION') or os.environ.get('VERCEL')
 )
 
+# Founder emails — exempted from the /dashboard paywall gate. Everyone else
+# with plan='pending' must complete Stripe checkout before accessing the SaaS.
+DASHBOARD_FREE_PASS_EMAILS = {
+    'brice.demirdjian@gmail.com',
+    'tom@merciinternet.com',
+}
+
 _secret_key = os.environ.get('SECRET_KEY')
 if IS_PRODUCTION and not _secret_key:
     raise RuntimeError(
@@ -250,8 +257,8 @@ def dashboard():
     # Gate access behind a paid plan. New signups (Google or email/password)
     # land here with plan='pending' until they complete Stripe checkout —
     # bounce them to /billing so they can't dodge the paywall by typing the
-    # URL directly. Admins keep access regardless.
-    if current_user.plan == 'pending' and not current_user.is_admin:
+    # URL directly. Only the founders' emails bypass the paywall.
+    if current_user.plan == 'pending' and (current_user.email or '').lower() not in DASHBOARD_FREE_PASS_EMAILS:
         return redirect(url_for('billing'))
     return render_template("dashboard.html", user=current_user)
 
