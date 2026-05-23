@@ -221,7 +221,9 @@ def signup_page():
         return redirect(url_for('dashboard'))
     return render_template(
         'signup.html',
-        stripe_pub_key=os.environ.get('STRIPE_PUBLISHABLE_KEY', ''),
+        # .strip() defends against trailing whitespace / newline in the Vercel
+        # env var which would break the JS string literal client-side.
+        stripe_pub_key=(os.environ.get('STRIPE_PUBLISHABLE_KEY') or '').strip(),
     )
 
 

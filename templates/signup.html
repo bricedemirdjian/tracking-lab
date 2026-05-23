@@ -316,7 +316,12 @@
         // we validate the form, create the user + Subscription intent on
         // the server, then confirm payment client-side with the returned
         // client_secret. One click = full signup + payment.
-        const STRIPE_PUB_KEY = '{{ stripe_pub_key }}';
+        //
+        // Key is rendered via |tojson so trailing whitespace / newlines /
+        // special chars in the env var can't break the JS string literal
+        // (a real bug we saw in prod when the Vercel env var had a trailing
+        // newline — the SyntaxError aborted the whole script).
+        const STRIPE_PUB_KEY = ({{ stripe_pub_key | tojson }} || '').trim();
         const PLAN_AMOUNTS = { monthly: 2900, annual: 7900 };  // in cents
 
         const stripe = STRIPE_PUB_KEY ? Stripe(STRIPE_PUB_KEY) : null;
