@@ -56,3 +56,7 @@ v2/
 supabase/
 .env*.local
 .gstack/
+
+# Internal tooling — not for git
+.claude-flow/
+*.backup
