@@ -211,8 +211,11 @@
     </div>
 
     <script>
-        const PLAN_LABELS = { starter: 'Gratuit', pro: 'Mensuel', agency: 'Annuel' };
-        const PLAN_CLASSES = { starter: 'badge-plan-starter', pro: 'badge-plan-pro', agency: 'badge-plan-agency' };
+        const PLAN_LABELS = { pending: 'Pending', monthly: 'Mensuel', annual: 'Annuel',
+                              // legacy fallbacks
+                              starter: 'Pending', pro: 'Mensuel', agency: 'Annuel' };
+        const PLAN_CLASSES = { pending: 'badge-plan-starter', monthly: 'badge-plan-pro', annual: 'badge-plan-agency',
+                               starter: 'badge-plan-starter', pro: 'badge-plan-pro', agency: 'badge-plan-agency' };
 
         async function loadUsers() {
             try {
@@ -221,16 +224,22 @@
                 if (res.status === 403) { window.location.href = '/'; return; }
                 const users = await res.json();
 
-                const counts = { starter: 0, pro: 0, agency: 0 };
+                const counts = { pending: 0, monthly: 0, annual: 0 };
                 users.forEach(u => {
-                    const p = u.plan || 'starter';
-                    if (counts[p] !== undefined) counts[p]++;
+                    const p = u.plan || 'pending';
+                    // Normalise legacy keys so the KPI counters keep working
+                    // while old rows are still being migrated.
+                    const norm = ({ pro: 'monthly', agency: 'annual', starter: 'pending' })[p] || p;
+                    if (counts[norm] !== undefined) counts[norm]++;
                 });
 
                 document.getElementById('totalUsers').textContent = users.length;
-                document.getElementById('planStarter').textContent = counts.starter;
-                document.getElementById('planPro').textContent = counts.pro;
-                document.getElementById('planAgency').textContent = counts.agency;
+                const _pendEl = document.getElementById('planStarter');
+                if (_pendEl) _pendEl.textContent = counts.pending;
+                const _monEl = document.getElementById('planPro');
+                if (_monEl) _monEl.textContent = counts.monthly;
+                const _annEl = document.getElementById('planAgency');
+                if (_annEl) _annEl.textContent = counts.annual;
                 document.getElementById('totalAccounts').textContent = users.reduce((s, u) => s + (u.account_count || 0), 0);
 
                 const tbody = document.getElementById('usersTableBody');
@@ -257,13 +266,15 @@
                     }
                     const statusBadge = u.blocked ? '<span class="badge-role badge-blocked">Bloque</span>' : '<span class="badge-role badge-active">Actif</span>';
 
-                    const plan = u.plan || 'starter';
-                    const planBadge = `<span class="badge-plan ${PLAN_CLASSES[plan]}">${PLAN_LABELS[plan]}</span>`;
+                    // Normalise legacy plan keys so display + select stay
+                    // consistent with the new monthly/annual model.
+                    const _rawPlan = u.plan || 'pending';
+                    const plan = ({ pro: 'monthly', agency: 'annual', starter: 'pending' })[_rawPlan] || _rawPlan;
+                    const planBadge = `<span class="badge-plan ${PLAN_CLASSES[plan] || ''}">${PLAN_LABELS[plan] || plan}</span>`;
                     const planSelect = u.role !== 'admin'
                         ? `<select class="plan-select" onchange="changePlan(${u.id}, this.value)">
-                                <option value="starter" ${plan==='starter'?'selected':''}>Starter</option>
-                                <option value="pro" ${plan==='pro'?'selected':''}>Pro</option>
-                                <option value="agency" ${plan==='agency'?'selected':''}>Entreprises</option>
+                                <option value="monthly" ${plan==='monthly'?'selected':''}>Mensuel</option>
+                                <option value="annual" ${plan==='annual'?'selected':''}>Annuel</option>
                            </select>`
                         : '<span style="color:var(--admin-text-muted);font-size:12px;font-weight:600">Illimite</span>';
 

@@ -1885,8 +1885,15 @@ def get_all_users():
 
 
 def set_user_plan(user_id, plan):
-    """Admin-driven plan change. Updates both users.plan and subscriptions row."""
-    if plan not in ('starter', 'pro', 'agency'):
+    """Admin-driven plan change. Updates both users.plan and subscriptions row.
+
+    Canonical plan keys are 'monthly' and 'annual'. Legacy keys (starter/pro/
+    agency) are accepted and auto-normalised so older callers keep working
+    during the migration window.
+    """
+    legacy_map = {'pro': 'monthly', 'agency': 'annual', 'starter': 'monthly'}
+    plan = legacy_map.get(plan, plan)
+    if plan not in ('monthly', 'annual'):
         raise ValueError(f"Invalid plan: {plan}")
     conn = get_connection()
     _execute(conn, "UPDATE users SET plan = %s WHERE id = %s", (plan, user_id))

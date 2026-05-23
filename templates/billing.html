@@ -288,12 +288,12 @@
     <div class="current-plan-card">
         <div class="plan-info">
             <div class="plan-badge {{ sub.plan }}">
-                {% if sub.plan == 'pro' %}⚡{% elif sub.plan == 'agency' %}🚀{% else %}⭐{% endif %}
+                {% if sub.plan == 'monthly' %}⚡{% elif sub.plan == 'annual' %}🚀{% else %}🔒{% endif %}
                 {{ plan.name }}
             </div>
             <h2>{{ plan.name }}</h2>
             <p>
-                {% if sub.plan == 'starter' %}
+                {% if sub.plan == 'pending' %}
                     Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 77&nbsp;% d'économies.
                 {% elif pending_switch %}
                     Vous passez automatiquement en <strong>{{ pending_switch.target_label }}</strong> le <strong>{{ pending_switch.switch_at_human }}</strong>.
@@ -308,20 +308,20 @@
             </p>
         </div>
         <div class="plan-actions">
-            {% if sub.plan == 'starter' %}
+            {% if sub.plan == 'pending' %}
             <button class="btn btn-primary" onclick="document.getElementById('plans-section').scrollIntoView({behavior:'smooth'})">Activer l'abonnement →</button>
             {% endif %}
         </div>
     </div>
 
     <!-- Plans -->
-    <h2 style="font-size:32px;font-weight:800;margin:0 0 48px;letter-spacing:-0.6px;text-align:center" id="plans-section">{% if sub.plan == 'starter' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
+    <h2 style="font-size:32px;font-weight:800;margin:0 0 48px;letter-spacing:-0.6px;text-align:center" id="plans-section">{% if sub.plan == 'pending' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
 
     <div class="pricing pricing-2col">
 
         <!-- Mensuel (key: pro) -->
-        <div class="price-card{% if sub.plan == 'pro' %} current{% endif %}">
-            {% if sub.plan == 'pro' %}<div class="current-tag">Plan actuel</div>{% endif %}
+        <div class="price-card{% if sub.plan == 'monthly' %} current{% endif %}">
+            {% if sub.plan == 'monthly' %}<div class="current-tag">Plan actuel</div>{% endif %}
             <div class="price-name">Mensuel</div>
             <div class="price-val">29&#8364; <span>TTC/mois</span></div>
             <div class="price-sub">Flexibilité maximale, sans engagement</div>
@@ -363,16 +363,16 @@
                     </div>
                 </li>
             </ul>
-            {% if sub.plan == 'pro' %}
+            {% if sub.plan == 'monthly' %}
             <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn btn-outline" onclick="checkout('pro')">Commencer en mensuel</button>
+            <button class="btn btn-outline" onclick="checkout('monthly')">Commencer en mensuel</button>
             {% endif %}
         </div>
 
         <!-- Annuel (key: agency) -->
-        <div class="price-card pop{% if sub.plan == 'agency' %} current{% endif %}">
-            {% if sub.plan == 'agency' %}<div class="current-tag">Plan actuel</div>{% else %}<div class="price-tag">Économisez 77&nbsp;%</div>{% endif %}
+        <div class="price-card pop{% if sub.plan == 'annual' %} current{% endif %}">
+            {% if sub.plan == 'annual' %}<div class="current-tag">Plan actuel</div>{% else %}<div class="price-tag">Économisez 77&nbsp;%</div>{% endif %}
             <div class="price-name">Annuel</div>
             <div class="price-val">6,58&#8364; <span>TTC/mois</span></div>
             <div class="price-sub">soit 79&#8364; TTC/an</div>
@@ -414,10 +414,10 @@
                     </div>
                 </li>
             </ul>
-            {% if sub.plan == 'agency' %}
+            {% if sub.plan == 'annual' %}
             <button class="btn btn-disabled" disabled>Plan actuel</button>
             {% else %}
-            <button class="btn btn-primary" onclick="checkout('agency')">AUGMENTEZ VOS VUES TOUTE L'ANNÉE 🚀</button>
+            <button class="btn btn-primary" onclick="checkout('annual')">AUGMENTEZ VOS VUES TOUTE L'ANNÉE 🚀</button>
             {% endif %}
         </div>
     </div>
@@ -513,7 +513,7 @@ async function checkout(plan, btn) {
         const dateStr = new Intl.DateTimeFormat('fr-FR', {
             day: '2-digit', month: 'long', year: 'numeric'
         }).format(new Date(ts));
-        const targetIsAnnual = plan === 'agency';
+        const targetIsAnnual = plan === 'annual';
         const targetLabel = targetIsAnnual ? 'annuel' : 'mensuel';
         const targetPrice = targetIsAnnual ? '79€ TTC/an' : '29€ TTC/mois';
         const alreadyNote = data.already_scheduled

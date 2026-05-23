@@ -458,8 +458,10 @@ def api_admin_delete(user_id):
 @admin_required
 def api_admin_set_plan(user_id):
     plan = request.json.get("plan", "").strip() if request.json else ""
-    if plan not in ("starter", "pro", "agency"):
-        return jsonify({"error": "Plan invalide (starter / pro / agency)"}), 400
+    # Accept canonical 'monthly'/'annual' plus legacy 'pro'/'agency'/'starter'
+    # — set_user_plan() normalises legacy keys internally.
+    if plan not in ("monthly", "annual", "pro", "agency", "starter"):
+        return jsonify({"error": "Plan invalide (monthly / annual)"}), 400
     try:
         set_user_plan(user_id, plan)
         return jsonify({"status": "success", "plan": plan})
@@ -509,7 +511,7 @@ def _resolve_project_usernames(user_id, project_id):
 @login_required
 def billing():
     sub = get_user_subscription(current_user.id)
-    plan = get_plan(sub.get('plan', 'starter'))
+    plan = get_plan(sub.get('plan', 'pending'))
 
     # Detect a pending cadence switch (Stripe SubscriptionSchedule) so the
     # template can show "Vous passez à l'annuel le YYYY-MM-DD" instead of
@@ -550,7 +552,7 @@ def billing():
                     target_price = _stripe_get(items[0] if items else {}, 'price') if items else None
                     if target_price and not isinstance(target_price, str):
                         target_price = _stripe_get(target_price, 'id')
-                    target_plan = get_price_plan(target_price) if target_price else 'starter'
+                    target_plan = get_price_plan(target_price) if target_price else 'pending'
                     from datetime import datetime
                     months_fr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
                                  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
@@ -577,7 +579,7 @@ def account():
     """Mon Compte hub: profile, plan/usage, links to Facturation/Admin/Swarm, logout."""
     from database import get_connection, _fetchone
     plan_name = get_user_plan(current_user.data_user_id)
-    plan_meta = PLANS.get(plan_name, PLANS['starter'])
+    plan_meta = PLANS.get(plan_name, PLANS['monthly'])
     uid = current_user.data_user_id
     with get_connection() as conn:
         accounts_count = (_fetchone(conn,
@@ -640,7 +642,11 @@ def api_billing_create_subscription_intent():
     body = request.json or {}
     plan_name = body.get("plan")
     period = body.get("period", "annual")
-    if plan_name not in ('pro', 'agency'):
+    # Accept canonical 'monthly'/'annual' and the legacy 'pro'/'agency' names
+    # so the frontend can transition without coordinated deploys.
+    legacy_map = {'pro': 'monthly', 'agency': 'annual'}
+    plan_name = legacy_map.get(plan_name, plan_name)
+    if plan_name not in ('monthly', 'annual'):
         return jsonify({"error": "Plan invalide"}), 400
     if period not in ('monthly', 'annual'):
         return jsonify({"error": "Période invalide"}), 400
@@ -721,7 +727,10 @@ def api_billing_checkout():
     body = request.json or {}
     plan_name = body.get("plan")
     period = body.get("period", "annual")  # default to annual — matches landing UX
-    if plan_name not in ('starter', 'pro', 'agency'):
+    # Accept canonical + legacy names.
+    legacy_map = {'pro': 'monthly', 'agency': 'annual'}
+    plan_name = legacy_map.get(plan_name, plan_name)
+    if plan_name not in ('monthly', 'annual'):
         return jsonify({"error": "Plan invalide"}), 400
     if period not in ('monthly', 'annual'):
         return jsonify({"error": "Période invalide"}), 400
@@ -914,7 +923,7 @@ def api_billing_portal():
 @login_required
 def api_billing_subscription():
     sub = get_user_subscription(current_user.id)
-    plan = get_plan(sub.get('plan', 'starter'))
+    plan = get_plan(sub.get('plan', 'pending'))
     return jsonify({"subscription": sub, "plan": plan})
 
 
@@ -1017,7 +1026,7 @@ def stripe_webhook():
         sub = event.data.object
         customer_id = _so_get(sub, 'customer')
         status = _so_get(sub, 'status')
-        plan_name = 'starter'
+        plan_name = 'pending'
         if status == 'active':
             price_id = sub['items']['data'][0]['price']['id']
             plan_name = get_price_plan(price_id)
@@ -1300,7 +1309,7 @@ def api_video_analyze():
         return jsonify({
             "error": "Disponible sur l'offre Entreprises",
             "upgrade_required": True,
-            "current_plan": plan.get('name', 'starter'),
+            "current_plan": plan.get('name', 'Pending'),
         }), 403
 
     if not request.is_json:

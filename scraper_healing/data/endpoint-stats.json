@@ -12,11 +12,11 @@
     },
     "tiktok": {
       "tt_ytdlp_default": {
-        "success": 2,
+        "success": 3,
         "fail": 0,
-        "last_success": "2026-05-08T21:15:35Z",
+        "last_success": "2026-05-13T09:47:43Z",
         "last_fail": null,
-        "p95_ms": 8168
+        "p95_ms": 9002
       }
     }
   },

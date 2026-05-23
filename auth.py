@@ -31,8 +31,10 @@ class User(UserMixin):
         self.blocked = user_dict.get('blocked', False)
         self.created_at = user_dict.get('created_at')
         # Plan is read in templates (e.g. agency-only feature gates like the
-        # AI video analysis modal). Default to starter if unset.
-        self.plan = user_dict.get('plan', 'starter') or 'starter'
+        # AI video analysis modal). Default to 'pending' if unset so the
+        # paywall fires for any uninitialised row (safer than defaulting to
+        # 'monthly' which would silently grant free access).
+        self.plan = user_dict.get('plan', 'pending') or 'pending'
 
     @property
     def is_admin(self):

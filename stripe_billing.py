@@ -3,30 +3,45 @@ import stripe
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
-# Pricing collapsed on 2026-05-20 to a single offer with two billing
-# cadences (full feature parity, no gated tiers):
-#   - 'pro' = formule mensuelle (29€ TTC/mois)
-#   - 'agency' = formule annuelle (79€ TTC/an, soit ~6,58€/mois)
-# Plan keys are kept as 'pro'/'agency' to avoid migrating the users.plan
-# column; the user-facing names are 'Mensuel' / 'Annuel'. 'starter' is the
-# legacy free tier — no longer sold, but kept as a no-op fallback for any
-# pre-existing rows (and the auth.py default when a user is created before
-# they pick a plan).
+# Single offer, two billing cadences (full feature parity):
+#   - 'monthly' = 29€ TTC/mois, sans engagement
+#   - 'annual'  = 79€ TTC/an  (soit ~6,58€/mois, économie 77%)
+# users.plan column values:
+#   - 'pending'  → signup terminé mais paiement Stripe pas encore confirmé
+#   - 'monthly'  → abonnement mensuel actif
+#   - 'annual'   → abonnement annuel actif
+# Legacy keys ('starter', 'pro', 'agency') are aliased below for back-compat
+# with any pre-existing row, then migrated to the new names.
+_FULL_FEATURES = {
+    'max_accounts': 9999,
+    'max_videos': 999999,
+    'max_projects': 9999,
+    'max_shared_users': 9999,
+    'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
+    'instagram': True,
+    'linkedin': True,
+    'export_csv': True,
+    'import_csv': True,
+    'competitor_access': True,
+    'analytics_full': True,
+    'ai_video_analysis': True,
+    'scrape_cadence_hours': 1,
+}
+
 PLANS = {
-    'starter': {
-        'name': 'Gratuit',
+    'pending': {
+        'name': 'Sans abonnement',
         'price': 0,
         'price_annual': 0,
         'price_id': None,
         'price_id_annual': None,
-        # Legacy free tier: keep the original limits so existing rows
-        # don't suddenly gain unlimited access without paying. Anyone new
-        # is routed to 'pro' or 'agency' on signup.
-        'max_accounts': 1,
-        'max_videos': 999999,
-        'max_projects': 1,
+        # Pending users hit the paywall on /dashboard — keep limits at 0 so
+        # any rogue feature access without a gate also fails closed.
+        'max_accounts': 0,
+        'max_videos': 0,
+        'max_projects': 0,
         'max_shared_users': 0,
-        'platforms': ['tiktok', 'youtube'],
+        'platforms': [],
         'instagram': False,
         'linkedin': False,
         'export_csv': False,
@@ -34,51 +49,33 @@ PLANS = {
         'competitor_access': False,
         'analytics_full': False,
         'ai_video_analysis': False,
-        'scrape_cadence_hours': 6,
+        'scrape_cadence_hours': 24,
     },
-    'pro': {
+    'monthly': {
         'name': 'Mensuel',
         'price': 29,
-        'price_annual': 29,  # legacy field, kept = price for back-compat
+        'price_annual': 29,
         'price_id': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_MONTHLY_PRICE_ID'),
-        # Full feature parity with the annual plan — only difference is
-        # the Stripe billing cadence.
-        'max_accounts': 9999,
-        'max_videos': 999999,
-        'max_projects': 9999,
-        'max_shared_users': 9999,
-        'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
-        'instagram': True,
-        'linkedin': True,
-        'export_csv': True,
-        'import_csv': True,
-        'competitor_access': True,
-        'analytics_full': True,
-        'ai_video_analysis': True,
-        'scrape_cadence_hours': 1,
+        **_FULL_FEATURES,
     },
-    'agency': {
+    'annual': {
         'name': 'Annuel',
         'price': 79,
         'price_annual': 79,
         'price_id': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
         'price_id_annual': os.environ.get('STRIPE_ANNUAL_PRICE_ID'),
-        'max_accounts': 9999,
-        'max_videos': 999999,
-        'max_projects': 9999,
-        'max_shared_users': 9999,
-        'platforms': ['tiktok', 'youtube', 'instagram', 'linkedin'],
-        'instagram': True,
-        'linkedin': True,
-        'export_csv': True,
-        'import_csv': True,
-        'competitor_access': True,
-        'analytics_full': True,
-        'ai_video_analysis': True,
-        'scrape_cadence_hours': 1,
+        **_FULL_FEATURES,
     },
 }
+
+# Back-compat aliases for any legacy row still tagged with old names.
+# These point to the SAME config dict so feature-flag reads return correct
+# values during the transition. Stripe webhook normalises new subs to the
+# canonical 'monthly' / 'annual' keys.
+PLANS['pro']     = PLANS['monthly']
+PLANS['agency']  = PLANS['annual']
+PLANS['starter'] = PLANS['monthly']
 
 
 # Admin role bypasses tier-based scrape throttling. The owner of the SaaS
@@ -97,12 +94,12 @@ def get_scrape_cadence_hours(plan_name, is_admin=False):
     """
     if is_admin:
         return ADMIN_SCRAPE_CADENCE_HOURS
-    plan = PLANS.get(plan_name) or PLANS['starter']
+    plan = PLANS.get(plan_name) or PLANS['monthly']
     return plan.get('scrape_cadence_hours', 6)
 
 
 def get_plan(plan_name):
-    return PLANS.get(plan_name, PLANS['starter'])
+    return PLANS.get(plan_name, PLANS['monthly'])
 
 
 def create_checkout_session(user_email, price_id, success_url, cancel_url, customer_id=None):
@@ -136,7 +133,13 @@ def get_subscription(subscription_id):
 
 
 def get_price_plan(price_id):
-    for plan_name, plan in PLANS.items():
+    # Only consider canonical keys when reverse-looking-up by price_id —
+    # the legacy aliases ('pro', 'agency', 'starter') all point to the same
+    # config dict, so iterating PLANS.items() would return whichever key
+    # came first. Pin to canonical names so new subs always normalise to
+    # 'monthly' or 'annual'.
+    for plan_name in ('monthly', 'annual'):
+        plan = PLANS[plan_name]
         if plan.get('price_id') == price_id or plan.get('price_id_annual') == price_id:
             return plan_name
-    return 'starter'
+    return 'pending'
