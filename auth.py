@@ -192,6 +192,20 @@ def auth_callback():
         signup_intent = request.cookies.get('tl_signup_intent') == '1'
         print(f"[Auth] callback ok email={user_email} is_new={is_new} signup_intent={signup_intent} plan={user_dict.get('plan')}")
 
+        if signup_intent and is_new:
+            # Brand new Google signup: force plan='pending' so /dashboard
+            # redirects to /billing until they pay. Direct UPDATE because
+            # set_user_plan() only accepts paid tiers.
+            try:
+                from database import get_connection, _execute
+                conn = get_connection()
+                _execute(conn, "UPDATE users SET plan = %s WHERE id = %s", ('pending', user_dict['id']))
+                conn.commit()
+                conn.close()
+                user.plan = 'pending'
+            except Exception as e:
+                print(f"[Auth] failed to mark new Google signup as pending: {e}")
+
         if signup_intent and (is_new or user_dict.get('plan') in (None, 'pending', 'starter')):
             resp = redirect(url_for('billing'))
             resp.delete_cookie('tl_signup_intent', path='/')

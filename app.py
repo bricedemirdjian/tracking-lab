@@ -247,6 +247,12 @@ def index():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    # Gate access behind a paid plan. New signups (Google or email/password)
+    # land here with plan='pending' until they complete Stripe checkout —
+    # bounce them to /billing so they can't dodge the paywall by typing the
+    # URL directly. Admins keep access regardless.
+    if current_user.plan == 'pending' and not current_user.is_admin:
+        return redirect(url_for('billing'))
     return render_template("dashboard.html", user=current_user)
 
 
