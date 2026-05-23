@@ -7,21 +7,9 @@
       "config": {
         "maxDuration": 60
       }
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
-    {
-      "src": "/static/css/(.*)",
-      "dest": "/public/css/$1"
-    },
-    {
-      "src": "/static/js/(.*)",
-      "dest": "/public/js/$1"
-    },
     {
       "src": "/(.*)",
       "dest": "/api/index.py"
