@@ -613,7 +613,9 @@ def api_billing_checkout():
         step = "init"
         try:
             step = "retrieve_subscription"
-            existing = stripe.Subscription.retrieve(subscription_id)
+            existing = stripe.Subscription.retrieve(
+                subscription_id, expand=['schedule']
+            )
             if existing.status not in ('active', 'trialing'):
                 raise _ScheduleSkip(f"subscription not active (status={existing.status})")
 
@@ -636,22 +638,48 @@ def api_billing_checkout():
             if not period_end_ts:
                 raise _ScheduleSkip("could not determine current_period_end on subscription")
 
-            step = "check_existing_schedule"
-            existing_schedule_id = existing.get('schedule')
-            if existing_schedule_id:
-                return jsonify({
-                    "scheduled": True,
-                    "already_scheduled": True,
-                    "switch_date": period_end_ts,
-                })
+            # Idempotency: if a schedule is already attached (from a previous
+            # attempt or webhook race), reuse it instead of trying to create
+            # a 2nd one (Stripe rejects that with subscription_schedule_already_exists).
+            # We also fall back to listing schedules by subscription, because
+            # the `schedule` field on Subscription isn't always populated for
+            # schedules created via `from_subscription` on older API versions.
+            step = "find_existing_schedule"
+            existing_schedule = None
+            sched_field = existing.get('schedule')
+            if sched_field:
+                if isinstance(sched_field, dict):
+                    existing_schedule = sched_field
+                else:
+                    existing_schedule = stripe.SubscriptionSchedule.retrieve(sched_field)
+            if not existing_schedule:
+                listed = stripe.SubscriptionSchedule.list(
+                    customer=customer_id, limit=10
+                )
+                for s in listed.get('data', []):
+                    if s.get('subscription') == subscription_id and s.get('status') in ('not_started', 'active'):
+                        existing_schedule = s
+                        break
 
-            # Create a schedule mirroring the current sub, then rewrite the
-            # phases: phase 1 = current price until period_end, phase 2 =
-            # target price for 1 iteration (then renews indefinitely after
-            # release). proration_behavior='none' on both phases is the
-            # safety belt that prevents any mid-period credit/charge.
-            step = "create_schedule_from_subscription"
-            schedule = stripe.SubscriptionSchedule.create(from_subscription=subscription_id)
+            schedule = existing_schedule
+            if schedule is None:
+                # No existing schedule — create one mirroring the current sub.
+                step = "create_schedule_from_subscription"
+                try:
+                    schedule = stripe.SubscriptionSchedule.create(from_subscription=subscription_id)
+                except stripe.error.InvalidRequestError as create_err:
+                    # If Stripe says one already exists, try once more to find it.
+                    msg = str(create_err).lower()
+                    if 'already' in msg or 'schedule' in msg:
+                        listed = stripe.SubscriptionSchedule.list(
+                            customer=customer_id, limit=10
+                        )
+                        for s in listed.get('data', []):
+                            if s.get('subscription') == subscription_id:
+                                schedule = s
+                                break
+                    if schedule is None:
+                        raise
 
             step = "extract_current_phase"
             current_phase = schedule['phases'][0]
