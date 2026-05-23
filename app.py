@@ -707,6 +707,27 @@ def api_billing_checkout():
             if not isinstance(cp_price, str):
                 cp_price = cp_price['id'] if 'id' in cp_price else None
 
+            # Compute phase 2's end_date from the target price's interval.
+            # The user's Stripe API version doesn't accept phases[].iterations
+            # ("Received unknown parameter: phases[iterations]"), so we
+            # have to provide an explicit end timestamp. Approximate seconds
+            # are fine — end_behavior='release' lets the sub renew normally
+            # afterward, so a few hours off from the exact anniversary
+            # doesn't affect billing alignment.
+            step = "retrieve_target_price_interval"
+            target_price = stripe.Price.retrieve(price_id)
+            recurring = target_price['recurring']
+            t_interval = recurring['interval']
+            t_count = recurring['interval_count'] if 'interval_count' in recurring else 1
+            seconds_per_unit = {
+                'day': 24 * 3600,
+                'week': 7 * 24 * 3600,
+                'month': 30 * 24 * 3600,
+                'year': 365 * 24 * 3600,
+            }
+            phase_2_length = seconds_per_unit.get(t_interval, 365 * 24 * 3600) * t_count
+            phase_2_end = current_phase['end_date'] + phase_2_length
+
             step = "modify_schedule_add_phase_2"
             stripe.SubscriptionSchedule.modify(
                 schedule['id'],
@@ -720,7 +741,7 @@ def api_billing_checkout():
                     },
                     {
                         'items': [{'price': price_id, 'quantity': 1}],
-                        'iterations': 1,
+                        'end_date': phase_2_end,
                         'proration_behavior': 'none',
                     },
                 ],
