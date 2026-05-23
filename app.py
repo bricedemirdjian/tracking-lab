@@ -506,10 +506,17 @@ def billing():
                 else:
                     sched = sched_field
                 # Stripe API 2024-09+ moved current_period_end to items[].
-                current_period_end = _stripe_get(
-                    _stripe_get(_stripe_get(stripe_sub, 'items', {}), 'data', [{}])[0],
-                    'current_period_end',
-                ) or _stripe_get(stripe_sub, 'current_period_end')
+                current_period_end = 0
+                try:
+                    if 'items' in stripe_sub:
+                        _items = stripe_sub['items']
+                        _data = _items['data'] if 'data' in _items else []
+                        if _data and 'current_period_end' in _data[0]:
+                            current_period_end = _data[0]['current_period_end']
+                except Exception:
+                    pass
+                if not current_period_end and 'current_period_end' in stripe_sub:
+                    current_period_end = stripe_sub['current_period_end']
                 future_phase = None
                 if current_period_end:
                     for p in _stripe_get(sched, 'phases', []) or []:
@@ -651,13 +658,21 @@ def api_billing_checkout():
             # Stripe API 2024-09+ moved current_period_end from the
             # Subscription level down to items[].current_period_end. Read
             # both locations so we work across versions.
+            # Mirror the webhook handler's pattern (app.py ~820): Stripe
+            # API 2024-09+ moved current_period_end from Subscription down
+            # to items.data[0]. Read both, fall back gracefully.
             step = "extract_period_end"
-            period_end_ts = _stripe_get(
-                _stripe_get(_stripe_get(existing, 'items', {}), 'data', [{}])[0],
-                'current_period_end',
-            )
-            if not period_end_ts:
-                period_end_ts = _stripe_get(existing, 'current_period_end')
+            period_end_ts = 0
+            try:
+                if 'items' in existing:
+                    items_obj = existing['items']
+                    items_data = items_obj['data'] if 'data' in items_obj else []
+                    if items_data and 'current_period_end' in items_data[0]:
+                        period_end_ts = items_data[0]['current_period_end']
+            except Exception as inner_e:
+                print(f"[STRIPE] period_end items extraction failed: {inner_e}")
+            if not period_end_ts and 'current_period_end' in existing:
+                period_end_ts = existing['current_period_end']
             if not period_end_ts:
                 raise _ScheduleSkip("could not determine current_period_end on subscription")
 

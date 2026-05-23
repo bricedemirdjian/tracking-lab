@@ -78,7 +78,13 @@
             transition: all .3s cubic-bezier(.2,0,0,1);
             display: flex; flex-direction: column;
         }
-        .price-card:hover { transform: translateY(-4px); border-color: #ccc; }
+        /* Hover: change shadow/border only — no transform. A translateY on
+           hover creates a "moving target" bug: as the cursor enters the
+           card the card jumps 4-6px up, the CTA at the bottom slides out
+           from under the pointer, and the first click misses. Users had
+           to click twice to activate the CTA. Keeping a richer shadow is
+           enough visual feedback. */
+        .price-card:hover { border-color: #ccc; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
         .price-card.current { border-color: #FF69B4; }
         .price-card.pop {
             background: linear-gradient(180deg, #FF69B4 0%, #f05aa0 100%);
@@ -87,7 +93,7 @@
             z-index: 2;
         }
         .price-card.pop:hover {
-            transform: translateY(-6px); border-color: #FF69B4;
+            border-color: #FF69B4;
             box-shadow: 0 32px 70px rgba(255,105,180,.42), 0 10px 26px rgba(255,105,180,.22);
         }
         .price-card.pop::after {
