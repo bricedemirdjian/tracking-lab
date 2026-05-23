@@ -1952,6 +1952,67 @@ button { font-family: inherit; cursor: pointer; }
   .charts-grid { grid-template-columns: 1fr; }
   .chart-card { min-height: 280px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE SWEEP — phones ≤600px and ≤420px
+   Complements the existing @media (max-width: 900px) sidebar-drawer block
+   above. Targets the patterns the audit flagged: cramped account cards,
+   oversized H1, body overflow, modal padding too generous on small phones.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  /* Account cards: the 4-col mini-KPI footer (followers / vues / likes / engagement)
+     gets unreadable below 380px width. Drop to 2×2 grid. */
+  .account-card-meta { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .account-card-stat-value { font-size: 15px; }
+
+  /* H1 'Bonjour Brice' / 'Dashboard' was 32px on the 900px breakpoint,
+     still pushy on iPhone SE width. Clamp it. */
+  .h-title { font-size: clamp(24px, 7vw, 32px) !important; line-height: 1.1; }
+  .h-eyebrow { font-size: 11px; }
+
+  /* Main content padding tighter for more usable card width. */
+  .main { padding: 64px 12px 60px; }
+
+  /* Section headings inside main. */
+  .section-h2 { font-size: 18px !important; letter-spacing: -0.2px; }
+
+  /* Filter bar pills get tighter padding so 3-4 fit per row. */
+  .filter-bar > * { font-size: 12px; }
+  .filter-bar select, .filter-bar input { padding: 8px 10px; }
+
+  /* Modals: smaller padding so content has room. */
+  .ai-modal { padding: 18px 14px; max-height: 88vh; border-radius: 16px; }
+  .ai-modal-close { width: 32px; height: 32px; top: 10px; right: 10px; }
+}
+
+/* Extra-tight phones (iPhone SE, small Android, ≤420px) */
+@media (max-width: 420px) {
+  /* Even tighter account meta to keep numbers readable. */
+  .account-card-meta { gap: 8px; }
+  .account-card-stat-label { font-size: 9px; }
+  .account-card-stat-value { font-size: 14px; }
+
+  /* Platform picker: 4 buttons in 320px viewport = 80px each minus gap.
+     Logos still fit but the cell shrinks — tighten padding so the button
+     surface stays tappable. */
+  .platform-btn { height: 36px; }
+
+  /* Data-table scrollbar: make the horizontal scroll cue visible so users
+     know they can swipe. Default WebKit is invisible. */
+  .table-wrap::-webkit-scrollbar { height: 6px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .table-wrap { scrollbar-width: thin; }
+
+  /* Chat float button: smaller so it doesn't dominate the small viewport. */
+  .chat-float { width: 48px; height: 48px; bottom: 14px; right: 14px; }
+}
+
+/* Safety net — kill any rogue horizontal overflow caused by extra-wide
+   elements (long titles, oversized SVGs, etc.) that slipped past the
+   per-element fixes above. Desktop unaffected. */
+@media (max-width: 900px) {
+  html, body { overflow-x: hidden; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
