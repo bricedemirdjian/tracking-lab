@@ -656,7 +656,11 @@ def api_billing_create_subscription_intent():
             payment_behavior='default_incomplete',
             payment_settings={
                 'save_default_payment_method': 'on_subscription',
-                'payment_method_types': ['card'],  # 'card' includes Apple Pay & Link via Payment Element
+                # card + link. Apple Pay & Google Pay are wallet buttons
+                # surfaced automatically on top of the card form when the
+                # browser supports them and the Stripe domain verification
+                # is in place.
+                'payment_method_types': ['card', 'link'],
             },
             expand=['latest_invoice.payment_intent'],
             metadata={

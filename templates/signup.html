@@ -379,13 +379,13 @@
                 mode: 'subscription',
                 amount: PLAN_AMOUNTS[getPeriod()],
                 currency: 'eur',
-                // Restrict to card-family only. Apple Pay / Google Pay /
-                // Link are NOT separate payment methods in Stripe — they're
-                // wallets that wrap a card. Specifying 'card' here means
-                // the Element shows: Apple Pay button (Safari/iOS), Google
-                // Pay button (Chrome), card form. Hides Klarna, Amazon Pay,
-                // SEPA, etc. which Stripe activates by default.
-                paymentMethodTypes: ['card'],
+                // Show only card + Link + wallets (Apple Pay, Google Pay).
+                // Hides Klarna, Amazon Pay, SEPA, etc. — these clutter the
+                // form and most converters never use them anyway.
+                // Apple Pay / Google Pay buttons render automatically when
+                // the browser supports them AND the domain is verified
+                // with Stripe (Settings -> Payment methods -> Apple Pay -> Add domain).
+                paymentMethodTypes: ['card', 'link'],
                 appearance: {
                     theme: 'stripe',
                     variables: {
@@ -401,9 +401,7 @@
             });
             paymentElement = elements.create('payment', {
                 layout: { type: 'tabs', defaultCollapsed: false },
-                // Hide the Link autofill prompt for a cleaner look — wallets
-                // are still surfaced via Apple Pay / Google Pay buttons.
-                wallets: { applePay: 'auto', googlePay: 'auto', link: 'never' },
+                wallets: { applePay: 'auto', googlePay: 'auto', link: 'auto' },
             });
             peContainer.innerHTML = '';
             paymentElement.mount('#payment-element');
