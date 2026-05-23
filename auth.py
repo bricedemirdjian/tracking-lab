@@ -219,7 +219,10 @@ def signup_page():
     """Render the signup form. Already-logged-in users skip to dashboard."""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    return render_template('signup.html')
+    return render_template(
+        'signup.html',
+        stripe_pub_key=os.environ.get('STRIPE_PUBLISHABLE_KEY', ''),
+    )
 
 
 @auth_bp.route('/api/signup', methods=['POST'])

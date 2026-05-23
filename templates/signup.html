@@ -296,7 +296,7 @@
             </div>
             <div id="errorBox" class="error"></div>
 
-            <button type="submit" class="cta" id="submitBtn">PAYER ET DEVENIR VIRAL 🚀</button>
+            <button type="submit" class="cta" id="submitBtn">DEVENIR VIRAL</button>
 
             <div class="trust-row">
                 <span>🔒 Paiement sécurisé par Stripe</span>
@@ -310,12 +310,18 @@
     </div>
 
     <script>
-        // ── State ──────────────────────────────────────────────────
-        let stripe = null;
+        // ── Stripe Elements deferred intent flow ───────────────────
+        // Payment Element mounts immediately on page load (no client_secret
+        // needed yet — mode='subscription' + amount + currency). On submit
+        // we validate the form, create the user + Subscription intent on
+        // the server, then confirm payment client-side with the returned
+        // client_secret. One click = full signup + payment.
+        const STRIPE_PUB_KEY = '{{ stripe_pub_key }}';
+        const PLAN_AMOUNTS = { monthly: 2900, annual: 7900 };  // in cents
+
+        const stripe = STRIPE_PUB_KEY ? Stripe(STRIPE_PUB_KEY) : null;
         let elements = null;
-        let userCreated = false;       // /api/signup succeeded
-        let intentReady = false;       // Payment Element mounted
-        let currentClientSecret = null;
+        let paymentElement = null;
 
         const form = document.getElementById('signupForm');
         const submitBtn = document.getElementById('submitBtn');
@@ -333,20 +339,11 @@
             errorBox.textContent = '';
             errorBox.classList.remove('visible');
         }
-
-        // Pre-select plan from query: /signup?period=monthly
-        const params = new URLSearchParams(window.location.search);
-        const periodParam = params.get('period');
-        if (periodParam === 'monthly' || periodParam === 'annual') {
-            const radio = document.querySelector(`input[name="plan_period"][value="${periodParam}"]`);
-            if (radio) radio.checked = true;
-        }
-
-        function getSelectedPeriod() {
+        function getPeriod() {
             return document.querySelector('input[name="plan_period"]:checked')?.value || 'annual';
         }
         function updateSummary() {
-            const period = getSelectedPeriod();
+            const period = getPeriod();
             if (period === 'annual') {
                 summaryPlan.textContent = 'Annuel · 6,58€/mois';
                 summaryPrice.innerHTML = '79€<span>TTC/an</span>';
@@ -355,61 +352,28 @@
                 summaryPrice.innerHTML = '29€<span>TTC/mois</span>';
             }
         }
-        document.querySelectorAll('input[name="plan_period"]').forEach(r =>
-            r.addEventListener('change', () => {
-                updateSummary();
-                // If a payment intent was already created for the old plan,
-                // we'll regenerate it at submit time — flag for reset.
-                if (intentReady) {
-                    intentReady = false;
-                    peContainer.innerHTML = '<div id="payment-element-loading">Plan changé — paiement régénéré au clic.</div>';
-                }
-            })
-        );
+
+        // Pre-select plan from query: /signup?period=monthly|annual
+        const params = new URLSearchParams(window.location.search);
+        const periodParam = params.get('period');
+        if (periodParam === 'monthly' || periodParam === 'annual') {
+            const radio = document.querySelector(`input[name="plan_period"][value="${periodParam}"]`);
+            if (radio) radio.checked = true;
+        }
         updateSummary();
 
-        // ── Step A: validate form + create user + create subscription intent ──
-        async function ensureUserAndIntent() {
-            // 1. Create the user (idempotent server-side — re-signup OK while pending)
-            if (!userCreated) {
-                const payload = {
-                    first_name: document.getElementById('first_name').value.trim(),
-                    last_name: document.getElementById('last_name').value.trim(),
-                    email: document.getElementById('email').value.trim(),
-                    company: document.getElementById('company').value.trim() || null,
-                    password: document.getElementById('password').value,
-                };
-                if (!payload.first_name || !payload.last_name || !payload.email || !payload.password) {
-                    throw new Error('Tous les champs obligatoires doivent être remplis.');
-                }
-                if (payload.password.length < 8) {
-                    throw new Error('Le mot de passe doit faire au moins 8 caractères.');
-                }
-                const r = await fetch('/api/signup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const d = await r.json();
-                if (!r.ok) throw new Error(d.error || 'Inscription impossible.');
-                userCreated = true;
+        // Mount the Payment Element at page load using deferred-intent mode.
+        // Stripe figures out which payment methods to show (Apple Pay, Link,
+        // card, etc.) from the merchant account config + browser support.
+        function mountPaymentElement() {
+            if (!stripe) {
+                peContainer.innerHTML = '<div id="payment-element-loading" style="color:#c11149">Erreur: STRIPE_PUBLISHABLE_KEY non configurée côté serveur.</div>';
+                return;
             }
-
-            // 2. Create the Subscription Intent for the chosen plan
-            const period = getSelectedPeriod();
-            const plan = period === 'annual' ? 'agency' : 'pro';
-            const r = await fetch('/api/billing/create-subscription-intent', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan, period }),
-            });
-            const d = await r.json();
-            if (!r.ok) throw new Error(d.error || 'Impossible de préparer le paiement.');
-
-            // 3. Mount Stripe Elements with the client_secret
-            stripe = Stripe(d.publishable_key);
             elements = stripe.elements({
-                clientSecret: d.client_secret,
+                mode: 'subscription',
+                amount: PLAN_AMOUNTS[getPeriod()],
+                currency: 'eur',
                 appearance: {
                     theme: 'stripe',
                     variables: {
@@ -419,51 +383,104 @@
                         colorDanger: '#c11149',
                         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
                         borderRadius: '10px',
+                        spacingUnit: '4px',
                     },
                 },
             });
-            const paymentElement = elements.create('payment', {
-                layout: { type: 'accordion', defaultCollapsed: false, radios: false, spacedAccordionItems: false },
+            paymentElement = elements.create('payment', {
+                layout: { type: 'tabs', defaultCollapsed: false },
             });
             peContainer.innerHTML = '';
             paymentElement.mount('#payment-element');
-            currentClientSecret = d.client_secret;
-            intentReady = true;
         }
+        mountPaymentElement();
 
+        // When the user toggles plan, update the Element's amount so Stripe
+        // re-renders the correct total (especially important for wallets
+        // like Apple Pay that show the amount in the sheet).
+        document.querySelectorAll('input[name="plan_period"]').forEach(r =>
+            r.addEventListener('change', () => {
+                updateSummary();
+                if (elements) {
+                    elements.update({ amount: PLAN_AMOUNTS[getPeriod()] });
+                }
+            })
+        );
+
+        // ── Single-submit flow: validate → create user + intent → confirm ──
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearError();
-            submitBtn.disabled = true;
             const originalLabel = submitBtn.textContent;
-            submitBtn.textContent = intentReady ? 'Paiement en cours…' : 'Préparation du paiement…';
+
+            // 1. Synchronous form validation.
+            const payload = {
+                first_name: document.getElementById('first_name').value.trim(),
+                last_name: document.getElementById('last_name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                company: document.getElementById('company').value.trim() || null,
+                password: document.getElementById('password').value,
+            };
+            if (!payload.first_name || !payload.last_name || !payload.email || !payload.password) {
+                showError('Tous les champs obligatoires doivent être remplis.');
+                return;
+            }
+            if (payload.password.length < 8) {
+                showError('Le mot de passe doit faire au moins 8 caractères.');
+                return;
+            }
+            if (!elements) {
+                showError('Le formulaire de paiement n\'est pas chargé. Rafraîchissez la page.');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Paiement en cours…';
 
             try {
-                if (!intentReady) {
-                    // First submit: create user + intent + mount Payment Element.
-                    // Don't auto-confirm — let the user fill in card details.
-                    await ensureUserAndIntent();
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalLabel;
-                    peContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    return;
+                // 2. Validate Stripe Payment Element (locks fields, runs
+                //    Stripe-side validation on the card / wallet).
+                const { error: submitError } = await elements.submit();
+                if (submitError) {
+                    throw new Error(submitError.message || 'Carte invalide.');
                 }
 
-                // Second submit (user has filled card details): confirm payment.
-                const { error } = await stripe.confirmPayment({
+                // 3. Create the pending user account.
+                const r1 = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!r1.ok) {
+                    const d = await r1.json();
+                    throw new Error(d.error || 'Inscription impossible.');
+                }
+
+                // 4. Create Stripe Subscription (returns client_secret).
+                const period = getPeriod();
+                const plan = period === 'annual' ? 'agency' : 'pro';
+                const r2 = await fetch('/api/billing/create-subscription-intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan, period }),
+                });
+                const d = await r2.json();
+                if (!r2.ok) throw new Error(d.error || 'Impossible de préparer le paiement.');
+
+                // 5. Confirm the payment with Stripe. Stripe handles the
+                //    redirect to return_url on success — dashboard reads
+                //    ?welcome=1 to show a celebration banner.
+                const { error: confirmError } = await stripe.confirmPayment({
                     elements,
+                    clientSecret: d.client_secret,
                     confirmParams: {
                         return_url: window.location.origin + '/dashboard?welcome=1',
                     },
                 });
-                // If we reach here, there was an immediate validation error — Stripe
-                // doesn't redirect on confirm failures. Render the error to the user.
-                if (error) {
-                    showError(error.message || 'Paiement refusé.');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalLabel;
+                if (confirmError) {
+                    throw new Error(confirmError.message || 'Paiement refusé.');
                 }
-                // Success path: Stripe redirects to return_url with payment_intent params.
+                // Success path: browser is being redirected by Stripe right now.
             } catch (err) {
                 console.error('[signup]', err);
                 showError(err.message || 'Une erreur est survenue.');
