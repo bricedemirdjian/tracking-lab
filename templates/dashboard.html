@@ -2177,7 +2177,7 @@ button { font-family: inherit; cursor: pointer; }
           <input type="text" id="sbNewProjectInput" placeholder="Nouveau projet…" maxlength="60" autocomplete="off">
           <button type="submit" title="Créer">+</button>
         </form>
-        <div class="sb-mgr-section-label">Tes projets</div>
+        <div class="sb-mgr-section-label">Vos projets</div>
         <div id="sbProjectsList" class="sb-mgr-list"></div>
       </div>
     </div>
@@ -2198,7 +2198,7 @@ button { font-family: inherit; cursor: pointer; }
       <div class="h-eyebrow">Tableau de bord</div>
       <h1 class="h-title">
         Bonjour {{ (user.name or user.email.split('@')[0]).split(' ')[0] }},
-        <em class="h-title-line2">voici l'analyse de tes réseaux sociaux.</em>
+        <em class="h-title-line2">voici l'analyse de vos réseaux sociaux.</em>
       </h1>
       <div class="h-subtitle-row">
         <div class="h-subtitle" id="subtitle">Chargement…</div>
@@ -2379,7 +2379,7 @@ button { font-family: inherit; cursor: pointer; }
     </div>
 
     <!-- Audience details -->
-    <h2 class="section-h2">Ton audience en détail</h2>
+    <h2 class="section-h2">Votre audience en détail</h2>
     <p class="section-sub">Comptes nécessitant une mise à jour</p>
     <div class="attention" id="attentionCard" style="display:none">
       <div class="attention-icon">
@@ -2524,8 +2524,8 @@ button { font-family: inherit; cursor: pointer; }
         <div class="advice-card" id="adviceRecipeCard-v" hidden>
           <div class="advice-card-head">
             <span class="advice-card-icon">🧪</span>
-            <h4 class="advice-card-title">La recette de tes hits</h4>
-            <p class="advice-card-sub">Pattern dominant dans tes 25 % meilleures vidéos vs ton catalogue global</p>
+            <h4 class="advice-card-title">La recette de vos hits</h4>
+            <p class="advice-card-sub">Pattern dominant dans vos 25 % meilleures vidéos vs votre catalogue global</p>
           </div>
           <ul class="advice-card-list" id="adviceRecipeList-v"></ul>
         </div>
@@ -2576,7 +2576,7 @@ button { font-family: inherit; cursor: pointer; }
       <div class="advice-group">
         <div class="advice-group-head">
           <h3 class="advice-group-title">Évolution dans le temps</h3>
-          <p class="advice-group-sub">Comment ton audience progresse jour après jour.</p>
+          <p class="advice-group-sub">Comment votre audience progresse jour après jour.</p>
         </div>
         <div class="charts-grid">
 
@@ -2661,7 +2661,7 @@ button { font-family: inherit; cursor: pointer; }
             <div class="chart-card-head">
               <div>
                 <h3 class="chart-card-title">Répartition des followers</h3>
-                <p class="chart-card-sub">Part de chaque plateforme dans ton audience</p>
+                <p class="chart-card-sub">Part de chaque plateforme dans votre audience</p>
               </div>
               <span class="chart-card-badge" id="chartDonutBadge">—</span>
             </div>
@@ -2710,7 +2710,7 @@ button { font-family: inherit; cursor: pointer; }
         <div class="advice-card" id="advicePlatCard" hidden>
           <div class="advice-card-head">
             <span class="advice-card-icon">🎯</span>
-            <h4 class="advice-card-title">Où concentrer tes efforts</h4>
+            <h4 class="advice-card-title">Où concentrer vos efforts</h4>
           </div>
           <ul class="advice-card-list" id="advicePlatList"></ul>
         </div>
@@ -2771,7 +2771,7 @@ button { font-family: inherit; cursor: pointer; }
         <div class="advice-card" id="advicePerfCard" hidden>
           <div class="advice-card-head">
             <span class="advice-card-icon">🏆</span>
-            <h4 class="advice-card-title">Tes patterns gagnants</h4>
+            <h4 class="advice-card-title">Vos patterns gagnants</h4>
           </div>
           <ul class="advice-card-list" id="advicePerfList"></ul>
         </div>
@@ -2797,8 +2797,8 @@ button { font-family: inherit; cursor: pointer; }
         <div class="advice-card" id="adviceRecipeCard" hidden>
           <div class="advice-card-head">
             <span class="advice-card-icon">🧪</span>
-            <h4 class="advice-card-title">La recette de tes hits</h4>
-            <p class="advice-card-sub">Pattern dominant dans tes 25 % meilleures vidéos vs ton catalogue global</p>
+            <h4 class="advice-card-title">La recette de vos hits</h4>
+            <p class="advice-card-sub">Pattern dominant dans vos 25 % meilleures vidéos vs votre catalogue global</p>
           </div>
           <ul class="advice-card-list" id="adviceRecipeList"></ul>
         </div>
@@ -4234,11 +4234,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const pct = (gain / base) * 100;
       if (gain > 0) {
         const flavor = pct >= 5
-          ? 'Trajectoire saine — continue le format actuel.'
+          ? 'Trajectoire saine — continuez le format actuel.'
           : 'Croissance modérée. Tente un changement de hook ou de format pour passer la vitesse supérieure.';
-        tips.push({type:'good', html:`<strong>+${fmt(gain)} followers</strong> sur la période (+${pct.toFixed(1).replace('.',',')} % de ta base). ${flavor}`});
+        tips.push({type:'good', html:`<strong>+${fmt(gain)} followers</strong> sur la période (+${pct.toFixed(1).replace('.',',')} % de votre base). ${flavor}`});
       } else if (gain < 0) {
-        tips.push({type:'warn', html:`<strong>${fmt(gain)} followers</strong> sur la période (${pct.toFixed(1).replace('.',',')} %). Audit : qu'est-ce qui a changé dans tes derniers contenus ? Vérifie tes 3 dernières vidéos.`});
+        tips.push({type:'warn', html:`<strong>${fmt(gain)} followers</strong> sur la période (${pct.toFixed(1).replace('.',',')} %). Audit : qu'est-ce qui a changé dans vos derniers contenus ? Vérifiez vos 3 dernières vidéos.`});
       } else {
         tips.push({type:'', html:`Solde followers stable. <em>Stagnation = signal pour tester un nouveau format ou un nouveau créneau.</em>`});
       }
@@ -4249,10 +4249,10 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     if (er > 0) {
       const t = er >= 3 ? 'good' : er >= 1 ? '' : 'warn';
       const msg = er >= 3
-        ? 'Très sain — ton audience est qualifiée et active.'
+        ? 'Très sain — votre audience est qualifiée et active.'
         : er >= 1
         ? 'Correct pour une audience large. Pour passer ≥ 3 %, parle plus directement à un sous-segment.'
-        : 'Trop bas — soit ton audience est froide (trop large), soit le format ne résonne pas. Tente un sondage en story pour réengager.';
+        : 'Trop bas — soit votre audience est froide (trop large), soit le format ne résonne pas. Tentez un sondage en story pour réengager.';
       tips.push({type:t, html:`Taux d'engagement global : <strong>${er.toFixed(2).replace('.',',')} %</strong>. ${msg}`});
     }
 
@@ -4271,7 +4271,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
         const prev7 = dates.slice(-14, -7).reduce((s,d) => s + byDate[d], 0);
         if (prev7 > 0) {
           const delta = ((last7 - prev7) / prev7) * 100;
-          if (delta >= 15) tips.push({type:'good', html:`Tes <strong>vues quotidiennes accélèrent</strong> (+${delta.toFixed(0)} % vs 7 jours précédents). <em>Capitalise : double la fréquence sur 1-2 semaines.</em>`});
+          if (delta >= 15) tips.push({type:'good', html:`Vos <strong>vues quotidiennes accélèrent</strong> (+${delta.toFixed(0)} % vs 7 jours précédents). <em>Capitalisez : doublez la fréquence sur 1-2 semaines.</em>`});
           else if (delta <= -15) tips.push({type:'warn', html:`Vues quotidiennes en <strong>baisse de ${Math.abs(delta).toFixed(0)} %</strong> sur 7 jours. Souvent signe d'un format saturé — change d'angle ou de hook.`});
         }
       }
@@ -4285,8 +4285,8 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const msg = avg < 1000
         ? 'Sous le seuil viral — travaille les 3 premières secondes et la promesse du titre.'
         : avg < 5000
-        ? 'Bonne base — analyse tes top 20 % pour identifier ce qui scale.'
-        : 'Excellent niveau — réplique le format de tes top performers sur tes autres comptes.';
+        ? 'Bonne base — analysez vos top 20 % pour identifier ce qui scale.'
+        : 'Excellent niveau — répliquez le format de vos top performers sur vos autres comptes.';
       tips.push({type:'', html:`<strong>${fmt(Math.round(avg))} vues/vidéo</strong> en moyenne. ${msg}`});
     }
 
@@ -4331,7 +4331,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const vPct = byPlat[topViews].views / totalViews * 100;
       const fPct = totalFollowers > 0 ? byPlat[topViews].followers / totalFollowers * 100 : 0;
       if (vPct >= 50 && fPct < vPct - 20) {
-        tips.push({type:'warn', html:`<strong>${_PLAT_LBL[topViews]||topViews} = ${vPct.toFixed(0)} % de tes vues</strong> mais seulement ${fPct.toFixed(0)} % de tes followers. Canal fort en découverte, faible en conversion — ajoute un CTA "Suis-moi pour [bénéfice]" en fin de vidéo, ou un teasing vers ton autre plateforme.`});
+        tips.push({type:'warn', html:`<strong>${_PLAT_LBL[topViews]||topViews} = ${vPct.toFixed(0)} % de vos vues</strong> mais seulement ${fPct.toFixed(0)} % de vos followers. Canal fort en découverte, faible en conversion — ajoutez un CTA "Suis-moi pour [bénéfice]" en fin de vidéo, ou un teasing vers votre autre plateforme.`});
       } else if (vPct >= 50) {
         tips.push({type:'good', html:`<strong>${_PLAT_LBL[topViews]||topViews}</strong> domine (${vPct.toFixed(0)} % des vues, ${fPct.toFixed(0)} % des followers). <em>Continue d'y publier en priorité — ratio sain.</em>`});
       }
@@ -4345,7 +4345,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     }).filter(x => x.views >= 100).sort((a,b) => b.er - a.er);
     if (platsER.length >= 2 && platsER[1].er > 0 && platsER[0].er >= platsER[1].er * 1.5) {
       const top = platsER[0];
-      tips.push({type:'good', html:`<strong>${_PLAT_LBL[top.p]||top.p}</strong> a ton meilleur taux d'engagement (${top.er.toFixed(2).replace('.',',')} %, soit ${(top.er / platsER[1].er).toFixed(1)}× ${_PLAT_LBL[platsER[1].p]||platsER[1].p}). Chaque vue y "compte plus" — poste-y tes contenus stratégiques (lancements, sondages, CTAs).`});
+      tips.push({type:'good', html:`<strong>${_PLAT_LBL[top.p]||top.p}</strong> a votre meilleur taux d'engagement (${top.er.toFixed(2).replace('.',',')} %, soit ${(top.er / platsER[1].er).toFixed(1)}× ${_PLAT_LBL[platsER[1].p]||platsER[1].p}). Chaque vue y "compte plus" — postez-y vos contenus stratégiques (lancements, sondages, CTAs).`});
     }
 
     // 3. Dormant platforms (have followers but 0 views in period)
@@ -4353,7 +4353,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     if (dormant.length > 0) {
       const labels = dormant.map(p => _PLAT_LBL[p]||p).join(', ');
       const fSum = dormant.reduce((s,p) => s + byPlat[p].followers, 0);
-      tips.push({type:'warn', html:`<strong>${labels}</strong> : 0 vue sur la période mais ${fmt(fSum)} followers cumulés dorment. Soit tu relances (3 posts/sem), soit tu arrêtes pour ne pas diluer ton attention.`});
+      tips.push({type:'warn', html:`<strong>${labels}</strong> : 0 vue sur la période mais ${fmt(fSum)} followers cumulés dorment. Soit vous relancez (3 posts/sem), soit vous arrêtez pour ne pas diluer votre attention.`});
     }
 
     if (tips.length === 0) { card.hidden = true; return; }
@@ -4376,7 +4376,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
         const others = sorted.slice(1);
         const avgOthers = others.reduce((s,a) => s + (a.total_views||0), 0) / Math.max(others.length, 1);
         if (avgOthers > 0 && top.total_views >= avgOthers * 2.5) {
-          tips.push({type:'good', html:`<strong>Top compte : @${top.account_username}</strong> (${_PLAT_LBL[top.platform]||top.platform}) — ${fmt(top.total_views)} vues, soit ${(top.total_views/avgOthers).toFixed(1)}× la moyenne de tes autres comptes. Analyse ses 3 dernières vidéos et adapte le format ailleurs.`});
+          tips.push({type:'good', html:`<strong>Top compte : @${top.account_username}</strong> (${_PLAT_LBL[top.platform]||top.platform}) — ${fmt(top.total_views)} vues, soit ${(top.total_views/avgOthers).toFixed(1)}× la moyenne de vos autres comptes. Analysez ses 3 dernières vidéos et adaptez le format ailleurs.`});
         }
       }
     }
@@ -4403,7 +4403,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
         const bestAvg = slotArr[0].avg;
         const globalAvg = videos.reduce((s,v) => s + (v.views||0), 0) / videos.length;
         if (bestAvg >= globalAvg * 1.4) {
-          tips.push({type:'good', html:`<strong>Tes meilleurs créneaux</strong> : ${best} — ${(bestAvg/globalAvg).toFixed(1)}× les vues moyennes. Bloque ces fenêtres pour tes contenus phares.`});
+          tips.push({type:'good', html:`<strong>Vos meilleurs créneaux</strong> : ${best} — ${(bestAvg/globalAvg).toFixed(1)}× les vues moyennes. Bloquez ces fenêtres pour vos contenus phares.`});
         }
       }
     }
@@ -4422,9 +4422,9 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
         }
         const pct = videosAt80 / sorted.length * 100;
         if (pct <= 25) {
-          tips.push({type:'', html:`<strong>${pct.toFixed(0)} % de tes vidéos = 80 % de tes vues</strong> (Pareto inversé sain). Tu produis assez pour "spray and pray" — continue la consistance, l'algo récompense la cadence.`});
+          tips.push({type:'', html:`<strong>${pct.toFixed(0)} % de vos vidéos = 80 % de vos vues</strong> (Pareto inversé sain). Vous produisez assez pour "spray and pray" — continuez la consistance, l'algo récompense la cadence.`});
         } else if (pct >= 60) {
-          tips.push({type:'warn', html:`Tes vues sont <strong>très étalées</strong> (${pct.toFixed(0)} % des vidéos = 80 % des vues). Aucun hit clair — analyse ce qui rend tes 5 meilleurs uniques, et amplifie ce levier.`});
+          tips.push({type:'warn', html:`Vos vues sont <strong>très étalées</strong> (${pct.toFixed(0)} % des vidéos = 80 % des vues). Aucun hit clair — analysez ce qui rend vos 5 meilleurs uniques, et amplifiez ce levier.`});
         }
       }
     }
@@ -4653,7 +4653,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 403 && data.upgrade_required) {
-          _aiModalShowError(`<strong>Disponible sur l'offre Entreprises.</strong><br>Ton plan actuel : <em>${escapeHTML(data.current_plan || 'starter')}</em>. <a href="/billing" style="color:var(--accent);font-weight:600">Passer à Entreprises →</a>`);
+          _aiModalShowError(`<strong>Disponible sur l'offre Entreprises.</strong><br>Votre plan actuel : <em>${escapeHTML(data.current_plan || 'starter')}</em>. <a href="/billing" style="color:var(--accent);font-weight:600">Passer à Entreprises →</a>`);
         } else if (res.status === 503) {
           _aiModalShowError(`<strong>AI vision désactivée.</strong><br>${escapeHTML(data.error || '')}<br><br><em style="font-size:12px">${escapeHTML(data.setup_hint || '')}</em>`);
         } else {
@@ -4751,7 +4751,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     topCards.forEach(card => {
       const t = card.querySelector('.advice-card-title');
       const s = card.querySelector('.advice-card-sub');
-      if (t) t.textContent = top.length === 1 ? 'Analyse de ta vidéo' : 'Pourquoi ces vidéos cartonnent';
+      if (t) t.textContent = top.length === 1 ? 'Analyse de votre vidéo' : 'Pourquoi ces vidéos cartonnent';
       if (s) s.textContent = top.length === 1
         ? 'Une seule vidéo sur la période · clic pour la voir'
         : `Top ${top.length} vues sur la période · clic pour voir la vidéo`;
@@ -4786,33 +4786,33 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const topModeDur = _mode(topBuckets);
     const restModeDur = _mode(restBuckets);
     if (topModeDur && topModeDur.share >= 0.5 && (!restModeDur || topModeDur.value !== restModeDur.value)) {
-      tips.push({type:'good', html:`<strong>Durée : ${topModeDur.value}</strong> domine tes hits (${Math.round(topModeDur.share * 100)} %). Ton reste de catalogue est plutôt sur ${restModeDur ? restModeDur.value : 'autre chose'} — privilégie le format ${topModeDur.value} pour les contenus que tu veux pousser.`});
+      tips.push({type:'good', html:`<strong>Durée : ${topModeDur.value}</strong> domine vos hits (${Math.round(topModeDur.share * 100)} %). Votre reste de catalogue est plutôt sur ${restModeDur ? restModeDur.value : 'autre chose'} — privilégiez le format ${topModeDur.value} pour les contenus que vous voulez pousser.`});
     } else if (topModeDur && topModeDur.share >= 0.5) {
-      tips.push({type:'', html:`Tes hits sont majoritairement <strong>${topModeDur.value}</strong> (${Math.round(topModeDur.share * 100)} %). Format cohérent avec le reste de ton catalogue — c'est ta zone de confort, exploite-la.`});
+      tips.push({type:'', html:`Vos hits sont majoritairement <strong>${topModeDur.value}</strong> (${Math.round(topModeDur.share * 100)} %). Format cohérent avec le reste de votre catalogue — c'est votre zone de confort, exploitez-la.`});
     }
 
     // Hashtag pattern
     const topHashMed = topQuart.map(f => f.hashtagCount).sort((a,b) => a-b)[Math.floor(topQuart.length / 2)];
     const restHashMed = restQuart.length ? restQuart.map(f => f.hashtagCount).sort((a,b) => a-b)[Math.floor(restQuart.length / 2)] : 0;
     if (topHashMed >= restHashMed + 2) {
-      tips.push({type:'good', html:`<strong>Hashtags : médiane ${topHashMed} sur tes hits</strong> vs ${restHashMed} sur le reste. L'algo amplifie quand tu cibles précisément — vise ${topHashMed}-${topHashMed + 2} hashtags pertinents par vidéo.`});
+      tips.push({type:'good', html:`<strong>Hashtags : médiane ${topHashMed} sur vos hits</strong> vs ${restHashMed} sur le reste. L'algo amplifie quand vous ciblez précisément — visez ${topHashMed}-${topHashMed + 2} hashtags pertinents par vidéo.`});
     } else if (restHashMed >= topHashMed + 2 && topHashMed <= 2) {
-      tips.push({type:'good', html:`<strong>Tes hits ont moins de hashtags</strong> (médiane ${topHashMed} vs ${restHashMed} ailleurs). Ton audience te trouve sans surcharge SEO — concentre-toi sur 1-2 hashtags signature plutôt que la chasse.`});
+      tips.push({type:'good', html:`<strong>Vos hits ont moins de hashtags</strong> (médiane ${topHashMed} vs ${restHashMed} ailleurs). Votre audience vous trouve sans surcharge SEO — concentrez-vous sur 1-2 hashtags signature plutôt que la chasse.`});
     }
 
     // Posting slot pattern
     if (recipe.bestSlots.length > 0) {
       const slots = recipe.bestSlots.map(s => `<em>${s.dayLbl} ${s.hour}h</em>`).join(' et ');
-      tips.push({type:'good', html:`<strong>Créneau gagnant : ${slots}</strong> — ces slots reviennent dans tes top 25 %. Bloque-les en priorité pour tes vidéos travaillées.`});
+      tips.push({type:'good', html:`<strong>Créneau gagnant : ${slots}</strong> — ces slots reviennent dans vos top 25 %. Bloquez-les en priorité pour vos vidéos travaillées.`});
     }
 
     // Description-length pattern
     const topDescAvg = topQuart.reduce((s, f) => s + f.descLen, 0) / topQuart.length;
     const restDescAvg = restQuart.length ? restQuart.reduce((s, f) => s + f.descLen, 0) / restQuart.length : 0;
     if (topDescAvg + 30 < restDescAvg) {
-      tips.push({type:'good', html:`<strong>Descriptions courtes</strong> chez tes hits (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs). Hook visuel ou intrigue : la vidéo parle d'elle-même.`});
+      tips.push({type:'good', html:`<strong>Descriptions courtes</strong> chez vos hits (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs). Hook visuel ou intrigue : la vidéo parle d'elle-même.`});
     } else if (topDescAvg > restDescAvg + 50) {
-      tips.push({type:'good', html:`Tes hits ont des <strong>descriptions plus longues</strong> (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs) — l'algo lit ce texte pour le ranking, garde le storytelling.`});
+      tips.push({type:'good', html:`Vos hits ont des <strong>descriptions plus longues</strong> (${Math.round(topDescAvg)} chars vs ${Math.round(restDescAvg)} ailleurs) — l'algo lit ce texte pour le ranking, gardez le storytelling.`});
     }
 
     // Engagement-type pattern: what KIND of reactions do hits get?
@@ -4820,10 +4820,10 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const topEngMode = _mode(topEngTypes);
     if (topEngMode && topEngMode.share >= 0.5) {
       const meaning = {
-        'émotion':    'tes hits sont des contenus émotionnels purs (likes dominants) — bon pour audience croissance',
-        'discussion': 'tes hits déclenchent des commentaires — contenus clivants ou questions ouvertes, parfait pour communauté',
-        'viralité':   'tes hits sont partagés — formats "à montrer à un ami", capitalise sur le humor/utility',
-        'référence':  'tes hits sont sauvegardés — contenus à valeur/tutos, utilise-les en lead magnet ou pour conversion',
+        'émotion':    'vos hits sont des contenus émotionnels purs (likes dominants) — bon pour audience croissance',
+        'discussion': 'vos hits déclenchent des commentaires — contenus clivants ou questions ouvertes, parfait pour communauté',
+        'viralité':   'vos hits sont partagés — formats "à montrer à un ami", capitalisez sur le humor/utility',
+        'référence':  'vos hits sont sauvegardés — contenus à valeur/tutos, utilisez-les en lead magnet ou pour conversion',
       }[topEngMode.value] || 'pattern d\'engagement spécifique';
       tips.push({type:'good', html:`<strong>Type dominant : ${topEngMode.value}</strong> (${Math.round(topEngMode.share * 100)} % des hits) — ${meaning}.`});
     }
@@ -5658,8 +5658,8 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const line2 = document.querySelector('.h-title-line2');
     if (line2) {
       line2.textContent = isCompetitorScope
-        ? 'voici l\'analyse de tes concurrents.'
-        : 'voici l\'analyse de tes réseaux sociaux.';
+        ? 'voici l\'analyse de vos concurrents.'
+        : 'voici l\'analyse de vos réseaux sociaux.';
     }
 
     // 3. Update the page eyebrow + section header for clarity
