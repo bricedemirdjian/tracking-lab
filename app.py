@@ -564,6 +564,13 @@ def account():
     )
 
 
+class _ScheduleSkip(Exception):
+    """Raised inside the cadence-switch path when we want to silently fall
+    through to a fresh Checkout Session (sub not active, missing data, etc).
+    Separate from stripe.error.* so we don't accidentally swallow real Stripe
+    errors with the same fallback semantics."""
+
+
 @app.route("/api/billing/checkout", methods=["POST"])
 @login_required
 def api_billing_checkout():
@@ -603,34 +610,39 @@ def api_billing_checkout():
     # the schedule fires phase 2 → Stripe charges 79€ and starts the annual
     # cycle. Net cost over the year: 29 + 79 = 108€. No credits, no prorata.
     if customer_id and subscription_id:
+        step = "init"
         try:
+            step = "retrieve_subscription"
             existing = stripe.Subscription.retrieve(subscription_id)
             if existing.status not in ('active', 'trialing'):
-                # Sub exists in DB but Stripe says it's cancelled/incomplete.
-                # Treat as no sub — fall through to fresh checkout.
-                raise stripe.error.InvalidRequestError(
-                    f"subscription not active (status={existing.status})", None
-                )
+                raise _ScheduleSkip(f"subscription not active (status={existing.status})")
 
+            step = "extract_current_price"
             current_price_id = existing['items']['data'][0]['price']['id']
             if current_price_id == price_id:
                 return jsonify({"error": "Vous êtes déjà sur cette formule."}), 400
 
-            # If a schedule already exists on this sub, the user already
-            # asked for the switch — just report it back idempotently.
+            # Stripe API 2024-09+ moved current_period_end from the
+            # Subscription level down to items[].current_period_end. Read
+            # both locations so we work across versions.
+            step = "extract_period_end"
+            period_end_ts = None
+            try:
+                period_end_ts = existing['items']['data'][0].get('current_period_end')
+            except Exception:
+                pass
+            if not period_end_ts:
+                period_end_ts = existing.get('current_period_end')
+            if not period_end_ts:
+                raise _ScheduleSkip("could not determine current_period_end on subscription")
+
+            step = "check_existing_schedule"
             existing_schedule_id = existing.get('schedule')
             if existing_schedule_id:
-                sched = stripe.SubscriptionSchedule.retrieve(existing_schedule_id)
-                # Find the future phase (the one starting at period_end).
-                future_phase = next(
-                    (p for p in sched['phases'] if p.get('start_date', 0) >= existing.current_period_end),
-                    None,
-                )
                 return jsonify({
                     "scheduled": True,
                     "already_scheduled": True,
-                    "switch_date": existing.current_period_end,
-                    "target_price_id": (future_phase or {}).get('items', [{}])[0].get('price'),
+                    "switch_date": period_end_ts,
                 })
 
             # Create a schedule mirroring the current sub, then rewrite the
@@ -638,26 +650,28 @@ def api_billing_checkout():
             # target price for 1 iteration (then renews indefinitely after
             # release). proration_behavior='none' on both phases is the
             # safety belt that prevents any mid-period credit/charge.
+            step = "create_schedule_from_subscription"
             schedule = stripe.SubscriptionSchedule.create(from_subscription=subscription_id)
+
+            step = "extract_current_phase"
             current_phase = schedule['phases'][0]
+            current_phase_price = current_phase['items'][0]['price']
+            if isinstance(current_phase_price, dict):
+                current_phase_price = current_phase_price.get('id')
+
+            step = "modify_schedule_add_phase"
             stripe.SubscriptionSchedule.modify(
                 schedule.id,
                 end_behavior='release',
                 phases=[
                     {
-                        'items': [{
-                            'price': current_phase['items'][0]['price'],
-                            'quantity': 1,
-                        }],
+                        'items': [{'price': current_phase_price, 'quantity': 1}],
                         'start_date': current_phase['start_date'],
                         'end_date': current_phase['end_date'],
                         'proration_behavior': 'none',
                     },
                     {
-                        'items': [{
-                            'price': price_id,
-                            'quantity': 1,
-                        }],
+                        'items': [{'price': price_id, 'quantity': 1}],
                         'iterations': 1,
                         'proration_behavior': 'none',
                     },
@@ -666,18 +680,23 @@ def api_billing_checkout():
 
             return jsonify({
                 "scheduled": True,
-                "switch_date": existing.current_period_end,
+                "switch_date": period_end_ts,
                 "target_price_id": price_id,
             })
+        except _ScheduleSkip as e:
+            # Expected case: sub not active, no period_end, etc. Fall
+            # through to a fresh Checkout Session (user creates new sub).
+            print(f"[STRIPE] cadence-switch skipped at step={step}: {e}")
         except stripe.error.InvalidRequestError as e:
-            # Sub doesn't exist in Stripe anymore (or is cancelled). Fall
-            # through to a fresh Checkout Session — user creates a new sub.
-            print(f"[STRIPE] cadence-switch path skipped, falling back to checkout: {e}")
+            print(f"[STRIPE] cadence-switch InvalidRequestError at step={step}: {e}")
         except Exception as e:
-            print(f"[STRIPE ERROR] cadence-switch: {e}")
-            # Don't fall through on unknown errors — surface them so we
-            # don't silently double-bill or skip the schedule.
-            return jsonify({"error": str(e)}), 500
+            import traceback
+            tb = traceback.format_exc()
+            print(f"[STRIPE ERROR] cadence-switch failed at step={step}:\n{tb}")
+            return jsonify({
+                "error": f"[{step}] {type(e).__name__}: {str(e) or '(no message)'}",
+                "step": step,
+            }), 500
 
     # Signup path — no active Stripe subscription (or portal flow failed).
     # Create a fresh Checkout Session.

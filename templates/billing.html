@@ -481,18 +481,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function checkout(plan) {
     const period = isAnnual ? 'annual' : 'monthly';
-    const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, period })
-    });
-    const data = await res.json();
+    let res, raw, data;
+    try {
+        res = await fetch('/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan, period })
+        });
+        raw = await res.text();
+        try { data = JSON.parse(raw); } catch (_) { data = { error: raw }; }
+    } catch (netErr) {
+        console.error('[checkout] network error', netErr);
+        alert('Erreur réseau: ' + netErr.message);
+        return;
+    }
+
+    console.log('[checkout] status=' + res.status, data);
 
     // Cadence switch — backend created a Stripe SubscriptionSchedule.
     // No redirect: user stays on their current plan until period_end,
     // then auto-switches. Show an inline confirmation banner and
     // reload so the new badge / disabled buttons reflect reality.
-    if (data.scheduled) {
+    if (data && data.scheduled) {
         const ts = data.switch_date * 1000;
         const dateStr = new Intl.DateTimeFormat('fr-FR', {
             day: '2-digit', month: 'long', year: 'numeric'
@@ -507,8 +517,11 @@ async function checkout(plan) {
         return;
     }
 
-    if (data.url) { window.location.href = data.url; return; }
-    alert(data.error || 'Erreur');
+    if (data && data.url) { window.location.href = data.url; return; }
+
+    const errMsg = (data && data.error) || raw || 'Erreur inconnue';
+    const step = data && data.step ? ` (étape: ${data.step})` : '';
+    alert(`Erreur ${res.status}${step}\n\n${errMsg}\n\nOuvrez la console (F12) pour le détail.`);
 }
 
 function showScheduleConfirmation(targetLabel, targetPrice, dateStr, alreadyNote) {
