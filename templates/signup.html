@@ -270,15 +270,15 @@
                 <label class="plan-opt">
                     <input type="radio" name="plan_period" value="monthly">
                     <div class="plan-opt-name">Mensuel</div>
-                    <div class="plan-opt-price">29€<span>TTC/mois</span></div>
+                    <div class="plan-opt-price">29&nbsp;€<span>TTC/mois</span></div>
                     <div class="plan-opt-sub">Sans engagement</div>
                 </label>
                 <label class="plan-opt">
                     <input type="radio" name="plan_period" value="annual" checked>
-                    <div class="plan-opt-badge">-77%</div>
+                    <div class="plan-opt-badge">Économisez 77&nbsp;%</div>
                     <div class="plan-opt-name">Annuel</div>
-                    <div class="plan-opt-price">6,58€<span>TTC/mois</span></div>
-                    <div class="plan-opt-sub">Soit 79€ TTC/an</div>
+                    <div class="plan-opt-price">6,58&nbsp;€<span>TTC/mois</span></div>
+                    <div class="plan-opt-sub">Soit 79&nbsp;€ TTC/an</div>
                 </label>
             </div>
 
@@ -289,7 +289,7 @@
                     <span class="summary-label">À payer aujourd'hui</span>
                     <span class="summary-plan" id="summaryPlan">Annuel</span>
                 </div>
-                <div class="summary-price" id="summaryPrice">79€<span>TTC/an</span></div>
+                <div class="summary-price" id="summaryPrice">79&nbsp;€<span>TTC/an</span></div>
             </div>
             <div id="payment-element">
                 <div id="payment-element-loading">Chargement du formulaire de paiement…</div>
@@ -350,11 +350,11 @@
         function updateSummary() {
             const period = getPeriod();
             if (period === 'annual') {
-                summaryPlan.textContent = 'Annuel · 6,58€/mois';
-                summaryPrice.innerHTML = '79€<span>TTC/an</span>';
+                summaryPlan.textContent = 'Annuel · 6,58 € TTC/mois';
+                summaryPrice.innerHTML = '79 €<span>TTC/an</span>';
             } else {
                 summaryPlan.textContent = 'Mensuel · sans engagement';
-                summaryPrice.innerHTML = '29€<span>TTC/mois</span>';
+                summaryPrice.innerHTML = '29 €<span>TTC/mois</span>';
             }
         }
 

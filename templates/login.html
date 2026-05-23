@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion · Tracking Lab</title>
-  <link rel="icon" href="/static/favicon.ico">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='10' fill='%23FF69B4'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -157,8 +157,8 @@
 
     <form id="pwLoginForm" class="pw-form" novalidate>
       <div id="pwError" class="pw-error"></div>
-      <input id="pwEmail" name="email" type="email" placeholder="Email" autocomplete="email" required>
-      <input id="pwPassword" name="password" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
+      <input id="pwEmail" name="email" type="email" placeholder="Email" autocomplete="email" required aria-label="Email">
+      <input id="pwPassword" name="password" type="password" placeholder="Mot de passe" autocomplete="current-password" required aria-label="Mot de passe">
       <button type="submit" class="btn-pw" id="pwSubmit">Se connecter</button>
     </form>
 
