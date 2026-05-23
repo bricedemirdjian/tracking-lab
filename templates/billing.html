@@ -261,14 +261,14 @@
 
     <div class="billing-header">
         <h1>Mon abonnement</h1>
-        <p>Gérez votre plan et vos informations de facturation.</p>
+        <p>Gérez votre plan.</p>
     </div>
 
     <!-- Current plan -->
     <div class="current-plan-card">
         <div class="plan-info">
             <div class="plan-badge {{ sub.plan }}">
-                {% if sub.plan == 'pro' %}🚀{% elif sub.plan == 'agency' %}🏢{% else %}⭐{% endif %}
+                {% if sub.plan == 'pro' %}⚡{% elif sub.plan == 'agency' %}🚀{% else %}⭐{% endif %}
                 {{ plan.name }}
             </div>
             <h2>{{ plan.name }}</h2>
