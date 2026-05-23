@@ -97,6 +97,30 @@
             .admin-container { padding: 20px; }
             .adm-header { padding: 14px 20px; }
         }
+
+        /* Tighter phone breakpoint — stack stats, compact header, table scroll. */
+        @media (max-width: 600px) {
+            .admin-stats { grid-template-columns: 1fr; gap: 10px; }
+            .admin-container { padding: 16px; }
+            .adm-header { padding: 12px 14px; gap: 8px; }
+            .adm-header-right { gap: 6px; }
+            .adm-brand-title { font-size: 14px; }
+            .adm-brand-sub { font-size: 10px; }
+            /* Hide the user name on small screens — avatar is enough. */
+            .adm-user-name { display: none; }
+            .adm-user { padding: 4px; }
+            /* Compact btn label so Dashboard + Logout buttons fit. */
+            .adm-btn { padding: 7px 10px; font-size: 12px; }
+            .admin-title { font-size: 20px; }
+            .admin-subtitle { font-size: 12px; margin-bottom: 20px; }
+            /* Table can't be made narrower without losing columns — let it
+               scroll horizontally with a visible scrollbar so users know. */
+            .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .users-table { min-width: 700px; }
+            .table-wrap::-webkit-scrollbar { height: 6px; }
+            .table-wrap::-webkit-scrollbar-thumb { background: var(--admin-border); border-radius: 3px; }
+            html, body { overflow-x: hidden; }
+        }
     </style>
 </head>
 <body>
