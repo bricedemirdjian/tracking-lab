@@ -483,6 +483,53 @@ def _resolve_project_usernames(user_id, project_id):
 
 # ==================== Billing routes ====================
 
+@app.route("/preview/savings-badge")
+def preview_savings_badge():
+    """Standalone preview of 4 'Économisez 77%' badge variants side by side.
+    Used to let the founder pick a design before propagating to /billing
+    and the landing page. No auth — public pricing info only."""
+    return render_template("preview_savings_badge.html")
+
+
+@app.route("/preview/savings-badge/pick")
+def preview_savings_badge_pick():
+    """Records the picked variant in the response so the founder can
+    screenshot/share it back. Logs to stdout for Vercel logs too."""
+    v = (request.args.get('v') or '').upper()
+    label = {
+        'A': "Option A · Blanc + ring (actuel)",
+        'B': "Option B · Gradient rose→orange",
+        'C': "Option C · Blanc + reflet animé",
+        'D': "Option D · XL multi-couleur + glow",
+    }.get(v, f"Option inconnue ({v})")
+    print(f"[savings-badge-preview] founder picked: {v} — {label}")
+    return (
+        f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Choix enregistré · {v}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+        <style>
+            body {{ margin:0; padding:60px 20px; font-family:'Inter',-apple-system,sans-serif; background:#f5f5f7; color:#0d0d0d; text-align:center; }}
+            .box {{ max-width:520px; margin:0 auto; background:#fff; border-radius:24px; padding:48px 32px; box-shadow:0 24px 60px rgba(0,0,0,.08); }}
+            .check {{ width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg,#FF69B4,#f05aa0); display:inline-flex; align-items:center; justify-content:center; margin-bottom:24px; box-shadow:0 12px 28px rgba(255,105,180,.4); }}
+            h1 {{ font-size:24px; font-weight:900; letter-spacing:-.4px; margin:0 0 12px; }}
+            .pick {{ font-size:18px; font-weight:700; color:#FF69B4; margin:0 0 24px; }}
+            p {{ color:#5a5a66; line-height:1.55; margin:0 0 28px; font-size:15px; }}
+            a {{ display:inline-block; background:#0d0d0d; color:#fff; text-decoration:none; padding:14px 24px; border-radius:980px; font-weight:600; font-size:14px; }}
+        </style></head><body>
+        <div class="box">
+            <div class="check"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <h1>Choix enregistré</h1>
+            <div class="pick">{label}</div>
+            <p>Retourne sur ton chat avec Claude et dis-lui : <strong>"je prends l'option {v}"</strong>. Il déploiera la variante sur /billing et la landing.</p>
+            <a href="/preview/savings-badge">← Revoir les variantes</a>
+        </div>
+        </body></html>""",
+        200,
+        {'Content-Type': 'text/html; charset=utf-8'},
+    )
+
+
 @app.route("/billing")
 @login_required
 def billing():
