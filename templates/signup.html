@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Lab · Inscription</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         :root {
             --accent: #FF69B4;
@@ -23,25 +24,24 @@
             color: var(--text);
             margin: 0;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
         .container {
-            max-width: 480px;
-            margin: 40px auto;
-            padding: 0 20px;
+            max-width: 520px;
+            margin: 32px auto;
+            padding: 0 20px 60px;
         }
         .back-link {
             display: inline-flex; align-items: center; gap: 6px;
             color: var(--text-muted);
             text-decoration: none;
             font-size: 14px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             transition: color .15s;
         }
         .back-link:hover { color: var(--text); }
 
         h1 {
-            font-size: 28px;
+            font-size: 30px;
             font-weight: 800;
             letter-spacing: -0.5px;
             margin: 0 0 8px;
@@ -53,56 +53,13 @@
             line-height: 1.5;
         }
 
-        /* ─── Plan selector ─────────────────────────────────────── */
-        .plan-pick {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 24px;
-        }
-        .plan-opt {
-            position: relative;
-            display: block;
-            padding: 16px 14px;
-            border-radius: 14px;
-            border: 1.5px solid var(--border);
-            background: var(--bg-card);
-            cursor: pointer;
-            transition: border-color .15s, box-shadow .15s;
-        }
-        .plan-opt input { position: absolute; opacity: 0; pointer-events: none; }
-        .plan-opt-name {
-            font-size: 11px; font-weight: 800; text-transform: uppercase;
+        .section-title {
+            font-size: 12px; font-weight: 800; text-transform: uppercase;
             letter-spacing: 1.5px; color: var(--text-muted);
-            margin-bottom: 6px;
-        }
-        .plan-opt-price {
-            font-size: 22px; font-weight: 900; letter-spacing: -0.5px;
-            color: var(--text); line-height: 1;
-        }
-        .plan-opt-price span {
-            font-size: 12px; font-weight: 600; color: var(--text-muted);
-            margin-left: 4px;
-        }
-        .plan-opt-sub {
-            font-size: 12px; color: var(--text-muted); margin-top: 4px;
-        }
-        .plan-opt:has(input:checked) {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(255,105,180,.12);
-        }
-        .plan-opt-badge {
-            position: absolute; top: -10px; right: 12px;
-            background: #fff; color: var(--accent);
-            font-size: 10px; font-weight: 900;
-            padding: 4px 10px; border-radius: 980px;
-            letter-spacing: 0.4px;
-            border: 1.5px solid var(--accent);
-            box-shadow: 0 4px 10px rgba(255,105,180,.25);
+            margin: 28px 0 12px;
         }
 
-        /* ─── Form ──────────────────────────────────────────────── */
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        /* ─── Form fields ────────────────────────────────────────── */
         .form-field { margin-bottom: 14px; }
         .form-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
         .form-field label {
@@ -130,6 +87,93 @@
             box-shadow: 0 0 0 4px rgba(255,105,180,.12);
         }
 
+        /* ─── Plan selector ─────────────────────────────────────── */
+        .plan-pick {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .plan-opt {
+            position: relative;
+            display: block;
+            padding: 14px 12px;
+            border-radius: 14px;
+            border: 1.5px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .plan-opt input { position: absolute; opacity: 0; pointer-events: none; }
+        .plan-opt-name {
+            font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1.5px; color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .plan-opt-price {
+            font-size: 20px; font-weight: 900; letter-spacing: -0.5px;
+            color: var(--text); line-height: 1;
+        }
+        .plan-opt-price span {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            margin-left: 3px;
+        }
+        .plan-opt-sub {
+            font-size: 11px; color: var(--text-muted); margin-top: 4px;
+        }
+        .plan-opt:has(input:checked) {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(255,105,180,.12);
+        }
+        .plan-opt-badge {
+            position: absolute; top: -10px; right: 12px;
+            background: #fff; color: var(--accent);
+            font-size: 10px; font-weight: 900;
+            padding: 4px 10px; border-radius: 980px;
+            letter-spacing: 0.4px;
+            border: 1.5px solid var(--accent);
+            box-shadow: 0 4px 10px rgba(255,105,180,.25);
+        }
+
+        /* ─── Stripe Payment Element ─────────────────────────────── */
+        #payment-element {
+            padding: 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            background: #fff;
+            margin-bottom: 14px;
+            min-height: 50px;
+        }
+        #payment-element-loading {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 80px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* ─── Summary line ───────────────────────────────────────── */
+        .summary {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px;
+            background: #fff;
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+        .summary-left {
+            display: flex; flex-direction: column;
+        }
+        .summary-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .summary-plan { font-size: 15px; font-weight: 700; color: var(--text); }
+        .summary-price {
+            font-size: 22px; font-weight: 900; letter-spacing: -0.5px;
+            color: var(--text);
+        }
+        .summary-price span {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            display: block; text-align: right;
+        }
+
         .cta {
             width: 100%;
             padding: 16px;
@@ -148,13 +192,9 @@
         }
         .cta:hover:not(:disabled) {
             transform: translateY(-1px);
-            box-shadow: 0 14px 36px rgba(255,105,180,.45), 0 5px 14px rgba(255,105,180,.2);
             filter: brightness(1.05);
         }
-        .cta:disabled {
-            opacity: 0.6;
-            cursor: progress;
-        }
+        .cta:disabled { opacity: 0.6; cursor: progress; }
 
         .login-link {
             text-align: center;
@@ -163,7 +203,6 @@
             color: var(--text-muted);
         }
         .login-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
-        .login-link a:hover { text-decoration: underline; }
 
         .legal {
             text-align: center;
@@ -184,33 +223,24 @@
             display: none;
         }
         .error.visible { display: block; }
+
+        .trust-row {
+            display: flex; align-items: center; justify-content: center; gap: 14px;
+            margin-top: 12px;
+            font-size: 11px; color: var(--text-muted); font-weight: 500;
+        }
+        .trust-row .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); }
     </style>
 </head>
 <body>
     <div class="container">
         <a href="/" class="back-link">← Retour à l'accueil</a>
         <h1>Créez votre compte</h1>
-        <p class="sub">Quelques infos, votre formule, puis on s'occupe du reste.</p>
+        <p class="sub">Inscription et paiement en une étape — vous restez sur Tracking Lab.</p>
 
         <form id="signupForm" novalidate>
-            <div class="plan-pick">
-                <label class="plan-opt">
-                    <input type="radio" name="plan_period" value="monthly">
-                    <div class="plan-opt-name">Mensuel</div>
-                    <div class="plan-opt-price">29€<span>TTC/mois</span></div>
-                    <div class="plan-opt-sub">Sans engagement</div>
-                </label>
-                <label class="plan-opt">
-                    <input type="radio" name="plan_period" value="annual" checked>
-                    <div class="plan-opt-badge">-77%</div>
-                    <div class="plan-opt-name">Annuel</div>
-                    <div class="plan-opt-price">6,58€<span>TTC/mois</span></div>
-                    <div class="plan-opt-sub">Soit 79€ TTC/an</div>
-                </label>
-            </div>
-
-            <div id="errorBox" class="error"></div>
-
+            <!-- 1. Vos infos -->
+            <div class="section-title">1 · Vos infos</div>
             <div class="form-field-row">
                 <div class="form-field">
                     <label for="first_name">Prénom</label>
@@ -234,7 +264,45 @@
                 <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
             </div>
 
-            <button type="submit" class="cta" id="submitBtn">JE SUIS PRÊT 🔥</button>
+            <!-- 2. Forfait -->
+            <div class="section-title">2 · Choisissez votre forfait</div>
+            <div class="plan-pick">
+                <label class="plan-opt">
+                    <input type="radio" name="plan_period" value="monthly">
+                    <div class="plan-opt-name">Mensuel</div>
+                    <div class="plan-opt-price">29€<span>TTC/mois</span></div>
+                    <div class="plan-opt-sub">Sans engagement</div>
+                </label>
+                <label class="plan-opt">
+                    <input type="radio" name="plan_period" value="annual" checked>
+                    <div class="plan-opt-badge">-77%</div>
+                    <div class="plan-opt-name">Annuel</div>
+                    <div class="plan-opt-price">6,58€<span>TTC/mois</span></div>
+                    <div class="plan-opt-sub">Soit 79€ TTC/an</div>
+                </label>
+            </div>
+
+            <!-- 3. Paiement -->
+            <div class="section-title">3 · Paiement sécurisé</div>
+            <div class="summary">
+                <div class="summary-left">
+                    <span class="summary-label">À payer aujourd'hui</span>
+                    <span class="summary-plan" id="summaryPlan">Annuel</span>
+                </div>
+                <div class="summary-price" id="summaryPrice">79€<span>TTC/an</span></div>
+            </div>
+            <div id="payment-element">
+                <div id="payment-element-loading">Chargement du formulaire de paiement…</div>
+            </div>
+            <div id="errorBox" class="error"></div>
+
+            <button type="submit" class="cta" id="submitBtn">PAYER ET DEVENIR VIRAL 🚀</button>
+
+            <div class="trust-row">
+                <span>🔒 Paiement sécurisé par Stripe</span>
+                <span class="dot"></span>
+                <span>Annulable à tout moment</span>
+            </div>
 
             <p class="legal">En vous inscrivant, vous acceptez les <a href="/cgv" style="color:var(--text-muted);text-decoration:underline">CGV</a> et notre <a href="/confidentialite" style="color:var(--text-muted);text-decoration:underline">politique de confidentialité</a>.</p>
             <p class="login-link">Déjà un compte ? <a href="/login">Se connecter</a></p>
@@ -242,17 +310,19 @@
     </div>
 
     <script>
-        // Pre-select plan from query params if present: /signup?period=monthly
-        const params = new URLSearchParams(window.location.search);
-        const periodParam = params.get('period');
-        if (periodParam === 'monthly' || periodParam === 'annual') {
-            const radio = document.querySelector(`input[name="plan_period"][value="${periodParam}"]`);
-            if (radio) radio.checked = true;
-        }
+        // ── State ──────────────────────────────────────────────────
+        let stripe = null;
+        let elements = null;
+        let userCreated = false;       // /api/signup succeeded
+        let intentReady = false;       // Payment Element mounted
+        let currentClientSecret = null;
 
         const form = document.getElementById('signupForm');
         const submitBtn = document.getElementById('submitBtn');
         const errorBox = document.getElementById('errorBox');
+        const summaryPlan = document.getElementById('summaryPlan');
+        const summaryPrice = document.getElementById('summaryPrice');
+        const peContainer = document.getElementById('payment-element');
 
         function showError(msg) {
             errorBox.textContent = msg;
@@ -264,68 +334,139 @@
             errorBox.classList.remove('visible');
         }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            clearError();
+        // Pre-select plan from query: /signup?period=monthly
+        const params = new URLSearchParams(window.location.search);
+        const periodParam = params.get('period');
+        if (periodParam === 'monthly' || periodParam === 'annual') {
+            const radio = document.querySelector(`input[name="plan_period"][value="${periodParam}"]`);
+            if (radio) radio.checked = true;
+        }
 
-            const period = document.querySelector('input[name="plan_period"]:checked')?.value || 'annual';
-            // Plan key: 'pro' = monthly cadence, 'agency' = annual cadence (legacy DB labels)
-            const plan = period === 'annual' ? 'agency' : 'pro';
-            const payload = {
-                first_name: document.getElementById('first_name').value.trim(),
-                last_name: document.getElementById('last_name').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                company: document.getElementById('company').value.trim() || null,
-                password: document.getElementById('password').value,
-                plan,
-                period,
-            };
-
-            if (!payload.first_name || !payload.last_name || !payload.email || !payload.password) {
-                showError('Tous les champs obligatoires doivent être remplis.');
-                return;
+        function getSelectedPeriod() {
+            return document.querySelector('input[name="plan_period"]:checked')?.value || 'annual';
+        }
+        function updateSummary() {
+            const period = getSelectedPeriod();
+            if (period === 'annual') {
+                summaryPlan.textContent = 'Annuel · 6,58€/mois';
+                summaryPrice.innerHTML = '79€<span>TTC/an</span>';
+            } else {
+                summaryPlan.textContent = 'Mensuel · sans engagement';
+                summaryPrice.innerHTML = '29€<span>TTC/mois</span>';
             }
-            if (payload.password.length < 8) {
-                showError('Le mot de passe doit faire au moins 8 caractères.');
-                return;
-            }
+        }
+        document.querySelectorAll('input[name="plan_period"]').forEach(r =>
+            r.addEventListener('change', () => {
+                updateSummary();
+                // If a payment intent was already created for the old plan,
+                // we'll regenerate it at submit time — flag for reset.
+                if (intentReady) {
+                    intentReady = false;
+                    peContainer.innerHTML = '<div id="payment-element-loading">Plan changé — paiement régénéré au clic.</div>';
+                }
+            })
+        );
+        updateSummary();
 
-            submitBtn.disabled = true;
-            const originalLabel = submitBtn.textContent;
-            submitBtn.textContent = 'Création du compte…';
-
-            try {
-                // Step 1 — create the pending user + log them in.
-                const signupRes = await fetch('/api/signup', {
+        // ── Step A: validate form + create user + create subscription intent ──
+        async function ensureUserAndIntent() {
+            // 1. Create the user (idempotent server-side — re-signup OK while pending)
+            if (!userCreated) {
+                const payload = {
+                    first_name: document.getElementById('first_name').value.trim(),
+                    last_name: document.getElementById('last_name').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    company: document.getElementById('company').value.trim() || null,
+                    password: document.getElementById('password').value,
+                };
+                if (!payload.first_name || !payload.last_name || !payload.email || !payload.password) {
+                    throw new Error('Tous les champs obligatoires doivent être remplis.');
+                }
+                if (payload.password.length < 8) {
+                    throw new Error('Le mot de passe doit faire au moins 8 caractères.');
+                }
+                const r = await fetch('/api/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
-                const signupData = await signupRes.json();
-                if (!signupRes.ok) {
-                    showError(signupData.error || 'Inscription impossible.');
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error || 'Inscription impossible.');
+                userCreated = true;
+            }
+
+            // 2. Create the Subscription Intent for the chosen plan
+            const period = getSelectedPeriod();
+            const plan = period === 'annual' ? 'agency' : 'pro';
+            const r = await fetch('/api/billing/create-subscription-intent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan, period }),
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'Impossible de préparer le paiement.');
+
+            // 3. Mount Stripe Elements with the client_secret
+            stripe = Stripe(d.publishable_key);
+            elements = stripe.elements({
+                clientSecret: d.client_secret,
+                appearance: {
+                    theme: 'stripe',
+                    variables: {
+                        colorPrimary: '#FF69B4',
+                        colorBackground: '#ffffff',
+                        colorText: '#0d0d0d',
+                        colorDanger: '#c11149',
+                        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                        borderRadius: '10px',
+                    },
+                },
+            });
+            const paymentElement = elements.create('payment', {
+                layout: { type: 'accordion', defaultCollapsed: false, radios: false, spacedAccordionItems: false },
+            });
+            peContainer.innerHTML = '';
+            paymentElement.mount('#payment-element');
+            currentClientSecret = d.client_secret;
+            intentReady = true;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError();
+            submitBtn.disabled = true;
+            const originalLabel = submitBtn.textContent;
+            submitBtn.textContent = intentReady ? 'Paiement en cours…' : 'Préparation du paiement…';
+
+            try {
+                if (!intentReady) {
+                    // First submit: create user + intent + mount Payment Element.
+                    // Don't auto-confirm — let the user fill in card details.
+                    await ensureUserAndIntent();
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalLabel;
+                    peContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     return;
                 }
 
-                // Step 2 — kick off Stripe Checkout immediately.
-                submitBtn.textContent = 'Redirection vers le paiement…';
-                const checkoutRes = await fetch('/api/billing/checkout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plan: payload.plan, period: payload.period }),
+                // Second submit (user has filled card details): confirm payment.
+                const { error } = await stripe.confirmPayment({
+                    elements,
+                    confirmParams: {
+                        return_url: window.location.origin + '/dashboard?welcome=1',
+                    },
                 });
-                const checkoutData = await checkoutRes.json();
-                if (checkoutData.url) {
-                    window.location.href = checkoutData.url;
-                    return;
+                // If we reach here, there was an immediate validation error — Stripe
+                // doesn't redirect on confirm failures. Render the error to the user.
+                if (error) {
+                    showError(error.message || 'Paiement refusé.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalLabel;
                 }
-                showError(checkoutData.error || 'Impossible de lancer le paiement. Vous êtes connecté — retentez depuis la facturation.');
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalLabel;
+                // Success path: Stripe redirects to return_url with payment_intent params.
             } catch (err) {
-                showError('Erreur réseau : ' + (err.message || 'réessayez.'));
+                console.error('[signup]', err);
+                showError(err.message || 'Une erreur est survenue.');
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalLabel;
             }

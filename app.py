@@ -602,6 +602,93 @@ def _stripe_get(obj, key, default=None):
         return default
 
 
+@app.route("/api/billing/create-subscription-intent", methods=["POST"])
+@login_required
+def api_billing_create_subscription_intent():
+    """Inline-payment endpoint used by /signup with Stripe Elements.
+
+    Creates a Stripe Customer (or reuses one if the user already has one),
+    then creates a Subscription with payment_behavior='default_incomplete'.
+    Stripe returns the latest_invoice.payment_intent.client_secret which
+    the frontend uses to confirm the payment via stripe.confirmPayment().
+
+    No redirect to Checkout — the entire payment UI lives on /signup via
+    Stripe Payment Element (card + Apple Pay + Link auto-detected).
+    """
+    body = request.json or {}
+    plan_name = body.get("plan")
+    period = body.get("period", "annual")
+    if plan_name not in ('pro', 'agency'):
+        return jsonify({"error": "Plan invalide"}), 400
+    if period not in ('monthly', 'annual'):
+        return jsonify({"error": "Période invalide"}), 400
+    plan_cfg = PLANS[plan_name]
+    price_id = plan_cfg.get('price_id_annual') if period == 'annual' else plan_cfg.get('price_id')
+    if not price_id:
+        price_id = plan_cfg.get('price_id') or plan_cfg.get('price_id_annual')
+    if not price_id:
+        return jsonify({"error": "Prix non configuré"}), 500
+
+    sub = get_user_subscription(current_user.id)
+    customer_id = sub.get('stripe_customer_id')
+
+    try:
+        # 1. Get or create the Stripe Customer.
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.name or current_user.email,
+                metadata={'tl_user_id': str(current_user.id)},
+            )
+            customer_id = customer.id
+            # Persist so subsequent retries reuse the same customer.
+            from database import upsert_subscription
+            upsert_subscription(
+                current_user.id, 'pending', 'incomplete',
+                stripe_customer_id=customer_id,
+            )
+
+        # 2. Create the Subscription with default_incomplete so we get a
+        # PaymentIntent client_secret to confirm client-side.
+        subscription = stripe.Subscription.create(
+            customer=customer_id,
+            items=[{'price': price_id}],
+            payment_behavior='default_incomplete',
+            payment_settings={
+                'save_default_payment_method': 'on_subscription',
+                'payment_method_types': ['card'],  # 'card' includes Apple Pay & Link via Payment Element
+            },
+            expand=['latest_invoice.payment_intent'],
+            metadata={
+                'tl_user_id': str(current_user.id),
+                'tl_plan': plan_name,
+                'tl_period': period,
+            },
+        )
+
+        invoice = subscription['latest_invoice']
+        if isinstance(invoice, str):
+            return jsonify({"error": "Payment intent not expanded"}), 500
+        payment_intent = invoice['payment_intent'] if 'payment_intent' in invoice else None
+        if not payment_intent or isinstance(payment_intent, str):
+            return jsonify({"error": "Payment intent missing"}), 500
+
+        return jsonify({
+            "client_secret": payment_intent['client_secret'],
+            "subscription_id": subscription['id'],
+            "customer_id": customer_id,
+            "publishable_key": os.environ.get('STRIPE_PUBLISHABLE_KEY'),
+        })
+    except stripe.error.StripeError as e:
+        print(f"[STRIPE] create-subscription-intent failed: {e}")
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[STRIPE ERROR] create-subscription-intent: {e}")
+        return jsonify({"error": str(e) or "Erreur interne"}), 500
+
+
 @app.route("/api/billing/checkout", methods=["POST"])
 @login_required
 def api_billing_checkout():
