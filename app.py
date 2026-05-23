@@ -497,21 +497,31 @@ def billing():
     sub_id = sub.get('stripe_subscription_id')
     if sub_id:
         try:
-            stripe_sub = stripe.Subscription.retrieve(sub_id)
-            sched_id = stripe_sub.get('schedule')
-            if sched_id and stripe_sub.status in ('active', 'trialing'):
-                sched = stripe.SubscriptionSchedule.retrieve(sched_id)
-                current_period_end = stripe_sub.current_period_end
-                future_phase = next(
-                    (p for p in sched['phases']
-                     if p.get('start_date', 0) >= current_period_end),
-                    None,
-                )
-                if future_phase:
-                    target_price = future_phase['items'][0]['price']
-                    if isinstance(target_price, dict):
-                        target_price = target_price.get('id')
-                    target_plan = get_price_plan(target_price)
+            stripe_sub = stripe.Subscription.retrieve(sub_id, expand=['schedule'])
+            sched_field = _stripe_get(stripe_sub, 'schedule')
+            sub_status = _stripe_get(stripe_sub, 'status')
+            if sched_field and sub_status in ('active', 'trialing'):
+                if isinstance(sched_field, str):
+                    sched = stripe.SubscriptionSchedule.retrieve(sched_field)
+                else:
+                    sched = sched_field
+                # Stripe API 2024-09+ moved current_period_end to items[].
+                current_period_end = _stripe_get(
+                    _stripe_get(_stripe_get(stripe_sub, 'items', {}), 'data', [{}])[0],
+                    'current_period_end',
+                ) or _stripe_get(stripe_sub, 'current_period_end')
+                future_phase = None
+                if current_period_end:
+                    for p in _stripe_get(sched, 'phases', []) or []:
+                        if (_stripe_get(p, 'start_date') or 0) >= current_period_end:
+                            future_phase = p
+                            break
+                if future_phase and current_period_end:
+                    items = _stripe_get(future_phase, 'items', []) or []
+                    target_price = _stripe_get(items[0] if items else {}, 'price') if items else None
+                    if target_price and not isinstance(target_price, str):
+                        target_price = _stripe_get(target_price, 'id')
+                    target_plan = get_price_plan(target_price) if target_price else 'starter'
                     from datetime import datetime
                     months_fr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
                                  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
@@ -571,6 +581,20 @@ class _ScheduleSkip(Exception):
     errors with the same fallback semantics."""
 
 
+def _stripe_get(obj, key, default=None):
+    """Safe accessor for Stripe SDK objects.
+
+    Modern stripe-python returns typed resources that don't expose dict.get(),
+    so `obj.get('x')` raises AttributeError. This helper uses bracket access
+    + `in` membership check, which both StripeObject (dict subclass) and the
+    newer typed resources support.
+    """
+    try:
+        return obj[key] if key in obj else default
+    except Exception:
+        return default
+
+
 @app.route("/api/billing/checkout", methods=["POST"])
 @login_required
 def api_billing_checkout():
@@ -628,13 +652,12 @@ def api_billing_checkout():
             # Subscription level down to items[].current_period_end. Read
             # both locations so we work across versions.
             step = "extract_period_end"
-            period_end_ts = None
-            try:
-                period_end_ts = existing['items']['data'][0].get('current_period_end')
-            except Exception:
-                pass
+            period_end_ts = _stripe_get(
+                _stripe_get(_stripe_get(existing, 'items', {}), 'data', [{}])[0],
+                'current_period_end',
+            )
             if not period_end_ts:
-                period_end_ts = existing.get('current_period_end')
+                period_end_ts = _stripe_get(existing, 'current_period_end')
             if not period_end_ts:
                 raise _ScheduleSkip("could not determine current_period_end on subscription")
 
@@ -646,7 +669,7 @@ def api_billing_checkout():
             # schedules created via `from_subscription` on older API versions.
             step = "find_existing_schedule"
             existing_schedule = None
-            sched_field = existing.get('schedule')
+            sched_field = _stripe_get(existing, 'schedule')
             if sched_field:
                 if isinstance(sched_field, dict):
                     existing_schedule = sched_field
@@ -656,8 +679,8 @@ def api_billing_checkout():
                 listed = stripe.SubscriptionSchedule.list(
                     customer=customer_id, limit=10
                 )
-                for s in listed.get('data', []):
-                    if s.get('subscription') == subscription_id and s.get('status') in ('not_started', 'active'):
+                for s in _stripe_get(listed, 'data', []):
+                    if _stripe_get(s, 'subscription') == subscription_id and _stripe_get(s, 'status') in ('not_started', 'active'):
                         existing_schedule = s
                         break
 
@@ -674,8 +697,8 @@ def api_billing_checkout():
                         listed = stripe.SubscriptionSchedule.list(
                             customer=customer_id, limit=10
                         )
-                        for s in listed.get('data', []):
-                            if s.get('subscription') == subscription_id:
+                        for s in _stripe_get(listed, 'data', []):
+                            if _stripe_get(s, 'subscription') == subscription_id:
                                 schedule = s
                                 break
                     if schedule is None:
@@ -684,8 +707,9 @@ def api_billing_checkout():
             step = "extract_current_phase"
             current_phase = schedule['phases'][0]
             current_phase_price = current_phase['items'][0]['price']
-            if isinstance(current_phase_price, dict):
-                current_phase_price = current_phase_price.get('id')
+            if not isinstance(current_phase_price, str):
+                # Expanded price object — pull the ID safely.
+                current_phase_price = _stripe_get(current_phase_price, 'id')
 
             step = "modify_schedule_add_phase"
             stripe.SubscriptionSchedule.modify(
