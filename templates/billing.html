@@ -485,8 +485,20 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePricingDisplay();
 });
 
-async function checkout(plan) {
+async function checkout(plan, btn) {
     const period = isAnnual ? 'annual' : 'monthly';
+
+    // Instant loading state — Stripe API roundtrips take ~500-1500ms and
+    // without feedback the user re-clicks (which doesn't double-submit
+    // thanks to the disable, but still feels broken).
+    const trigger = btn || (event && event.currentTarget);
+    const originalLabel = trigger ? trigger.textContent : '';
+    if (trigger) {
+        trigger.disabled = true;
+        trigger.textContent = 'Patientez…';
+        trigger.style.cursor = 'progress';
+    }
+
     let res, raw, data;
     try {
         res = await fetch('/api/billing/checkout', {
@@ -499,6 +511,7 @@ async function checkout(plan) {
     } catch (netErr) {
         console.error('[checkout] network error', netErr);
         alert('Erreur réseau: ' + netErr.message);
+        if (trigger) { trigger.disabled = false; trigger.textContent = originalLabel; trigger.style.cursor = ''; }
         return;
     }
 
@@ -528,6 +541,7 @@ async function checkout(plan) {
     const errMsg = (data && data.error) || raw || 'Erreur inconnue';
     const step = data && data.step ? ` (étape: ${data.step})` : '';
     alert(`Erreur ${res.status}${step}\n\n${errMsg}\n\nOuvrez la console (F12) pour le détail.`);
+    if (trigger) { trigger.disabled = false; trigger.textContent = originalLabel; trigger.style.cursor = ''; }
 }
 
 function showScheduleConfirmation(targetLabel, targetPrice, dateStr, alreadyNote) {

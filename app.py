@@ -630,16 +630,23 @@ def api_billing_checkout():
     cancel_url = f"{base_url}/billing?cancelled=1"
 
     # Cadence-switch path — user already has an active Stripe subscription
-    # and is switching between monthly ↔ annual. We do NOT proration-switch
-    # immediately (Stripe Portal's default behavior): instead we create a
-    # SubscriptionSchedule that keeps the user on their current price until
-    # the end of the period they've already paid for, then auto-transitions
-    # to the new price at the next renewal.
+    # and is switching between monthly ↔ annual. We do NOT prorate or
+    # double-charge: modify the existing subscription with
+    # proration_behavior='none' + billing_cycle_anchor='unchanged'. Stripe
+    # applies the new price but defers the next invoice to the existing
+    # period_end. User finishes the period they've already paid for, then
+    # auto-renews at the new cadence at period_end.
     #
-    # Concrete example: user paid 29€ on day 1, clicks "Annuel" on day 10.
-    # They keep their monthly sub until day 30, no extra debit. On day 30
-    # the schedule fires phase 2 → Stripe charges 79€ and starts the annual
-    # cycle. Net cost over the year: 29 + 79 = 108€. No credits, no prorata.
+    # Concrete: user paid 29€ on day 1, clicks "Annuel" on day 10. Stripe
+    # keeps period_end at day 30. On day 30, Stripe bills 79€ at the new
+    # annual price and the period rolls forward by 1 year. Net cost over
+    # the year: 29 + 79 = 108€. No proration, no credit.
+    #
+    # Earlier iteration used SubscriptionSchedule (cleaner in theory) but
+    # required 5+ API calls per click, hit "schedule_already_exists" on
+    # retry, and exposed data-shape inconsistencies across Stripe API
+    # versions. Subscription.modify is the battle-tested primitive and
+    # completes in 2 API calls (retrieve + modify).
     if customer_id and subscription_id:
         step = "init"
         try:
@@ -647,102 +654,51 @@ def api_billing_checkout():
             existing = stripe.Subscription.retrieve(
                 subscription_id, expand=['schedule']
             )
-            if existing.status not in ('active', 'trialing'):
-                raise _ScheduleSkip(f"subscription not active (status={existing.status})")
+            sub_status = existing['status'] if 'status' in existing else None
+            if sub_status not in ('active', 'trialing'):
+                raise _ScheduleSkip(f"subscription not active (status={sub_status})")
 
-            step = "extract_current_price"
-            current_price_id = existing['items']['data'][0]['price']['id']
+            step = "extract_subscription_item"
+            items_data = []
+            if 'items' in existing:
+                items_obj = existing['items']
+                if 'data' in items_obj:
+                    items_data = items_obj['data']
+            if not items_data:
+                raise _ScheduleSkip("subscription has no items")
+            item_id = items_data[0]['id']
+            current_price_id = items_data[0]['price']['id']
             if current_price_id == price_id:
                 return jsonify({"error": "Vous êtes déjà sur cette formule."}), 400
 
-            # Stripe API 2024-09+ moved current_period_end from the
-            # Subscription level down to items[].current_period_end. Read
-            # both locations so we work across versions.
-            # Mirror the webhook handler's pattern (app.py ~820): Stripe
-            # API 2024-09+ moved current_period_end from Subscription down
-            # to items.data[0]. Read both, fall back gracefully.
+            # Read period_end for the success modal (Stripe API 2024-09+
+            # moved it under items[]; older versions kept it top-level).
             step = "extract_period_end"
             period_end_ts = 0
-            try:
-                if 'items' in existing:
-                    items_obj = existing['items']
-                    items_data = items_obj['data'] if 'data' in items_obj else []
-                    if items_data and 'current_period_end' in items_data[0]:
-                        period_end_ts = items_data[0]['current_period_end']
-            except Exception as inner_e:
-                print(f"[STRIPE] period_end items extraction failed: {inner_e}")
+            if 'current_period_end' in items_data[0]:
+                period_end_ts = items_data[0]['current_period_end']
             if not period_end_ts and 'current_period_end' in existing:
                 period_end_ts = existing['current_period_end']
-            if not period_end_ts:
-                raise _ScheduleSkip("could not determine current_period_end on subscription")
 
-            # Idempotency: if a schedule is already attached (from a previous
-            # attempt or webhook race), reuse it instead of trying to create
-            # a 2nd one (Stripe rejects that with subscription_schedule_already_exists).
-            # We also fall back to listing schedules by subscription, because
-            # the `schedule` field on Subscription isn't always populated for
-            # schedules created via `from_subscription` on older API versions.
-            step = "find_existing_schedule"
-            existing_schedule = None
-            sched_field = _stripe_get(existing, 'schedule')
+            # If a SubscriptionSchedule is still attached from earlier
+            # failed attempts, release it — schedule-controlled subs
+            # reject direct modify() calls. release() unhooks the schedule
+            # without touching the subscription.
+            step = "release_orphan_schedule"
+            sched_field = existing['schedule'] if 'schedule' in existing else None
             if sched_field:
-                if isinstance(sched_field, dict):
-                    existing_schedule = sched_field
-                else:
-                    existing_schedule = stripe.SubscriptionSchedule.retrieve(sched_field)
-            if not existing_schedule:
-                listed = stripe.SubscriptionSchedule.list(
-                    customer=customer_id, limit=10
-                )
-                for s in _stripe_get(listed, 'data', []):
-                    if _stripe_get(s, 'subscription') == subscription_id and _stripe_get(s, 'status') in ('not_started', 'active'):
-                        existing_schedule = s
-                        break
-
-            schedule = existing_schedule
-            if schedule is None:
-                # No existing schedule — create one mirroring the current sub.
-                step = "create_schedule_from_subscription"
+                sched_id = sched_field if isinstance(sched_field, str) else sched_field['id']
                 try:
-                    schedule = stripe.SubscriptionSchedule.create(from_subscription=subscription_id)
-                except stripe.error.InvalidRequestError as create_err:
-                    # If Stripe says one already exists, try once more to find it.
-                    msg = str(create_err).lower()
-                    if 'already' in msg or 'schedule' in msg:
-                        listed = stripe.SubscriptionSchedule.list(
-                            customer=customer_id, limit=10
-                        )
-                        for s in _stripe_get(listed, 'data', []):
-                            if _stripe_get(s, 'subscription') == subscription_id:
-                                schedule = s
-                                break
-                    if schedule is None:
-                        raise
+                    stripe.SubscriptionSchedule.release(sched_id)
+                except stripe.error.InvalidRequestError as rel_err:
+                    print(f"[STRIPE] could not release schedule {sched_id}: {rel_err}")
 
-            step = "extract_current_phase"
-            current_phase = schedule['phases'][0]
-            current_phase_price = current_phase['items'][0]['price']
-            if not isinstance(current_phase_price, str):
-                # Expanded price object — pull the ID safely.
-                current_phase_price = _stripe_get(current_phase_price, 'id')
-
-            step = "modify_schedule_add_phase"
-            stripe.SubscriptionSchedule.modify(
-                schedule.id,
-                end_behavior='release',
-                phases=[
-                    {
-                        'items': [{'price': current_phase_price, 'quantity': 1}],
-                        'start_date': current_phase['start_date'],
-                        'end_date': current_phase['end_date'],
-                        'proration_behavior': 'none',
-                    },
-                    {
-                        'items': [{'price': price_id, 'quantity': 1}],
-                        'iterations': 1,
-                        'proration_behavior': 'none',
-                    },
-                ],
+            step = "modify_subscription_price"
+            stripe.Subscription.modify(
+                subscription_id,
+                items=[{'id': item_id, 'price': price_id}],
+                proration_behavior='none',
+                billing_cycle_anchor='unchanged',
             )
 
             return jsonify({
@@ -751,11 +707,17 @@ def api_billing_checkout():
                 "target_price_id": price_id,
             })
         except _ScheduleSkip as e:
-            # Expected case: sub not active, no period_end, etc. Fall
-            # through to a fresh Checkout Session (user creates new sub).
+            # Genuine fallthrough: sub inactive or has no items. Fall
+            # through to a fresh Checkout Session below.
             print(f"[STRIPE] cadence-switch skipped at step={step}: {e}")
         except stripe.error.InvalidRequestError as e:
+            # Surface to the user — silently falling through here would
+            # risk creating a parallel subscription via fresh checkout.
             print(f"[STRIPE] cadence-switch InvalidRequestError at step={step}: {e}")
+            return jsonify({
+                "error": f"[{step}] Stripe: {str(e)}",
+                "step": step,
+            }), 400
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
