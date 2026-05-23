@@ -177,73 +177,48 @@
         }
         .price-card.pop .price-trial { color: rgba(255,255,255,.92); }
 
-        /* ─── Manage subscription CTA (Stripe Portal) ──────────────
-           The hero action of the current-plan-card. Brand-pink gradient,
-           icon + 2-line label so users understand exactly what's behind
-           the click (factures + CB + annulation). */
-        .btn-manage-subscription {
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            padding: 14px 22px;
-            border-radius: 14px;
-            border: none;
-            background: linear-gradient(135deg, #FF69B4 0%, #f05aa0 100%);
-            color: #fff;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-weight: 600;
-            text-align: left;
-            cursor: pointer;
-            box-shadow: 0 6px 20px rgba(255,105,180,.28), 0 2px 6px rgba(255,105,180,.18);
-            transition: transform .2s cubic-bezier(.2,0,0,1), box-shadow .2s, filter .2s;
-        }
-        .btn-manage-subscription:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 28px rgba(255,105,180,.38), 0 4px 10px rgba(255,105,180,.22);
-            filter: brightness(1.05);
-        }
-        .btn-manage-subscription:active {
-            transform: translateY(0);
-            box-shadow: 0 4px 14px rgba(255,105,180,.32);
-        }
-        .btn-manage-subscription:focus-visible {
-            outline: 2px solid #fff;
-            outline-offset: 2px;
-            box-shadow: 0 0 0 4px rgba(255,105,180,.45), 0 6px 20px rgba(255,105,180,.28);
-        }
-        .btn-manage-subscription svg {
-            flex-shrink: 0;
-            opacity: 0.95;
-        }
-        .btn-manage-label {
+        /* ─── Cancel-by-email block ─────────────────────────────────
+           The hero action on the current-plan card. Self-service Stripe
+           Portal access was removed by product decision — cancellation
+           now requires emailing support so the team can attempt save
+           conversations before the cancel goes through. (Note: French
+           law L. 215-1 requires online subscriptions be cancellable as
+           easily as they were signed up for — a self-service path will
+           likely need to come back to stay DGCCRF-compliant.) */
+        .cancel-by-email {
             display: flex;
             flex-direction: column;
-            line-height: 1.25;
+            align-items: flex-end;
+            gap: 4px;
+            text-align: right;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        .btn-manage-title {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: -0.1px;
-        }
-        .btn-manage-sub {
+        .cancel-by-email-label {
             font-size: 11px;
-            font-weight: 500;
-            opacity: 0.82;
-            margin-top: 2px;
-            letter-spacing: 0.1px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: #86868b;
         }
-        .btn-manage-arrow {
-            margin-left: auto;
-            opacity: 0.75;
-            transition: transform .2s;
+        .cancel-by-email-link {
+            font-size: 15px;
+            font-weight: 600;
+            color: #FF69B4;
+            text-decoration: none;
+            padding: 4px 0;
+            transition: color .15s;
+            word-break: break-all;
         }
-        .btn-manage-subscription:hover .btn-manage-arrow {
-            transform: translateX(3px);
-            opacity: 1;
+        .cancel-by-email-link:hover { color: #d83a8b; text-decoration: underline; }
+        .cancel-by-email-sub {
+            font-size: 12px;
+            color: #86868b;
+            max-width: 260px;
+            line-height: 1.4;
         }
         @media (max-width: 700px) {
-            .btn-manage-subscription { width: 100%; padding: 14px 18px; }
-            .btn-manage-sub { display: none; }
+            .cancel-by-email { align-items: flex-start; text-align: left; }
+            .cancel-by-email-sub { max-width: none; }
         }
 
         .back-link {
@@ -355,19 +330,14 @@
         </div>
         <div class="plan-actions">
             {% if sub.plan != 'starter' and sub.stripe_customer_id %}
-            <button class="btn-manage-subscription" onclick="openPortal()">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <rect x="2" y="5" width="20" height="14" rx="3"/>
-                    <line x1="2" y1="10" x2="22" y2="10"/>
-                </svg>
-                <span class="btn-manage-label">
-                    <span class="btn-manage-title">Gérer votre abonnement</span>
-                    <span class="btn-manage-sub">Factures · Moyen de paiement · Annulation</span>
-                </span>
-                <svg class="btn-manage-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M9 18l6-6-6-6"/>
-                </svg>
-            </button>
+            <div class="cancel-by-email">
+                <div class="cancel-by-email-label">Annuler l'abonnement</div>
+                <a class="cancel-by-email-link"
+                   href="mailto:brice.demirdjian@gmail.com?subject=Demande%20d%27annulation%20d%27abonnement%20Tracking%20Lab&body=Bonjour%2C%0A%0AJe%20souhaite%20annuler%20mon%20abonnement%20Tracking%20Lab.%0A%0AEmail%20du%20compte%20%3A%20{{ user.email | urlencode }}%0AFormule%20actuelle%20%3A%20{{ plan.name }}%0A%0AMerci%20de%20confirmer%20la%20prise%20en%20compte.%0A%0ACordialement%2C">
+                    brice.demirdjian@gmail.com
+                </a>
+                <div class="cancel-by-email-sub">L'annulation s'effectue uniquement par email auprès du support.</div>
+            </div>
             {% endif %}
             {% if sub.plan == 'starter' %}
             <button class="btn btn-primary" onclick="document.getElementById('plans-section').scrollIntoView({behavior:'smooth'})">Activer l'abonnement →</button>
