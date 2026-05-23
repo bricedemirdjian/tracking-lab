@@ -110,6 +110,13 @@ def login_google():
     return oauth.google.authorize_redirect(redirect_uri)
 
 
+@auth_bp.route('/signup/google')
+def signup_google():
+    session['signup_intent'] = True
+    redirect_uri = url_for('auth.auth_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
 @auth_bp.route('/auth/callback')
 def auth_callback():
     try:
@@ -169,6 +176,13 @@ def auth_callback():
         # Welcome email on first login only (non-blocking, best-effort)
         if is_new:
             _maybe_send_welcome(user_dict)
+
+        # Google signups from /signup land on /billing to pick a paid plan
+        # (consistency with email/password signup flow). Returning users from
+        # /login go straight to the dashboard.
+        signup_intent = session.pop('signup_intent', False)
+        if signup_intent and (is_new or user_dict.get('plan') in (None, 'pending', 'starter')):
+            return redirect(url_for('billing'))
 
         next_page = request.args.get('next', url_for('dashboard'))
         return redirect(next_page)
