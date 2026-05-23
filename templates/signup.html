@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Lab · Inscription</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #FF69B4;
+            --accent-dark: #f05aa0;
+            --text: #0d0d0d;
+            --text-2: #3a3a40;
+            --text-muted: #86868b;
+            --border: #e0e0e5;
+            --bg: #f5f5f7;
+            --bg-card: #fff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .container {
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 24px;
+            transition: color .15s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin: 0 0 8px;
+        }
+        .sub {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin: 0 0 28px;
+            line-height: 1.5;
+        }
+
+        /* ─── Plan selector ─────────────────────────────────────── */
+        .plan-pick {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .plan-opt {
+            position: relative;
+            display: block;
+            padding: 16px 14px;
+            border-radius: 14px;
+            border: 1.5px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .plan-opt input { position: absolute; opacity: 0; pointer-events: none; }
+        .plan-opt-name {
+            font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1.5px; color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .plan-opt-price {
+            font-size: 22px; font-weight: 900; letter-spacing: -0.5px;
+            color: var(--text); line-height: 1;
+        }
+        .plan-opt-price span {
+            font-size: 12px; font-weight: 600; color: var(--text-muted);
+            margin-left: 4px;
+        }
+        .plan-opt-sub {
+            font-size: 12px; color: var(--text-muted); margin-top: 4px;
+        }
+        .plan-opt:has(input:checked) {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(255,105,180,.12);
+        }
+        .plan-opt-badge {
+            position: absolute; top: -10px; right: 12px;
+            background: #fff; color: var(--accent);
+            font-size: 10px; font-weight: 900;
+            padding: 4px 10px; border-radius: 980px;
+            letter-spacing: 0.4px;
+            border: 1.5px solid var(--accent);
+            box-shadow: 0 4px 10px rgba(255,105,180,.25);
+        }
+
+        /* ─── Form ──────────────────────────────────────────────── */
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .form-field { margin-bottom: 14px; }
+        .form-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .form-field label {
+            display: block;
+            font-size: 12px; font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 6px;
+            letter-spacing: 0.1px;
+        }
+        .form-field label .opt { color: var(--text-muted); font-weight: 500; }
+        .form-field input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 15px;
+            background: #fff;
+            color: var(--text);
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .form-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(255,105,180,.12);
+        }
+
+        .cta {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 10px 28px rgba(255,105,180,.35), 0 4px 10px rgba(255,105,180,.15);
+            transition: transform .15s, box-shadow .15s, filter .15s;
+            margin-top: 8px;
+        }
+        .cta:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 36px rgba(255,105,180,.45), 0 5px 14px rgba(255,105,180,.2);
+            filter: brightness(1.05);
+        }
+        .cta:disabled {
+            opacity: 0.6;
+            cursor: progress;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .login-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
+        .login-link a:hover { text-decoration: underline; }
+
+        .legal {
+            text-align: center;
+            margin-top: 14px;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .error {
+            background: #fff0f3;
+            border: 1px solid #ffd1dc;
+            color: #c11149;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            display: none;
+        }
+        .error.visible { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Retour à l'accueil</a>
+        <h1>Créez votre compte</h1>
+        <p class="sub">Quelques infos, votre formule, puis on s'occupe du reste.</p>
+
+        <form id="signupForm" novalidate>
+            <div class="plan-pick">
+                <label class="plan-opt">
+                    <input type="radio" name="plan_period" value="monthly">
+                    <div class="plan-opt-name">Mensuel</div>
+                    <div class="plan-opt-price">29€<span>TTC/mois</span></div>
+                    <div class="plan-opt-sub">Sans engagement</div>
+                </label>
+                <label class="plan-opt">
+                    <input type="radio" name="plan_period" value="annual" checked>
+                    <div class="plan-opt-badge">-77%</div>
+                    <div class="plan-opt-name">Annuel</div>
+                    <div class="plan-opt-price">6,58€<span>TTC/mois</span></div>
+                    <div class="plan-opt-sub">Soit 79€ TTC/an</div>
+                </label>
+            </div>
+
+            <div id="errorBox" class="error"></div>
+
+            <div class="form-field-row">
+                <div class="form-field">
+                    <label for="first_name">Prénom</label>
+                    <input id="first_name" name="first_name" type="text" autocomplete="given-name" required>
+                </div>
+                <div class="form-field">
+                    <label for="last_name">Nom</label>
+                    <input id="last_name" name="last_name" type="text" autocomplete="family-name" required>
+                </div>
+            </div>
+            <div class="form-field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" required>
+            </div>
+            <div class="form-field">
+                <label for="company">Entreprise <span class="opt">(facultatif)</span></label>
+                <input id="company" name="company" type="text" autocomplete="organization">
+            </div>
+            <div class="form-field">
+                <label for="password">Mot de passe</label>
+                <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+            </div>
+
+            <button type="submit" class="cta" id="submitBtn">JE SUIS PRÊT 🔥</button>
+
+            <p class="legal">En vous inscrivant, vous acceptez les <a href="/cgv" style="color:var(--text-muted);text-decoration:underline">CGV</a> et notre <a href="/confidentialite" style="color:var(--text-muted);text-decoration:underline">politique de confidentialité</a>.</p>
+            <p class="login-link">Déjà un compte ? <a href="/login">Se connecter</a></p>
+        </form>
+    </div>
+
+    <script>
+        // Pre-select plan from query params if present: /signup?period=monthly
+        const params = new URLSearchParams(window.location.search);
+        const periodParam = params.get('period');
+        if (periodParam === 'monthly' || periodParam === 'annual') {
+            const radio = document.querySelector(`input[name="plan_period"][value="${periodParam}"]`);
+            if (radio) radio.checked = true;
+        }
+
+        const form = document.getElementById('signupForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorBox = document.getElementById('errorBox');
+
+        function showError(msg) {
+            errorBox.textContent = msg;
+            errorBox.classList.add('visible');
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        function clearError() {
+            errorBox.textContent = '';
+            errorBox.classList.remove('visible');
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError();
+
+            const period = document.querySelector('input[name="plan_period"]:checked')?.value || 'annual';
+            // Plan key: 'pro' = monthly cadence, 'agency' = annual cadence (legacy DB labels)
+            const plan = period === 'annual' ? 'agency' : 'pro';
+            const payload = {
+                first_name: document.getElementById('first_name').value.trim(),
+                last_name: document.getElementById('last_name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                company: document.getElementById('company').value.trim() || null,
+                password: document.getElementById('password').value,
+                plan,
+                period,
+            };
+
+            if (!payload.first_name || !payload.last_name || !payload.email || !payload.password) {
+                showError('Tous les champs obligatoires doivent être remplis.');
+                return;
+            }
+            if (payload.password.length < 8) {
+                showError('Le mot de passe doit faire au moins 8 caractères.');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            const originalLabel = submitBtn.textContent;
+            submitBtn.textContent = 'Création du compte…';
+
+            try {
+                // Step 1 — create the pending user + log them in.
+                const signupRes = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const signupData = await signupRes.json();
+                if (!signupRes.ok) {
+                    showError(signupData.error || 'Inscription impossible.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalLabel;
+                    return;
+                }
+
+                // Step 2 — kick off Stripe Checkout immediately.
+                submitBtn.textContent = 'Redirection vers le paiement…';
+                const checkoutRes = await fetch('/api/billing/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan: payload.plan, period: payload.period }),
+                });
+                const checkoutData = await checkoutRes.json();
+                if (checkoutData.url) {
+                    window.location.href = checkoutData.url;
+                    return;
+                }
+                showError(checkoutData.error || 'Impossible de lancer le paiement. Vous êtes connecté — retentez depuis la facturation.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalLabel;
+            } catch (err) {
+                showError('Erreur réseau : ' + (err.message || 'réessayez.'));
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalLabel;
+            }
+        });
+    </script>
+</body>
+</html>

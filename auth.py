@@ -1,8 +1,12 @@
 import os
-from flask import Blueprint, redirect, url_for, session, request, render_template
+from flask import Blueprint, redirect, url_for, session, request, render_template, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from database import create_or_update_user, get_user_by_id, seed_user_data, set_user_role, get_admin_user_id
+from werkzeug.security import generate_password_hash
+from database import (
+    create_or_update_user, get_user_by_id, seed_user_data, set_user_role,
+    get_admin_user_id, create_password_user, get_user_by_email, verify_password,
+)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -18,10 +22,11 @@ oauth = OAuth()
 class User(UserMixin):
     def __init__(self, user_dict):
         self.id = user_dict['id']
-        self.google_id = user_dict['google_id']
+        # google_id is nullable now (password-only users have it as None).
+        self.google_id = user_dict.get('google_id')
         self.email = user_dict['email']
-        self.name = user_dict['name']
-        self.avatar_url = user_dict['avatar_url']
+        self.name = user_dict.get('name')
+        self.avatar_url = user_dict.get('avatar_url')
         self.role = user_dict.get('role', 'user')
         self.blocked = user_dict.get('blocked', False)
         self.created_at = user_dict.get('created_at')
@@ -198,3 +203,89 @@ def unauthorized():
         from flask import jsonify
         return jsonify({"error": "Non autorise"}), 401
     return redirect(url_for('auth.login', next=request.url))
+
+
+# ============================================================
+# Email + password auth — coexists with Google OAuth.
+# Users who sign up via the /signup form get a password_hash and
+# plan='pending' until Stripe Checkout completes. Users who signed
+# up via Google never have a password_hash. A single email can be
+# linked to BOTH methods (create_or_update_user handles linking
+# Google to an existing password-only row).
+# ============================================================
+
+@auth_bp.route('/signup')
+def signup_page():
+    """Render the signup form. Already-logged-in users skip to dashboard."""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('signup.html')
+
+
+@auth_bp.route('/api/signup', methods=['POST'])
+def api_signup():
+    """Create an email/password user, log them in, return success.
+
+    Frontend follows up immediately with POST /api/billing/checkout to start
+    Stripe Checkout. We log the user in BEFORE redirecting to Stripe so the
+    @login_required-protected checkout endpoint accepts the request, and so
+    the user can land on /billing on Stripe's return.
+    """
+    body = request.json or {}
+    first_name = (body.get('first_name') or '').strip()
+    last_name = (body.get('last_name') or '').strip()
+    email = (body.get('email') or '').strip().lower()
+    company = (body.get('company') or '').strip() or None
+    password = body.get('password') or ''
+
+    # Basic validation (frontend also validates; defense in depth here).
+    if not first_name or not last_name:
+        return jsonify({"error": "Prénom et nom obligatoires."}), 400
+    if '@' not in email or '.' not in email.split('@')[-1]:
+        return jsonify({"error": "Email invalide."}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Le mot de passe doit faire au moins 8 caractères."}), 400
+
+    try:
+        user_dict = create_password_user(
+            email=email,
+            password_hash=generate_password_hash(password),
+            first_name=first_name,
+            last_name=last_name,
+            company=company,
+            plan='pending',
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 409
+    except Exception as e:
+        print(f"[Auth] signup failed: {e}")
+        return jsonify({"error": "Erreur lors de la création du compte."}), 500
+
+    user = User(user_dict)
+    login_user(user, remember=True)
+    return jsonify({"ok": True})
+
+
+@auth_bp.route('/api/login', methods=['POST'])
+def api_login():
+    """Email + password login. Returns redirect target on success."""
+    body = request.json or {}
+    email = (body.get('email') or '').strip().lower()
+    password = body.get('password') or ''
+    if not email or not password:
+        return jsonify({"error": "Email et mot de passe requis."}), 400
+
+    user_dict = verify_password(email, password)
+    if not user_dict:
+        return jsonify({"error": "Email ou mot de passe incorrect."}), 401
+
+    if user_dict.get('blocked'):
+        return jsonify({"error": "Compte suspendu."}), 403
+
+    user = User(user_dict)
+    login_user(user, remember=True)
+
+    # Pending payment? Send them back to billing to finish checkout.
+    if user_dict.get('plan') == 'pending':
+        return jsonify({"ok": True, "redirect": "/billing?resume=1"})
+    return jsonify({"ok": True, "redirect": "/dashboard"})

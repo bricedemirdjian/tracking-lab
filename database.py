@@ -323,6 +323,9 @@ def init_db():
     _migrate_user_plan_columns(conn)
     # Migration: add optional company column to users
     _migrate_user_company(conn)
+    # Migration: add password_hash + first_name/last_name to users; make
+    # google_id nullable (PG only) — enables email/password signup.
+    _migrate_user_password_auth(conn)
     # Migration: add is_competitor column to accounts if missing
     _migrate_competitor_column(conn)
     # Migration: per-account scraping health columns (failures, last error, last success)
@@ -451,6 +454,52 @@ def _migrate_user_plan_columns(conn):
                 print("[Migration] Added stripe_customer_id column to users (SQLite)")
     except Exception as e:
         print(f"[Migration] user plan columns: {e}")
+
+
+def _migrate_user_password_auth(conn):
+    """Add password_hash + first_name + last_name to users; make google_id
+    nullable. Required to support email/password signup alongside Google OAuth
+    (introduced 2026-05-23). google_id stays UNIQUE so it still gates duplicate
+    OAuth sign-ins, but nullable so password-only users don't need a fake ID."""
+    try:
+        if DATABASE_URL:
+            # Add password_hash
+            cols = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash'")
+            if not cols:
+                _execute(conn, "ALTER TABLE users ADD COLUMN password_hash TEXT")
+                print("[Migration] Added password_hash column to users (PostgreSQL)")
+            # Add first_name / last_name (optional, fallback to name)
+            cols = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='first_name'")
+            if not cols:
+                _execute(conn, "ALTER TABLE users ADD COLUMN first_name TEXT")
+                print("[Migration] Added first_name column to users (PostgreSQL)")
+            cols = _fetchall(conn, "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='last_name'")
+            if not cols:
+                _execute(conn, "ALTER TABLE users ADD COLUMN last_name TEXT")
+                print("[Migration] Added last_name column to users (PostgreSQL)")
+            # Drop NOT NULL on google_id (Postgres syntax). Safe to retry.
+            try:
+                _execute(conn, "ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL")
+                print("[Migration] Made google_id nullable on users (PostgreSQL)")
+            except Exception:
+                pass  # already nullable
+        else:
+            cur = conn.cursor()
+            columns = [col[1] for col in cur.execute("PRAGMA table_info(users)").fetchall()]
+            if "password_hash" not in columns:
+                cur.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+                print("[Migration] Added password_hash column to users (SQLite)")
+            if "first_name" not in columns:
+                cur.execute("ALTER TABLE users ADD COLUMN first_name TEXT")
+                print("[Migration] Added first_name column to users (SQLite)")
+            if "last_name" not in columns:
+                cur.execute("ALTER TABLE users ADD COLUMN last_name TEXT")
+                print("[Migration] Added last_name column to users (SQLite)")
+            # SQLite can't drop NOT NULL post-hoc without table rebuild —
+            # google_id stays NOT NULL there, dev/local only so password-only
+            # signups in dev won't work. Use Postgres for that flow.
+    except Exception as e:
+        print(f"[Migration] user password auth: {e}")
 
 
 def _migrate_account_error_tracking(conn):
@@ -786,29 +835,132 @@ def get_subscription_by_customer(stripe_customer_id):
 # ==================== User functions ====================
 
 def create_or_update_user(google_id, email, name, avatar_url):
-    """Upsert a user. Returns (user_dict, is_new: bool).
+    """Upsert a user via Google OAuth. Returns (user_dict, is_new: bool).
 
-    is_new is True only on the very first signup for this google_id — used to
-    gate side effects like the welcome email.
+    Email-first lookup: if a row already exists for this email (e.g. the user
+    previously signed up via email/password) we LINK the Google ID to it
+    instead of inserting a duplicate. One human = one account in `users`,
+    addressable by either auth method.
+
+    is_new gates the welcome email — true only when this is the first time
+    we see this email at all.
     """
+    email_lc = (email or '').strip().lower()
     conn = get_connection()
     existing = _fetchone(
-        conn, "SELECT id FROM users WHERE google_id = %s", (google_id,)
+        conn,
+        "SELECT * FROM users WHERE LOWER(email) = LOWER(%s)",
+        (email_lc,)
     )
-    is_new = existing is None
+    if existing:
+        # User exists — link Google ID if not already set, refresh metadata.
+        _execute(conn, """
+            UPDATE users SET
+                google_id = COALESCE(google_id, %s),
+                name = COALESCE(%s, name),
+                avatar_url = COALESCE(%s, avatar_url),
+                last_login = %s
+            WHERE id = %s
+        """, (google_id, name, avatar_url, datetime.now().isoformat(), existing['id']))
+        conn.commit()
+        user = _fetchone(conn, "SELECT * FROM users WHERE id = %s", (existing['id'],))
+        conn.close()
+        return user, False  # not new — we already knew this email
+
+    # No user with this email — fresh OAuth signup.
     _execute(conn, """
         INSERT INTO users (google_id, email, name, avatar_url, last_login)
         VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT(google_id) DO UPDATE SET
-            email = excluded.email,
-            name = COALESCE(excluded.name, users.name),
-            avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
-            last_login = excluded.last_login
-    """, (google_id, email, name, avatar_url, datetime.now().isoformat()))
+    """, (google_id, email_lc, name, avatar_url, datetime.now().isoformat()))
     conn.commit()
-    user = _fetchone(conn, "SELECT * FROM users WHERE google_id = %s", (google_id,))
+    user = _fetchone(conn, "SELECT * FROM users WHERE LOWER(email) = LOWER(%s)", (email_lc,))
     conn.close()
-    return user, is_new
+    return user, True
+
+
+def create_password_user(email, password_hash, first_name=None, last_name=None,
+                         company=None, plan='pending'):
+    """Create an email/password user (no Google ID). Returns user_dict.
+
+    Idempotent: if a row already exists for this email AND it's a pending
+    password-only user (no Google ID, plan='pending'), we UPDATE the password
+    + name fields. This lets a user retry signup after abandoning Stripe
+    Checkout without hitting a unique constraint. Otherwise raises ValueError.
+    """
+    email_lc = email.strip().lower()
+    full_name = ' '.join(filter(None, [first_name, last_name])).strip() or None
+    conn = get_connection()
+
+    existing = _fetchone(
+        conn,
+        "SELECT * FROM users WHERE LOWER(email) = LOWER(%s)",
+        (email_lc,)
+    )
+    if existing:
+        if existing.get('google_id') or existing.get('plan') not in ('pending', None):
+            conn.close()
+            raise ValueError(f"Cet email est déjà utilisé.")
+        _execute(conn, """
+            UPDATE users SET
+                password_hash = %s,
+                first_name = COALESCE(%s, first_name),
+                last_name = COALESCE(%s, last_name),
+                name = COALESCE(%s, name),
+                company = COALESCE(%s, company),
+                last_login = %s
+            WHERE id = %s
+        """, (password_hash, first_name, last_name, full_name, company,
+              datetime.now().isoformat(), existing['id']))
+        conn.commit()
+        user = _fetchone(conn, "SELECT * FROM users WHERE id = %s", (existing['id'],))
+        conn.close()
+        return user
+
+    # Fresh password signup.
+    _execute(conn, """
+        INSERT INTO users (google_id, email, name, first_name, last_name, company,
+                           password_hash, plan, last_login)
+        VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (email_lc, full_name, first_name, last_name, company, password_hash,
+          plan, datetime.now().isoformat()))
+    conn.commit()
+    user = _fetchone(conn, "SELECT * FROM users WHERE LOWER(email) = LOWER(%s)", (email_lc,))
+    conn.close()
+    return user
+
+
+def get_user_by_email(email):
+    conn = get_connection()
+    user = _fetchone(
+        conn,
+        "SELECT * FROM users WHERE LOWER(email) = LOWER(%s)",
+        ((email or '').strip().lower(),)
+    )
+    conn.close()
+    return user
+
+
+def verify_password(email, password):
+    """Return user_dict on valid email+password, None otherwise.
+
+    Returns None for unknown email, Google-only user (no password_hash),
+    or hash mismatch. Bumps last_login on success.
+    """
+    from werkzeug.security import check_password_hash
+    user = get_user_by_email(email)
+    if not user:
+        return None
+    pw_hash = user.get('password_hash')
+    if not pw_hash:
+        return None  # Google-only account, no password set
+    if not check_password_hash(pw_hash, password):
+        return None
+    conn = get_connection()
+    _execute(conn, "UPDATE users SET last_login = %s WHERE id = %s",
+             (datetime.now().isoformat(), user['id']))
+    conn.commit()
+    conn.close()
+    return user
 
 
 def get_user_by_id(user_id):

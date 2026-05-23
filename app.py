@@ -873,6 +873,14 @@ def stripe_webhook():
                         stripe_subscription_id=subscription_id,
                         current_period_end=period_end,
                     )
+                    # Clear the 'pending' marker on users.plan that the signup
+                    # form set. set_user_plan also handles the legacy case
+                    # where users.plan was 'starter' (Google OAuth → upgrade).
+                    try:
+                        from database import set_user_plan
+                        set_user_plan(user['id'], plan_name)
+                    except Exception as e:
+                        print(f"[Stripe] set_user_plan failed (non-fatal, sub already active): {e}")
                     # Fire welcome/confirmation emails (best-effort, non-blocking)
                     try:
                         from emailer import send_payment_confirmation
