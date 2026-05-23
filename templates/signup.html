@@ -233,6 +233,21 @@
             font-size: 11px; color: var(--text-muted); font-weight: 500;
         }
         .trust-row .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); }
+
+        /* Mobile: tighten container padding, allow plan cards to breathe, and
+           let the badge "Économisez 77 %" not overflow on iPhone SE (~320px). */
+        @media (max-width: 420px) {
+            .container { padding: 0 14px 48px; margin-top: 20px; }
+            h1 { font-size: 26px; }
+            .sub { font-size: 14px; }
+            .plan-opt { padding: 14px 10px; }
+            .plan-opt-price { font-size: 18px; }
+            .plan-opt-badge { font-size: 9px; padding: 3px 8px; right: 8px; }
+            .summary { padding: 12px 14px; }
+            .summary-price { font-size: 20px; }
+            .trust-row { flex-wrap: wrap; gap: 8px; }
+        }
+        body { overflow-x: hidden; }
     </style>
 </head>
 <body>

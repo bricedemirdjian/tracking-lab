@@ -252,7 +252,18 @@
 
         @media (max-width: 700px) {
             .pricing { grid-template-columns: 1fr; }
-            .current-plan-card { flex-direction: column; align-items: flex-start; }
+            .pricing.pricing-2col { max-width: 380px; }
+            .current-plan-card { flex-direction: column; align-items: flex-start; padding: 22px; }
+            .billing-container { padding: 0 16px; }
+            .billing-header h1 { font-size: 24px; }
+            .price-card { padding: 28px 22px; }
+            .price-val { font-size: 42px; }
+            /* Shrink the inline 32px section h2 so it doesn't overflow 375px viewport */
+            #plans-section { font-size: 22px !important; margin-bottom: 28px !important; letter-spacing: -0.3px !important; }
+        }
+        @media (max-width: 420px) {
+            .admin-stats, .pricing { gap: 12px; }
+            .billing-container { padding: 0 12px; }
         }
     </style>
 </head>
