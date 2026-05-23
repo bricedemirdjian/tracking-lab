@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tracking Lab · Mon abonnement</title>
+    <title>Tracking Lab · {% if sub.plan == 'pending' %}Activez votre compte{% else %}Mon abonnement{% endif %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css?v=20260409">
     <script src="https://js.stripe.com/v3/"></script>
@@ -270,15 +270,35 @@
 <body>
 <div class="billing-container">
 
+    {% if sub.plan != 'pending' %}
     <a href="/dashboard" class="back-link">← Retour au dashboard</a>
+    {% endif %}
 
     {% if request.args.get('success') %}
-    <div class="alert alert-success">✓ Abonnement activé avec succès ! Bienvenue sur le plan supérieur.</div>
+    <div class="alert alert-success">✓ Abonnement activé avec succès ! Bienvenue sur Tracking Lab.</div>
     {% endif %}
     {% if request.args.get('cancelled') %}
     <div class="alert alert-info">Paiement annulé. Votre abonnement actuel reste inchangé.</div>
     {% endif %}
 
+    {% if sub.plan == 'pending' %}
+    {# ─── Onboarding mode : compte créé, paiement à finaliser ─────── #}
+    <div class="billing-header" style="text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:8px;background:#fff0f6;color:#FF69B4;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 14px;border-radius:980px;margin-bottom:18px">
+            <span>🎉</span><span>Bienvenue {{ current_user.name.split(' ')[0] if current_user.name else '' }}</span>
+        </div>
+        <h1 style="font-size:36px;letter-spacing:-0.8px;margin:0 0 12px">Une dernière étape</h1>
+        <p style="font-size:16px;color:#6e6e73;max-width:520px;margin:0 auto">
+            Votre compte est créé. Choisissez votre formule ci-dessous pour accéder au dashboard.
+        </p>
+        <ul style="list-style:none;padding:0;margin:28px auto 0;display:flex;justify-content:center;gap:24px;flex-wrap:wrap;font-size:13px;color:#6e6e73">
+            <li style="display:flex;align-items:center;gap:6px">✓ Sans engagement</li>
+            <li style="display:flex;align-items:center;gap:6px">✓ Annulable en 1 clic</li>
+            <li style="display:flex;align-items:center;gap:6px">✓ Paiement sécurisé Stripe</li>
+        </ul>
+    </div>
+    {% else %}
+    {# ─── Gestion d'un abonnement existant ──────────────────────── #}
     <div class="billing-header">
         <h1>Mon abonnement</h1>
         <p>Gérez votre plan.</p>
@@ -293,9 +313,7 @@
             </div>
             <h2>{{ plan.name }}</h2>
             <p>
-                {% if sub.plan == 'pending' %}
-                    Activez votre abonnement pour débloquer toutes les fonctionnalités. Mensuel sans engagement, ou annuel avec 77&nbsp;% d'économies.
-                {% elif pending_switch %}
+                {% if pending_switch %}
                     Vous passez automatiquement en <strong>{{ pending_switch.target_label }}</strong> le <strong>{{ pending_switch.switch_at_human }}</strong>.
                     Vous restez sur l'offre {{ plan.name }} jusqu'à cette date. Aucun débit supplémentaire d'ici là.
                 {% else %}
@@ -307,15 +325,11 @@
                 {% endif %}
             </p>
         </div>
-        <div class="plan-actions">
-            {% if sub.plan == 'pending' %}
-            <button class="btn btn-primary" onclick="document.getElementById('plans-section').scrollIntoView({behavior:'smooth'})">Activer l'abonnement →</button>
-            {% endif %}
-        </div>
     </div>
+    {% endif %}
 
     <!-- Plans -->
-    <h2 style="font-size:32px;font-weight:800;margin:0 0 48px;letter-spacing:-0.6px;text-align:center" id="plans-section">{% if sub.plan == 'pending' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
+    <h2 style="font-size:32px;font-weight:800;margin:{% if sub.plan == 'pending' %}40px{% else %}0{% endif %} 0 48px;letter-spacing:-0.6px;text-align:center" id="plans-section">{% if sub.plan == 'pending' %}Choisissez votre formule{% else %}Changer de formule{% endif %}</h2>
 
     <div class="pricing pricing-2col">
 
