@@ -53,6 +53,15 @@ app.config['SECRET_KEY'] = _secret_key or 'tiktok-tracker-dev-secret-2024'
 app.config['GOOGLE_CLIENT_ID'] = os.environ.get('GOOGLE_CLIENT_ID')
 app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
+# Session cookie config — required for OAuth state to survive the cross-origin
+# roundtrip to accounts.google.com. SameSite=Lax + Secure ensures the cookie
+# is sent back on the top-level GET redirect from Google to /auth/callback.
+# Without these explicit settings, some browsers (and the Vercel edge) may
+# drop the cookie, causing MismatchingStateError on the callback.
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = IS_PRODUCTION
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
 # Debug: log OAuth config status at startup
 print(f"[Config] GOOGLE_CLIENT_ID present: {app.config['GOOGLE_CLIENT_ID'] is not None}")
 print(f"[Config] GOOGLE_CLIENT_SECRET present: {app.config['GOOGLE_CLIENT_SECRET'] is not None}")

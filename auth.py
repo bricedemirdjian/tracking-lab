@@ -112,9 +112,16 @@ def login_google():
 
 @auth_bp.route('/signup/google')
 def signup_google():
-    session['signup_intent'] = True
     redirect_uri = url_for('auth.auth_callback', _external=True)
-    return oauth.google.authorize_redirect(redirect_uri)
+    resp = oauth.google.authorize_redirect(redirect_uri)
+    # signup intent in a SEPARATE cookie (not Flask session) so it survives
+    # even if authlib's session-stored OAuth state has issues with the proxy
+    # chain. Short-lived (10 min) and scoped to /auth/callback path.
+    resp.set_cookie(
+        'tl_signup_intent', '1',
+        max_age=600, httponly=True, secure=True, samesite='Lax', path='/'
+    )
+    return resp
 
 
 @auth_bp.route('/auth/callback')
@@ -179,15 +186,37 @@ def auth_callback():
 
         # Google signups from /signup land on /billing to pick a paid plan
         # (consistency with email/password signup flow). Returning users from
-        # /login go straight to the dashboard.
-        signup_intent = session.pop('signup_intent', False)
+        # /login go straight to the dashboard. Intent is read from a separate
+        # short-lived cookie so we don't rely on Flask session for it (the
+        # session may be lost across the OAuth roundtrip in some proxy setups).
+        signup_intent = request.cookies.get('tl_signup_intent') == '1'
+        print(f"[Auth] callback ok email={user_email} is_new={is_new} signup_intent={signup_intent} plan={user_dict.get('plan')}")
+
         if signup_intent and (is_new or user_dict.get('plan') in (None, 'pending', 'starter')):
-            return redirect(url_for('billing'))
+            resp = redirect(url_for('billing'))
+            resp.delete_cookie('tl_signup_intent', path='/')
+            return resp
 
         next_page = request.args.get('next', url_for('dashboard'))
-        return redirect(next_page)
+        resp = redirect(next_page)
+        # Best-effort cleanup if the intent cookie lingers (e.g. existing user
+        # came in through /signup/google but already has a paid plan).
+        if request.cookies.get('tl_signup_intent'):
+            resp.delete_cookie('tl_signup_intent', path='/')
+        return resp
     except Exception as e:
-        print(f"[Auth] Error: {e}")
+        # Detailed logging so we can diagnose OAuth state mismatches (common
+        # cause: session cookie lost across the proxy chain or SameSite issues).
+        has_intent = request.cookies.get('tl_signup_intent') == '1'
+        session_keys = list(session.keys()) if session else []
+        url_state = request.args.get('state', '<none>')[:12]
+        print(f"[Auth] Error type={type(e).__name__} msg={e} url_state={url_state} session_keys={session_keys} signup_intent_cookie={has_intent}")
+        # If this was a signup attempt, send them back to /signup not /login
+        # so they can retry without losing context.
+        if has_intent:
+            resp = redirect(url_for('auth.signup_page'))
+            resp.delete_cookie('tl_signup_intent', path='/')
+            return resp
         return redirect(url_for('auth.login'))
 
 
