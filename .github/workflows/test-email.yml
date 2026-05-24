@@ -1,0 +1,32 @@
+name: Test email deliverability
+
+# Manual smoke test — fires a Resend email to ADMIN_EMAIL to validate the
+# DKIM/SPF/DMARC pipeline end-to-end. Not scheduled. Triggered manually
+# via `gh workflow run "Test email deliverability"`.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call /api/cron/test-email
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET not configured"
+            exit 1
+          fi
+          RESPONSE=$(curl -sS -w "\nHTTP_CODE:%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://trackinglab.online/api/cron/test-email")
+          CODE=$(echo "$RESPONSE" | grep -oE "HTTP_CODE:[0-9]+" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:.*//')
+          echo "Response: $BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Test email returned HTTP $CODE"
+            exit 1
+          fi
