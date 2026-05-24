@@ -1,46 +1,61 @@
-# Hourly scrape cron driven by GitHub Actions, gated to 9h-21h Paris time.
+# Every-15-min scrape cron driven by GitHub Actions, 24/7.
 #
 # Why GitHub Actions and not Vercel cron? Vercel Hobby is limited to 2 daily
-# crons; we want hourly refresh during the user's active hours. GitHub Actions
-# free tier gives 2000 minutes/month — way more than enough.
+# crons. GitHub Actions free tier gives 2000 minutes/month — enough room for
+# 96 calls/day across multiple platforms.
 #
-# Why "every hour UTC + Paris-hour gate" instead of a fixed UTC range?
-#   GH Actions cron runs in UTC only. Paris is UTC+1 in winter, UTC+2 in summer
-#   (DST). A fixed UTC range would drift by 1 hour twice a year. The gate step
-#   below checks the actual Paris hour and skips the run if outside 9-21,
-#   handling DST automatically. The wasted runs (outside business hours) exit
-#   in ~5s each and consume <2 min/month of GH Actions budget.
+# Why every 15 min and 24/7 (no Paris-hour gate)?
+#   Paying customers (commercial launch 2026-05-23) expect <1h data freshness
+#   around the clock, not just during European business hours. The previous
+#   `'13 * * * *'` + 9-21 Paris gate left a 12h dead window every night where
+#   account data drifted stale.
+#
+# Why split LinkedIn off?
+#   LinkedIn's upstream Edge function is the slowest platform (~3-5s/account,
+#   frequently rate-limited). Running it at 15-min cadence with TikTok/YouTube
+#   means LinkedIn slow accounts starve the fast platforms. LinkedIn has its
+#   own hourly workflow (scrape-linkedin.yml).
 #
 # Each call to /api/cron/scrape-* runs inside a Vercel serverless function
-# (60s budget). The endpoints scrape staleest accounts first, so even if one
-# call hits the 55s ceiling, the next pass covers what was missed.
+# (60s budget). The endpoints scrape staleest accounts first and stamp
+# `"_timeout":true` when they bail early — we then loop up to 3 passes per
+# call so a single GH job can drain ~290 accounts × 3 = ~870 accounts per
+# 15-min window per platform group.
+#
+# Budget @ 96 calls/day:
+#   - Worst case (3 passes × ~30s + curl overhead): ~120s/job × 96 = ~192 min/day
+#   - Typical (1-2 passes after queue catches up): ~60s/job × 96 = ~96 min/day
+#   - Monthly: ~2880-5760 min worst case. With concurrency:cancel-in-progress=false
+#     and the in-app staleness queue, most calls clear in 1 pass after warmup.
+#   - LinkedIn workflow adds ~360 min/month (24 calls/day × ~30s × 30 days).
+#   - Health-monitor adds ~150 min/month.
+#   - Total stays under 2000-min free tier in steady state; spikes during
+#     onboarding may temporarily push higher.
 #
 # Setup:
 #   1. Repo Settings → Secrets and variables → Actions → New secret
 #      Name: CRON_SECRET (same value as Vercel env var)
-#   2. Manual trigger: Actions tab → "Scrape cron (hourly)" → Run workflow.
+#   2. Manual trigger: Actions tab → "Scrape cron (every 15 min)" → Run workflow.
 
-name: Scrape cron (hourly)
+name: Scrape cron (every 15 min)
 
 on:
   schedule:
-    # Every hour UTC at minute 13. The Paris-hour gate below filters to 9-21
-    # local. We avoid minute :00 because GitHub's docs explicitly warn that
-    # schedules at the top of the hour are most likely to be delayed (or
-    # silently dropped) under platform load — we observed 1h+ gaps when this
-    # was '0 * * * *', leaving newly-added accounts un-scraped for hours.
-    - cron: '13 * * * *'
+    # Every 15 min, around the clock. Offset by 2 min from :00/:15/:30/:45 to
+    # avoid GH Actions platform-load delays at quarter-hour boundaries.
+    - cron: '2,17,32,47 * * * *'
   workflow_dispatch:
     inputs:
       platforms:
-        description: 'Which crons to trigger (manual runs ignore the time gate)'
+        description: 'Which crons to trigger'
         required: false
         default: 'all'
         type: choice
         options: [all, instagram, tiktok-youtube]
 
-# Cancel any older still-running invocation when a new one starts. Avoids
-# overlapping cron calls when a previous run is taking unusually long.
+# Allow overlapping passes — the in-app staleness queue + _timeout: true resume
+# pattern handles duplicate calls gracefully (re-entrant; already-fresh accounts
+# are skipped via the cadence check).
 concurrency:
   group: scrape-cron
   cancel-in-progress: false
@@ -48,56 +63,34 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Paris business-hours gate
-        id: gate
-        run: |
-          # Skip scheduled runs outside 9h-21h Paris time. Manual workflow_dispatch
-          # always proceeds (user explicitly clicked "Run workflow").
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "→ manual trigger, gate bypassed"
-            echo "proceed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          PARIS_HOUR=$(TZ='Europe/Paris' date +%H | sed 's/^0//')
-          PARIS_HOUR=${PARIS_HOUR:-0}
-          echo "→ Paris hour: ${PARIS_HOUR}h"
-          if [ "$PARIS_HOUR" -ge 9 ] && [ "$PARIS_HOUR" -le 21 ]; then
-            echo "→ inside business window (9-21h), proceeding"
-            echo "proceed=true" >> $GITHUB_OUTPUT
-          else
-            echo "→ outside business window, skipping"
-            echo "proceed=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Pick platforms
         id: which
-        if: steps.gate.outputs.proceed == 'true'
         run: |
           PLATFORMS="${{ github.event.inputs.platforms || 'all' }}"
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
           echo "→ scraping: $PLATFORMS"
 
       - name: Trigger /api/cron/scrape-instagram
-        if: steps.gate.outputs.proceed == 'true' && (steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'instagram')
+        if: steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'instagram'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          APP_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}
+          APP_URL: ${{ vars.APP_URL || 'https://trackinglab.online' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET is not set in repo secrets"
             exit 1
           fi
           echo "── /api/cron/scrape-instagram ──"
-          # Two passes back-to-back: covers cases where pass 1 timed out before
-          # finishing the staleest accounts. Pass 2 picks them up.
-          for pass in 1 2; do
+          # Up to 3 passes: covers cases where pass 1 timed out before
+          # finishing the staleest accounts. Pass 2/3 picks them up.
+          for pass in 1 2 3; do
             echo "Pass $pass:"
             HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
                         -H "Authorization: Bearer $CRON_SECRET" \
                         --max-time 90 \
-                        "${APP_URL:-https://app.trackinglab.online}/api/cron/scrape-instagram")
+                        "${APP_URL}/api/cron/scrape-instagram")
             echo "$HTTP"
             if echo "$HTTP" | grep -q '"_timeout":true'; then
               echo "→ pass $pass timed out, will retry"
@@ -105,28 +98,28 @@ jobs:
               echo "→ pass $pass clean, skipping further passes"
               break
             fi
-            sleep 5
+            sleep 3
           done
 
       - name: Trigger /api/cron/scrape-tiktok-youtube
-        if: steps.gate.outputs.proceed == 'true' && (steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'tiktok-youtube')
+        if: steps.which.outputs.platforms == 'all' || steps.which.outputs.platforms == 'tiktok-youtube'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          APP_URL: ${{ vars.APP_URL || 'https://app.trackinglab.online' }}
+          APP_URL: ${{ vars.APP_URL || 'https://trackinglab.online' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET is not set in repo secrets"
             exit 1
           fi
           echo "── /api/cron/scrape-tiktok-youtube ──"
-          # TT/YT have heavier yt-dlp work; we typically need 2-3 passes to cover
-          # 20+ accounts within Vercel's 60s budget per call.
+          # TT/YT have heavier yt-dlp work; up to 3 passes cover ~870 accounts
+          # per 15-min window with 16-thread concurrency.
           for pass in 1 2 3; do
             echo "Pass $pass:"
             HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
                         -H "Authorization: Bearer $CRON_SECRET" \
                         --max-time 90 \
-                        "${APP_URL:-https://app.trackinglab.online}/api/cron/scrape-tiktok-youtube")
+                        "${APP_URL}/api/cron/scrape-tiktok-youtube")
             echo "$HTTP"
             if echo "$HTTP" | grep -q '"_timeout":true'; then
               echo "→ pass $pass timed out, will retry"
@@ -134,7 +127,7 @@ jobs:
               echo "→ pass $pass clean, skipping further passes"
               break
             fi
-            sleep 5
+            sleep 3
           done
 
       - name: Summary
@@ -143,6 +136,5 @@ jobs:
           echo "## Scrape cron summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Gate: \`${{ steps.gate.outputs.proceed }}\` (Paris business hours 9-21)" >> $GITHUB_STEP_SUMMARY
-          echo "- Platforms: \`${{ steps.which.outputs.platforms || 'skipped' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Platforms: \`${{ steps.which.outputs.platforms || 'all' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC') (Paris: $(TZ='Europe/Paris' date +'%H:%M:%S'))" >> $GITHUB_STEP_SUMMARY

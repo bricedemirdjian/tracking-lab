@@ -1,0 +1,71 @@
+# Hourly LinkedIn scrape, 24/7. Split off from scrape-cron.yml on 2026-05-23.
+#
+# Why a dedicated workflow?
+#   LinkedIn's upstream Edge function is the slowest platform (~3-5s/account,
+#   often rate-limited). At every-15-min cadence it was starving the fast
+#   platforms (TikTok/YouTube/Instagram). Hourly is the right cadence for
+#   LinkedIn — most LinkedIn accounts post ≤1-2 times/day so the freshness
+#   trade-off is acceptable.
+#
+# Budget: 24 calls/day × ~30s typical × 30 days = ~360 min/month.
+# Combined with scrape-cron.yml + health-monitor, total stays under the
+# 2000-min GitHub Actions free tier.
+#
+# Setup: requires CRON_SECRET as a repo Action secret (same value as Vercel env).
+
+name: Scrape cron LinkedIn (hourly)
+
+on:
+  schedule:
+    # Every hour at minute :07 — offset from scrape-cron.yml (:02/:17/:32/:47)
+    # so LinkedIn doesn't compete with TT/YT/IG for the same Vercel function
+    # capacity window.
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+# Allow overlapping passes — the in-app staleness queue + _timeout: true resume
+# pattern handles duplicate calls gracefully.
+concurrency:
+  group: scrape-cron-linkedin
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Trigger /api/cron/scrape-linkedin
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://trackinglab.online' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set in repo secrets"
+            exit 1
+          fi
+          echo "── /api/cron/scrape-linkedin ──"
+          # Up to 3 passes covers ~150 LinkedIn accounts within the hourly window
+          # at 8-thread concurrency (LI Edge function rate-limits at higher fan-out).
+          for pass in 1 2 3; do
+            echo "Pass $pass:"
+            HTTP=$(curl -sS -w "\n[HTTP %{http_code} in %{time_total}s]\n" \
+                        -H "Authorization: Bearer $CRON_SECRET" \
+                        --max-time 90 \
+                        "${APP_URL}/api/cron/scrape-linkedin")
+            echo "$HTTP"
+            if echo "$HTTP" | grep -q '"_timeout":true'; then
+              echo "→ pass $pass timed out, will retry"
+            else
+              echo "→ pass $pass clean, skipping further passes"
+              break
+            fi
+            sleep 3
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## LinkedIn scrape summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC') (Paris: $(TZ='Europe/Paris' date +'%H:%M:%S'))" >> $GITHUB_STEP_SUMMARY

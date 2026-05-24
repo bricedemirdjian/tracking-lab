@@ -33,9 +33,13 @@ def _get_pg_pool():
         # after ~30-60s, and the next query trips an EOF on the SSL stream.
         # With keepalives, the kernel pings the peer every keepalives_idle
         # seconds; the connection stays alive across batch pauses.
+        # Pool sizing: bumped 2026-05-23 (max 20→30) to absorb the every-15-min
+        # cron cadence × per-platform threads × 50-100 customers. Supabase Pro
+        # ceiling is ~60 connections — leaving headroom for the dashboard and
+        # admin queries. Override via DB_POOL_MAX env if Supabase plan changes.
         _pg_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=int(os.environ.get("DB_POOL_MIN", "2")),
-            maxconn=int(os.environ.get("DB_POOL_MAX", "20")),
+            maxconn=int(os.environ.get("DB_POOL_MAX", "30")),
             user=unquote(parsed.username or ''),
             password=unquote(parsed.password or ''),
             host=parsed.hostname or '',
@@ -48,7 +52,7 @@ def _get_pg_pool():
             keepalives_interval=int(os.environ.get("DB_KEEPALIVES_INTERVAL", "10")),
             keepalives_count=int(os.environ.get("DB_KEEPALIVES_COUNT", "5")),
         )
-        print(f"[DB] Pool initialized (min=2, max=20, keepalives on) → {parsed.hostname}:{parsed.port}")
+        print(f"[DB] Pool initialized (min={_pg_pool.minconn}, max={_pg_pool.maxconn}, keepalives on) → {parsed.hostname}:{parsed.port}")
     return _pg_pool
 
 

@@ -1995,7 +1995,19 @@ def _cron_scrape(platform_filter=None):
     user_account_pairs.sort(key=_staleness_key)
 
     if user_account_pairs:
-        with ThreadPoolExecutor(max_workers=12) as executor:
+        # Per-platform concurrency tuning: TikTok rate-limits if hammered from a
+        # single IP, so cap parallelism more aggressively when TikTok is in the
+        # mix. Instagram/YouTube/LinkedIn tolerate higher fan-out (yt-dlp is
+        # CPU-bound; IG/LI go through external Edge functions).
+        if platform_filter == ["linkedin"]:
+            max_workers = 8   # LinkedIn Edge function is the bottleneck
+        elif platform_filter == ["instagram"]:
+            max_workers = 16  # IG Edge function handles parallelism well
+        elif platform_filter and "tiktok" in platform_filter:
+            max_workers = 12  # TikTok rate-limits aggressively
+        else:
+            max_workers = 16  # default for mixed / all-platforms
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(scrape_one, pair): pair for pair in user_account_pairs}
             for fut in as_completed(futures):
                 if time.time() - started > max_duration:
@@ -2037,28 +2049,60 @@ def api_cron_daily_scrape():
 
 
 @app.route("/api/cron/scrape-tiktok-youtube", methods=["GET"])
-@limiter.limit("20 per hour", key_func=get_remote_address)
+@limiter.limit("60 per hour", key_func=get_remote_address)
 def api_cron_scrape_tiktok_youtube():
-    """Hourly cron — TikTok + YouTube + LinkedIn.
+    """15-min cron — TikTok + YouTube (LinkedIn split off 2026-05-23).
 
     Route name kept for backwards-compat with the existing GitHub Actions
-    workflow + .env-pinned monitors. LinkedIn was added 2026-05-11 because
-    it had no cron of its own and was drifting >24h stale.
+    workflow + .env-pinned monitors. LinkedIn moved to its own hourly
+    endpoint because its Edge function is the slowest (~3-5s/account) and
+    was dragging down the every-15-min cadence for fast platforms.
+
+    Optional `?platforms=` query param overrides the default filter, so a
+    single GH Actions job can chain platforms across passes without
+    needing 3 distinct endpoints. Example: `?platforms=tiktok,youtube`.
     """
     err = _cron_auth_check()
     if err:
         return err
-    return _cron_scrape(platform_filter=["tiktok", "youtube", "linkedin"])
+    override = request.args.get("platforms", "").strip()
+    if override:
+        plats = [p.strip().lower() for p in override.split(",") if p.strip()]
+        plats = [p for p in plats if p in ("tiktok", "youtube", "instagram", "linkedin")]
+        if plats:
+            return _cron_scrape(platform_filter=plats)
+    return _cron_scrape(platform_filter=["tiktok", "youtube"])
 
 
 @app.route("/api/cron/scrape-instagram", methods=["GET"])
-@limiter.limit("20 per hour", key_func=get_remote_address)
+@limiter.limit("60 per hour", key_func=get_remote_address)
 def api_cron_scrape_instagram():
-    """Twice daily cron (9h & 18h) — Instagram only."""
+    """15-min cron — Instagram only.
+
+    Bumped from twice-daily to every-15-min on 2026-05-23 to support the
+    commercial campaign launch (paying customers expect <1h freshness).
+    """
     err = _cron_auth_check()
     if err:
         return err
     return _cron_scrape(platform_filter=["instagram"])
+
+
+@app.route("/api/cron/scrape-linkedin", methods=["GET"])
+@limiter.limit("30 per hour", key_func=get_remote_address)
+def api_cron_scrape_linkedin():
+    """Hourly cron — LinkedIn only.
+
+    LinkedIn is the slowest platform (~3-5s/account, frequently rate-limited
+    by the upstream Edge function). Running it hourly instead of every 15 min
+    keeps the per-pass account budget realistic and avoids burning Vercel
+    function-seconds on overlapping LinkedIn calls that would mostly skip
+    not-due accounts anyway.
+    """
+    err = _cron_auth_check()
+    if err:
+        return err
+    return _cron_scrape(platform_filter=["linkedin"])
 
 
 @app.route("/api/cron/health-monitor", methods=["GET"])
