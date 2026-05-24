@@ -44,7 +44,7 @@ def _get_pg_pool():
         # logical conns over a small server-side pool.
         _pg_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=int(os.environ.get("DB_POOL_MIN", "1")),
-            maxconn=int(os.environ.get("DB_POOL_MAX", "5")),
+            maxconn=int(os.environ.get("DB_POOL_MAX", "3")),
             user=unquote(parsed.username or ''),
             password=unquote(parsed.password or ''),
             host=parsed.hostname or '',
@@ -208,7 +208,23 @@ else:
 def get_connection():
     if DATABASE_URL:
         pool = _get_pg_pool()
-        return _PooledConn(pool, pool.getconn())
+        # Retry-on-PoolError: psycopg2's pool.getconn() raises immediately
+        # when the pool is full. With concurrent scrape crons writing and a
+        # user-facing read landing at the same moment, this is common. Wait
+        # briefly + retry; this gracefully serialises bursts of demand
+        # instead of bubbling up "connection pool exhausted" 500s to users.
+        import time, random
+        last_err = None
+        for attempt in range(8):
+            try:
+                return _PooledConn(pool, pool.getconn())
+            except psycopg2.pool.PoolError as e:
+                last_err = e
+                sleep_ms = (50 << attempt) + random.randint(0, 50)  # 50,150,250,...
+                if sleep_ms > 2000:
+                    break
+                time.sleep(sleep_ms / 1000)
+        raise last_err
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
