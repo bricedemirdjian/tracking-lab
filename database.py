@@ -33,13 +33,18 @@ def _get_pg_pool():
         # after ~30-60s, and the next query trips an EOF on the SSL stream.
         # With keepalives, the kernel pings the peer every keepalives_idle
         # seconds; the connection stays alive across batch pauses.
-        # Pool sizing: bumped 2026-05-23 (max 20→30) to absorb the every-15-min
-        # cron cadence × per-platform threads × 50-100 customers. Supabase Pro
-        # ceiling is ~60 connections — leaving headroom for the dashboard and
-        # admin queries. Override via DB_POOL_MAX env if Supabase plan changes.
+        # Pool sizing on Vercel serverless: each function instance gets its
+        # own pool. With ~4-6 instances spawned concurrently by the 15-min
+        # cron cadence × per-platform threads, total connections =
+        # instances × maxconn. Supabase Pro caps at 60 direct connections;
+        # we keep maxconn=5 so 6 instances × 5 = 30 (well under the cap)
+        # leaving headroom for dashboard reads. The retry layer + SSL keepalives
+        # handle transient closes. For higher scale, migrate DATABASE_URL to
+        # the Supabase PgBouncer pooler (port 6543) which multiplexes infinite
+        # logical conns over a small server-side pool.
         _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=int(os.environ.get("DB_POOL_MIN", "2")),
-            maxconn=int(os.environ.get("DB_POOL_MAX", "30")),
+            minconn=int(os.environ.get("DB_POOL_MIN", "1")),
+            maxconn=int(os.environ.get("DB_POOL_MAX", "5")),
             user=unquote(parsed.username or ''),
             password=unquote(parsed.password or ''),
             host=parsed.hostname or '',
