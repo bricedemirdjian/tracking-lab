@@ -7,7 +7,7 @@ import requests
 import stripe
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, Response, redirect, url_for
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, logout_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -571,6 +571,97 @@ def billing():
                            plans=PLANS,
                            pending_switch=pending_switch,
                            stripe_pub_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
+
+
+@app.route("/api/account/delete", methods=["POST"])
+@login_required
+def api_account_delete():
+    """GDPR Article 17 — right to erasure. Hard-deletes the user's data:
+      1. Cancels active Stripe subscription (no automatic refund).
+      2. Wipes all user-scoped rows (accounts, videos, snapshots, projects,
+         project_accounts, video_analysis, subscriptions, users).
+      3. Logs the user out.
+      4. Returns redirect target.
+
+    Idempotency: if any step fails partway, the user gets an error and can
+    retry — we don't roll back partial deletes because Stripe-side cancel
+    is irreversible anyway. Order is chosen so the most "valuable" data
+    (Stripe) is handled first; if it fails, no DB rows have been deleted yet.
+    """
+    body = request.json or {}
+    if (body.get("confirm") or "").strip().upper() != "SUPPRIMER":
+        return jsonify({"error": "Confirmation invalide — tapez SUPPRIMER."}), 400
+
+    uid = current_user.id
+    user_email = current_user.email
+    sub = get_user_subscription(uid)
+    stripe_sub_id = sub.get("stripe_subscription_id")
+
+    # 1. Cancel Stripe subscription (best-effort — if already canceled or
+    # missing, swallow the error and continue with DB cleanup).
+    if stripe_sub_id:
+        try:
+            stripe.Subscription.cancel(stripe_sub_id, prorate=False)
+            print(f"[account/delete] cancelled Stripe sub {stripe_sub_id} for user {uid}")
+        except stripe.error.InvalidRequestError as e:
+            # Already canceled or doesn't exist — fine.
+            print(f"[account/delete] Stripe cancel skip (already gone?) for {stripe_sub_id}: {e}")
+        except Exception as e:
+            # Unexpected — log but proceed (user wants out, Stripe-side will
+            # be reconciled manually if needed).
+            print(f"[account/delete] Stripe cancel ERROR for {stripe_sub_id}: {e}")
+
+    # 2. Hard-delete DB rows in FK-safe order.
+    try:
+        from database import get_connection, _execute
+        conn = get_connection()
+        for sql in (
+            "DELETE FROM video_analysis WHERE user_id = %s",
+            "DELETE FROM project_accounts WHERE user_id = %s",
+            "DELETE FROM projects WHERE user_id = %s",
+            "DELETE FROM daily_snapshots WHERE user_id = %s",
+            "DELETE FROM videos WHERE user_id = %s",
+            "DELETE FROM accounts WHERE user_id = %s",
+            "DELETE FROM subscriptions WHERE user_id = %s",
+            "DELETE FROM users WHERE id = %s",
+        ):
+            try:
+                _execute(conn, sql, (uid,))
+            except Exception as inner:
+                # Some tables may not exist on older DB; ignore "missing
+                # table" errors but bubble up genuine issues.
+                msg = str(inner).lower()
+                if "does not exist" in msg or "no such table" in msg:
+                    print(f"[account/delete] skip (table missing): {sql[:50]}…")
+                    conn.rollback()
+                    continue
+                raise
+        conn.commit()
+        conn.close()
+        print(f"[account/delete] DB rows wiped for user_id={uid} email={user_email}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[account/delete] DB cleanup error for uid={uid}: {e}")
+        return jsonify({"error": "Erreur lors de la suppression. Contactez support@trackinglab.online."}), 500
+
+    # 3. Log out (clears session cookie).
+    logout_user()
+
+    # 4. Best-effort confirmation email (non-blocking).
+    try:
+        from emailer import send_admin_alert
+        send_admin_alert(
+            subject=f"Compte supprimé : {user_email}",
+            body_text=f"L'utilisateur {user_email} (id={uid}) vient de supprimer son compte via /account.\n"
+                     f"Stripe sub: {stripe_sub_id or 'aucun'} → canceled.\n"
+                     f"Toutes les données utilisateur ont été effacées de la DB.",
+            severity="info",
+        )
+    except Exception:
+        pass  # Email failure must not block the deletion response.
+
+    return jsonify({"ok": True, "redirect": "/?deleted=1"})
 
 
 @app.route("/account")

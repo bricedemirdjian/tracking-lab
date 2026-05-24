@@ -152,6 +152,90 @@
     .logout-btn:hover { background: rgba(255, 59, 48, 0.06); }
     .logout-btn svg { width: 16px; height: 16px; }
 
+    /* GDPR Danger zone */
+    .danger-zone {
+      margin-top: 28px;
+      padding: 20px;
+      border: 1px solid #fcd5d5;
+      background: #fff8f8;
+      border-radius: 12px;
+    }
+    .danger-title { font-size: 14px; font-weight: 700; color: var(--red);
+      margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .danger-desc { font-size: 13px; color: var(--muted); margin: 0 0 14px;
+      line-height: 1.5; }
+    .danger-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .danger-btn:hover { background: rgba(255, 59, 48, 0.08); }
+
+    /* Delete confirmation modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 16px;
+    }
+    .modal-overlay.is-open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      max-width: 480px; width: 100%;
+      padding: 28px;
+      box-shadow: 0 24px 48px rgba(0,0,0,.2);
+    }
+    .modal h3 { margin: 0 0 12px; font-size: 20px; font-weight: 700;
+      letter-spacing: -.3px; }
+    .modal p { margin: 0 0 16px; font-size: 14px; line-height: 1.5;
+      color: var(--muted); }
+    .modal ul { margin: 0 0 18px; padding-left: 18px; font-size: 13px;
+      color: var(--muted); line-height: 1.6; }
+    .modal label { display: block; font-size: 12px; font-weight: 600;
+      color: var(--text); margin: 0 0 6px; }
+    .modal input[type="text"] {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 14px;
+      box-sizing: border-box;
+    }
+    .modal input[type="text"]:focus {
+      outline: none; border-color: var(--red);
+    }
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+      margin-top: 20px;
+    }
+    .modal-btn {
+      padding: 10px 18px; border-radius: 8px;
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; border: 1px solid transparent;
+      transition: opacity .15s, background .15s;
+    }
+    .modal-btn-cancel { background: #f5f5f7; color: var(--text); border-color: var(--border); }
+    .modal-btn-cancel:hover { background: #ebebef; }
+    .modal-btn-confirm { background: var(--red); color: #fff; }
+    .modal-btn-confirm:hover:not(:disabled) { filter: brightness(1.05); }
+    .modal-btn-confirm:disabled { opacity: .4; cursor: not-allowed; }
+    .modal-error {
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      background: #fff0f3;
+      border: 1px solid #ffd1dc;
+      color: #c11149;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+    .modal-error.is-visible { display: block; }
+
     /* Mobile sweep — the rest of the page is already mobile-first
        (.grid is 1fr by default, expands to 1fr 1fr at >=600px), but the
        profile header + topbar + container padding need tightening on
@@ -288,6 +372,100 @@
       </a>
     </div>
 
+    <!-- 5. GDPR Danger zone -->
+    <div class="danger-zone">
+      <p class="danger-title">Zone dangereuse</p>
+      <p class="danger-desc">
+        La suppression de votre compte est <strong>définitive et irréversible</strong>.
+        Toutes vos données seront effacées de manière permanente (comptes suivis,
+        vidéos, projets, historique, abonnement). Conformément au RGPD, cette
+        action est traitée immédiatement.
+      </p>
+      <button type="button" class="danger-btn" id="openDeleteModalBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        Supprimer mon compte
+      </button>
+    </div>
+
   </main>
+
+  <!-- Delete confirmation modal -->
+  <div class="modal-overlay" id="deleteModal" role="dialog" aria-labelledby="deleteModalTitle" aria-hidden="true">
+    <div class="modal">
+      <h3 id="deleteModalTitle">Supprimer définitivement votre compte ?</h3>
+      <p>Cette action est <strong>irréversible</strong>. Elle effacera immédiatement&nbsp;:</p>
+      <ul>
+        <li>Votre profil et email</li>
+        <li>Tous vos comptes suivis et leurs données (vidéos, métriques, snapshots)</li>
+        <li>Vos projets et organisations</li>
+        <li>Votre abonnement Stripe (annulé immédiatement, pas de remboursement automatique)</li>
+      </ul>
+      <label for="deleteConfirmInput">Pour confirmer, tapez <strong>SUPPRIMER</strong> ci-dessous&nbsp;:</label>
+      <input type="text" id="deleteConfirmInput" autocomplete="off" spellcheck="false">
+      <div id="deleteModalError" class="modal-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-cancel" id="cancelDeleteBtn">Annuler</button>
+        <button type="button" class="modal-btn modal-btn-confirm" id="confirmDeleteBtn" disabled>Supprimer définitivement</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const modal = document.getElementById('deleteModal');
+      const openBtn = document.getElementById('openDeleteModalBtn');
+      const cancelBtn = document.getElementById('cancelDeleteBtn');
+      const confirmBtn = document.getElementById('confirmDeleteBtn');
+      const input = document.getElementById('deleteConfirmInput');
+      const errorBox = document.getElementById('deleteModalError');
+
+      function openModal() {
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        confirmBtn.disabled = true;
+        errorBox.classList.remove('is-visible');
+        errorBox.textContent = '';
+        setTimeout(() => input.focus(), 50);
+      }
+      function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+      openBtn.addEventListener('click', openModal);
+      cancelBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      input.addEventListener('input', () => {
+        confirmBtn.disabled = input.value.trim().toUpperCase() !== 'SUPPRIMER';
+      });
+
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Suppression…';
+        errorBox.classList.remove('is-visible');
+        try {
+          const res = await fetch('/api/account/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: input.value.trim().toUpperCase() }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errorBox.textContent = data.error || 'Suppression impossible. Réessayez ou contactez support@trackinglab.online.';
+            errorBox.classList.add('is-visible');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Supprimer définitivement';
+            return;
+          }
+          window.location.href = data.redirect || '/?deleted=1';
+        } catch (err) {
+          errorBox.textContent = 'Erreur réseau : ' + (err.message || 'réessayez.');
+          errorBox.classList.add('is-visible');
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Supprimer définitivement';
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
