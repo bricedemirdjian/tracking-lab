@@ -2088,6 +2088,36 @@ def api_cron_scrape_instagram():
     return _cron_scrape(platform_filter=["instagram"])
 
 
+@app.route("/api/cron/test-email", methods=["GET"])
+@limiter.limit("10 per hour", key_func=get_remote_address)
+def api_cron_test_email():
+    """One-shot email pipeline smoke test. Sends an alert to ADMIN_EMAIL via
+    Resend so we can confirm DKIM/SPF/DMARC alignment + Resend deliverability
+    end-to-end without waiting for a real incident. Protected by CRON_SECRET."""
+    err = _cron_auth_check()
+    if err:
+        return err
+    try:
+        from emailer import send_admin_alert
+        from datetime import datetime
+        ok = send_admin_alert(
+            subject="Pipeline test — deliverability check",
+            body_text=(
+                "Si tu lis ce mail dans ta boîte principale (pas dans les spams), "
+                "le pipeline Resend → DKIM signed → SPF aligned → DMARC OK fonctionne "
+                "à 100%. La campagne d'acquisition peut démarrer.\n\n"
+                f"Triggered at: {datetime.utcnow().isoformat()}Z\n"
+                "From: noreply@trackinglab.online (or whatever RESEND_FROM_EMAIL is set to)\n"
+                "Reply-to: support@trackinglab.online (if RESEND_REPLY_TO is set)\n"
+            ),
+            severity="info",
+        )
+        return jsonify({"sent": ok, "from_addr": os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")})
+    except Exception as e:
+        print(f"[test-email] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/cron/scrape-linkedin", methods=["GET"])
 @limiter.limit("30 per hour", key_func=get_remote_address)
 def api_cron_scrape_linkedin():
