@@ -2247,7 +2247,6 @@ def api_cron_mirror_thumbs():
                 OR thumbnail_url LIKE '%%fbcdn%%'
                 OR thumbnail_url LIKE '%%tiktok.com%%'
               )
-            ORDER BY created_at DESC NULLS LAST
             LIMIT %s
         """, (BATCH_LIMIT,))
 
