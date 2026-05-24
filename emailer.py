@@ -18,7 +18,8 @@ from typing import Optional
 
 _FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 _FROM_NAME = os.environ.get("RESEND_FROM_NAME", "Tracking Lab")
-_APP_URL = os.environ.get("APP_BASE_URL", "https://tracking-lab.io").rstrip("/")
+_REPLY_TO = os.environ.get("RESEND_REPLY_TO", "").strip() or None
+_APP_URL = os.environ.get("APP_BASE_URL", "https://trackinglab.online").rstrip("/")
 
 
 def _send(to_email: str, subject: str, html: str, reply_to: Optional[str] = None) -> bool:
