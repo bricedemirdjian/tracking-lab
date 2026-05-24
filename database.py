@@ -795,11 +795,25 @@ def migrate_db():
 # ==================== Subscription functions ====================
 
 def get_user_subscription(user_id):
+    """Return the subscriptions row for this user; fall back to the users.plan
+    column when no subscriptions row exists (e.g. brand-new signup that hasn't
+    completed Stripe checkout yet — they should read as 'pending', not 'starter',
+    so the /billing page renders the onboarding state instead of 'Mon abonnement
+    actif').
+    """
     conn = get_connection()
     sub = _fetchone(conn, "SELECT * FROM subscriptions WHERE user_id = %s", (user_id,))
-    conn.close()
     if not sub:
-        return {'plan': 'starter', 'status': 'active', 'stripe_customer_id': None, 'stripe_subscription_id': None}
+        user = _fetchone(conn, "SELECT plan FROM users WHERE id = %s", (user_id,))
+        conn.close()
+        fallback_plan = (user or {}).get('plan') or 'pending'
+        return {
+            'plan': fallback_plan,
+            'status': 'pending' if fallback_plan == 'pending' else 'active',
+            'stripe_customer_id': None,
+            'stripe_subscription_id': None,
+        }
+    conn.close()
     return sub
 
 
