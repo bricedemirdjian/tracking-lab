@@ -2081,16 +2081,18 @@ def api_cron_health_monitor():
         from emailer import send_admin_alert
         conn = get_connection()
 
-        # 1. Reset transient SSL/network failures (safe — retry layer covers it)
+        # 1. Reset transient SSL/network failures (safe — retry layer covers it).
+        # psycopg2 treats `%` as the start of a parameter placeholder, so any
+        # literal `%` inside LIKE patterns must be doubled.
         reset_rows = _fetchall(conn, """
             SELECT id, username, platform, last_error_msg
             FROM accounts
             WHERE consecutive_failures BETWEEN 1 AND 2
               AND (
-                LOWER(last_error_msg) LIKE '%ssl connection has been closed%'
-                OR LOWER(last_error_msg) LIKE '%server closed the connection%'
-                OR LOWER(last_error_msg) LIKE '%eof detected%'
-                OR LOWER(last_error_msg) LIKE '%bad connection%'
+                LOWER(last_error_msg) LIKE '%%ssl connection has been closed%%'
+                OR LOWER(last_error_msg) LIKE '%%server closed the connection%%'
+                OR LOWER(last_error_msg) LIKE '%%eof detected%%'
+                OR LOWER(last_error_msg) LIKE '%%bad connection%%'
               )
         """)
         if reset_rows:
