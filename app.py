@@ -712,12 +712,30 @@ def api_billing_create_subscription_intent():
             "publishable_key": os.environ.get('STRIPE_PUBLISHABLE_KEY'),
         })
     except stripe.error.StripeError as e:
-        print(f"[STRIPE] create-subscription-intent failed: {e}")
-        return jsonify({"error": str(e)}), 400
+        # Verbose log so we can root-cause Stripe failures in prod (timeout vs
+        # auth vs price-not-found vs customer-issue). The user-facing JSON
+        # stays terse — only the print goes to Vercel logs.
+        print(
+            f"[STRIPE create-subscription-intent] {type(e).__name__}: "
+            f"msg={getattr(e, 'user_message', None) or str(e)!r} "
+            f"code={getattr(e, 'code', None)!r} "
+            f"http_status={getattr(e, 'http_status', None)!r} "
+            f"request_id={getattr(e, 'request_id', None)!r} "
+            f"plan={plan_name} period={period} "
+            f"customer_id={customer_id!r} "
+            f"price_id={price_id!r}"
+        )
+        return jsonify({"error": getattr(e, 'user_message', None) or str(e)}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"[STRIPE ERROR] create-subscription-intent: {e}")
+        print(
+            f"[STRIPE ERROR create-subscription-intent] {type(e).__name__}: "
+            f"msg={str(e)!r} "
+            f"plan={plan_name} period={period} "
+            f"customer_id={customer_id!r} "
+            f"price_id={price_id!r}"
+        )
         return jsonify({"error": str(e) or "Erreur interne"}), 500
 
 
