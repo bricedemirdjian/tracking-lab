@@ -586,6 +586,10 @@ async def fetch_tiktok_async(username: str, user_id: Optional[int] = None) -> An
                 v.setdefault("_tt_full_name",        profile_stats.get("full_name"))
                 v.setdefault("_tt_biography",        profile_stats.get("biography"))
                 v.setdefault("_tt_profile_pic",      profile_stats.get("profile_pic"))
+                # B2 guard: stamp the API-reported total count so _store() can
+                # detect partial yt-dlp listings and avoid overwriting good
+                # totals with a degraded SUM(videos).
+                v.setdefault("_tt_expected_video_count", profile_stats.get("video_count", 0))
         print(
             f"  [TikTok] @{username}: {len(winner)} videos, "
             f"{followers} followers, {total_likes} likes"
@@ -1001,6 +1005,7 @@ async def _process_and_store(
         tt_region = None
         tt_biography = None
         tt_profile_pic = None
+        tt_expected_video_count = 0  # B2: API-reported count (0 if non-TT)
         for item, mirrored_thumb in zip(pre_extracted, mirrored_urls):
             vdata = item["vdata"]
             video_id = item["vid"]
@@ -1024,6 +1029,7 @@ async def _process_and_store(
                 tt_region = vdata.get("_tt_region")
                 tt_biography = vdata.get("_tt_biography")
                 tt_profile_pic = vdata.get("_tt_profile_pic")
+                tt_expected_video_count = int(vdata.get("_tt_expected_video_count") or 0)
                 if vdata.get("_tt_full_name"):
                     display_name = vdata["_tt_full_name"]
             total_views_sum    += int(vdata.get("view_count", 0) or 0)
@@ -1068,14 +1074,33 @@ async def _process_and_store(
         # For TikTok, prefer the channel-level heartCount (authoritative);
         # for YouTube, the per-video sum is the only signal we have at scrape time.
         total_likes = total_likes_channel if total_likes_channel else total_likes_sum
+
+        # B2 listing-completeness guard: if yt-dlp came back with significantly
+        # fewer videos than TikTok's API reported (transient API flakiness),
+        # the partial SUM would clobber the previously-correct totals in DB.
+        # Writing 0 triggers the `CASE WHEN > 0 THEN ... ELSE old` guard inside
+        # upsert_account, so the historical value is preserved. Threshold: 95%.
+        listing_complete = True
+        if platform == "tiktok" and tt_expected_video_count > 0:
+            ratio = len(pre_extracted) / tt_expected_video_count
+            listing_complete = ratio >= 0.95
+            if not listing_complete:
+                print(
+                    f"  [TikTok] @{username}: partial listing "
+                    f"({len(pre_extracted)}/{tt_expected_video_count} = {ratio:.0%}) — "
+                    f"preserving total_views/total_comments from previous scrape"
+                )
+        safe_total_views    = total_views_sum    if listing_complete else 0
+        safe_total_comments = total_comments_sum if listing_complete else 0
+
         upsert_account(
             username=username,
             display_name=display_name,
             followers=followers,
             following=following,
             total_likes=total_likes,
-            total_views=total_views_sum,
-            total_comments=total_comments_sum,
+            total_views=safe_total_views,
+            total_comments=safe_total_comments,
             friend_count=tt_friend_count,
             verified=tt_verified,
             private_account=tt_private_account,

@@ -2061,6 +2061,166 @@ def api_cron_scrape_instagram():
     return _cron_scrape(platform_filter=["instagram"])
 
 
+@app.route("/api/cron/health-monitor", methods=["GET"])
+@limiter.limit("60 per hour", key_func=get_remote_address)
+def api_cron_health_monitor():
+    """24/7 auto-remediation pass. Runs every 15 min via GitHub Actions.
+
+    Responsibilities:
+      1. Detect accounts with consecutive_failures >= 1 but where last_error
+         looks transient (SSL drop, network blip) → reset to 0 + clear last_updated
+         so the next scrape cron picks them up first.
+      2. Detect accounts stale > 12h despite a healthy scraper → email admin.
+      3. Backfill last_updated when NULL but last_success_at is recent.
+    """
+    err = _cron_auth_check()
+    if err:
+        return err
+    try:
+        from database import get_connection, _execute, _fetchall
+        from emailer import send_admin_alert
+        conn = get_connection()
+
+        # 1. Reset transient SSL/network failures (safe — retry layer covers it)
+        reset_rows = _fetchall(conn, """
+            SELECT id, username, platform, last_error_msg
+            FROM accounts
+            WHERE consecutive_failures BETWEEN 1 AND 2
+              AND (
+                LOWER(last_error_msg) LIKE '%ssl connection has been closed%'
+                OR LOWER(last_error_msg) LIKE '%server closed the connection%'
+                OR LOWER(last_error_msg) LIKE '%eof detected%'
+                OR LOWER(last_error_msg) LIKE '%bad connection%'
+              )
+        """)
+        if reset_rows:
+            _execute(conn, """
+                UPDATE accounts
+                SET consecutive_failures = 0,
+                    last_error_msg = NULL,
+                    last_updated = NULL
+                WHERE id = ANY(%s)
+            """, ([r['id'] for r in reset_rows],))
+            conn.commit()
+
+        # 2. Detect accounts stale >12h despite healthy scraper
+        stale = _fetchall(conn, """
+            SELECT username, platform, last_updated, consecutive_failures, last_error_msg
+            FROM accounts
+            WHERE last_updated IS NOT NULL
+              AND EXTRACT(EPOCH FROM (NOW() - last_updated)) / 3600 > 12
+              AND consecutive_failures >= 3
+            ORDER BY last_updated ASC
+            LIMIT 20
+        """)
+
+        # 3. Backfill NULL last_updated from last_success_at (legacy rows)
+        _execute(conn, """
+            UPDATE accounts
+            SET last_updated = last_success_at
+            WHERE last_updated IS NULL AND last_success_at IS NOT NULL
+        """)
+        conn.commit()
+        conn.close()
+
+        result = {
+            "transient_reset": len(reset_rows),
+            "stale_alerts": len(stale),
+        }
+
+        if stale:
+            lines = [f"- @{r['username']} ({r['platform']}) "
+                     f"stuck since {r['last_updated']} "
+                     f"({r['consecutive_failures']} failures, err: {r['last_error_msg']})"
+                     for r in stale]
+            send_admin_alert(
+                subject=f"{len(stale)} comptes bloqués >12h",
+                body_text="Ces comptes ne se sont pas mis à jour depuis plus de "
+                          f"12h malgré ≥3 tentatives :\n\n" + "\n".join(lines) +
+                          "\n\nLe retry layer a déjà tenté de débloquer en transient. "
+                          "Investigation manuelle requise (handle invalide ? plateforme down ?).",
+                severity="critical",
+            )
+
+        if reset_rows:
+            print(f"[health-monitor] reset {len(reset_rows)} transient failures, "
+                  f"flagged {len(stale)} as critically stale")
+
+        return jsonify(result)
+    except Exception as e:
+        print(f"[health-monitor] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cron/data-accuracy-check", methods=["GET"])
+@limiter.limit("20 per hour", key_func=get_remote_address)
+def api_cron_data_accuracy_check():
+    """Periodic data sanity check. Runs every 6h.
+
+    Compares accounts.total_views vs SUM(videos.views) per account. If the
+    drift exceeds 5%, the account row is stale-overwritten — reconcile by
+    taking the larger value (since incremental video upserts are usually
+    more reliable than one-shot scrape totals). Emails admin when drifts
+    are caught and corrected so the user knows the data they're seeing is
+    fresh.
+    """
+    err = _cron_auth_check()
+    if err:
+        return err
+    try:
+        from database import get_connection, _execute, _fetchall
+        from emailer import send_admin_alert
+        conn = get_connection()
+        drifts = _fetchall(conn, """
+            SELECT a.username, a.platform, a.total_views AS account_views,
+                   vsum.sum_views AS videos_sum,
+                   CASE WHEN a.total_views > 0
+                        THEN ABS(vsum.sum_views - a.total_views)::float / a.total_views
+                        ELSE 1.0 END AS drift_pct
+            FROM accounts a
+            JOIN (
+                SELECT account_username, user_id, SUM(views) AS sum_views
+                FROM videos
+                GROUP BY account_username, user_id
+            ) vsum ON vsum.account_username = a.username AND vsum.user_id = a.user_id
+            WHERE vsum.sum_views > a.total_views * 1.05
+            ORDER BY drift_pct DESC
+            LIMIT 50
+        """)
+        if drifts:
+            _execute(conn, """
+                UPDATE accounts a SET total_views = vsum.sum_views
+                FROM (
+                    SELECT account_username, user_id, SUM(views) AS sum_views,
+                           SUM(comments) AS sum_comments
+                    FROM videos
+                    GROUP BY account_username, user_id
+                ) vsum
+                WHERE a.username = vsum.account_username
+                  AND a.user_id = vsum.user_id
+                  AND vsum.sum_views > a.total_views * 1.05
+            """)
+            conn.commit()
+        conn.close()
+
+        if drifts:
+            lines = [f"- @{d['username']} ({d['platform']}): "
+                     f"{int(d['account_views']):,} → {int(d['videos_sum']):,} "
+                     f"(+{d['drift_pct']*100:.0f}%)" for d in drifts[:10]]
+            send_admin_alert(
+                subject=f"{len(drifts)} comptes : totaux reconciliés (drift >5%)",
+                body_text="La vue agrégée par compte avait dérivé du SUM(videos). "
+                          "Reconciliation automatique appliquée.\n\n"
+                          + "\n".join(lines)
+                          + ("" if len(drifts) <= 10 else f"\n... et {len(drifts)-10} de plus"),
+                severity="info",
+            )
+        return jsonify({"drifts_reconciled": len(drifts)})
+    except Exception as e:
+        print(f"[accuracy-check] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ──────────────────────────────────────────────
 # ANALYTICS ENDPOINTS
 # ──────────────────────────────────────────────

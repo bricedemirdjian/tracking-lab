@@ -27,6 +27,12 @@ def _get_pg_pool():
     if _pg_pool is None:
         from urllib.parse import urlparse, unquote
         parsed = urlparse(DATABASE_URL)
+        # TCP keepalives + connect_timeout fight the #1 cause of
+        # "SSL connection has been closed unexpectedly" on Vercel ↔ Supabase:
+        # the serverless function's egress NAT silently drops idle TCP flows
+        # after ~30-60s, and the next query trips an EOF on the SSL stream.
+        # With keepalives, the kernel pings the peer every keepalives_idle
+        # seconds; the connection stays alive across batch pauses.
         _pg_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=int(os.environ.get("DB_POOL_MIN", "2")),
             maxconn=int(os.environ.get("DB_POOL_MAX", "20")),
@@ -36,9 +42,109 @@ def _get_pg_pool():
             port=parsed.port or 5432,
             dbname=(parsed.path or '/postgres').lstrip('/'),
             sslmode='require',
+            connect_timeout=int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
+            keepalives=1,
+            keepalives_idle=int(os.environ.get("DB_KEEPALIVES_IDLE", "30")),
+            keepalives_interval=int(os.environ.get("DB_KEEPALIVES_INTERVAL", "10")),
+            keepalives_count=int(os.environ.get("DB_KEEPALIVES_COUNT", "5")),
         )
-        print(f"[DB] Pool initialized (min=2, max=20) → {parsed.hostname}:{parsed.port}")
+        print(f"[DB] Pool initialized (min=2, max=20, keepalives on) → {parsed.hostname}:{parsed.port}")
     return _pg_pool
+
+
+# Transient psycopg2 errors that warrant a reconnect+retry. Caught by name
+# (psycopg2.errors.AdminShutdown isn't present on every version of psycopg2)
+# so import failures don't break the module.
+def _build_transient_error_set():
+    if not DATABASE_URL:
+        return tuple()
+    exc = [psycopg2.OperationalError, psycopg2.InterfaceError]
+    for name in ("AdminShutdown", "CrashShutdown", "ConnectionException",
+                 "ConnectionFailure", "ConnectionDoesNotExist"):
+        cls = getattr(getattr(psycopg2, "errors", object()), name, None)
+        if cls is not None:
+            exc.append(cls)
+    return tuple(exc)
+
+
+_TRANSIENT_DB_ERRORS = _build_transient_error_set()
+
+# String fragments that mark a transient SSL/connection drop even when the
+# exception class is something generic. The Supabase SSL drop surfaces as
+# psycopg2.OperationalError with this exact message in production.
+_TRANSIENT_DB_ERR_FRAGMENTS = (
+    "ssl connection has been closed unexpectedly",
+    "server closed the connection unexpectedly",
+    "terminating connection due to administrator command",
+    "connection not open",
+    "connection already closed",
+    "could not receive data from server",
+    "could not send data to server",
+    "eof detected",
+    "bad connection",
+)
+
+
+def _is_transient_db_error(exc: BaseException) -> bool:
+    """True iff `exc` looks like a recoverable connection drop."""
+    if not DATABASE_URL:
+        return False
+    if isinstance(exc, _TRANSIENT_DB_ERRORS):
+        return True
+    msg = str(exc).lower() if exc else ""
+    return any(frag in msg for frag in _TRANSIENT_DB_ERR_FRAGMENTS)
+
+
+def _db_retry(fn, *, label="db", retries=3):
+    """Run `fn(conn)` against a fresh pooled connection, retrying transient
+    SSL/connection drops with exponential backoff + jitter. Commits on success.
+
+    `fn` MUST be idempotent at the transaction boundary — it receives a brand
+    new connection on every attempt and is expected to redo the whole unit of
+    work. Used by the scraper write path so an SSL drop mid-batch doesn't lose
+    data: we rollback, get a new conn, replay the same INSERT/UPDATE, commit.
+
+    Sleeps are short by design (Vercel 60s budget): 50ms, 200ms, 800ms +/- jitter.
+    """
+    import random
+    import time as _time
+    delays = (0.05, 0.20, 0.80)
+    last_exc = None
+    attempts = max(1, retries + 1)
+    for attempt in range(attempts):
+        conn = None
+        try:
+            conn = get_connection()
+            result = fn(conn)
+            conn.commit()
+            return result
+        except BaseException as e:
+            last_exc = e
+            transient = _is_transient_db_error(e)
+            # Roll back + force-discard the broken conn so the pool doesn't
+            # hand it to the next caller. _PooledConn.close() routes the
+            # decision based on conn.closed, which psycopg2 sets to non-zero
+            # the moment the SSL stream dies.
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            if not transient or attempt >= attempts - 1:
+                raise
+            delay = delays[min(attempt, len(delays) - 1)]
+            delay += random.uniform(0, delay * 0.25)  # +0-25% jitter
+            print(f"[DB Retry] attempt={attempt + 1}/{attempts - 1} "
+                  f"label={label} error={str(e)[:160]!r} sleep={int(delay * 1000)}ms")
+            _time.sleep(delay)
+    # Unreachable — loop either returns or raises — but keeps linters happy.
+    if last_exc:
+        raise last_exc
+    return None
 
 
 class _PooledConn:
@@ -56,10 +162,18 @@ class _PooledConn:
         if self._returned:
             return
         self._returned = True
+        # If the underlying conn is broken (closed != 0 means "closed or in
+        # an unrecoverable state"), pass close=True so putconn discards it
+        # instead of recycling a dead socket to the next caller. Without
+        # this, an SSL-dropped conn would stay in the pool and poison every
+        # subsequent borrower until the pool was rebuilt.
+        broken = False
         try:
-            # If the underlying conn is in a broken state psycopg2's pool
-            # discards it; otherwise it goes back to the pool for reuse.
-            self._pool.putconn(self._conn)
+            broken = getattr(self._conn, "closed", 0) != 0
+        except Exception:
+            broken = True
+        try:
+            self._pool.putconn(self._conn, close=broken)
         except Exception:
             try:
                 self._conn.close()
@@ -537,32 +651,48 @@ def _migrate_account_error_tracking(conn):
 
 
 def record_scrape_success(user_id, username, platform):
-    """Mark a successful scrape: reset failure counter, stamp last_success_at."""
-    conn = get_connection()
-    try:
+    """Mark a successful scrape: reset failure counter, stamp last_success_at.
+    Wrapped in _db_retry so a transient SSL drop after a successful scrape
+    can't leave the row stamped with `consecutive_failures > 0`.
+    """
+    def _do(conn):
         _execute(conn,
             "UPDATE accounts SET consecutive_failures = 0, last_error_msg = NULL, "
             "last_success_at = NOW() "
             "WHERE user_id = %s AND username = %s AND platform = %s",
             (user_id, username, platform))
-        conn.commit()
-    finally:
-        conn.close()
+
+    if DATABASE_URL:
+        _db_retry(_do, label=f"record_scrape_success:{platform}:{username}")
+    else:
+        conn = get_connection()
+        try:
+            _do(conn)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def record_scrape_failure(user_id, username, platform, error_msg):
     """Mark a failed scrape: increment counter, store error message (truncated)."""
-    conn = get_connection()
-    try:
-        msg = (error_msg or "")[:300]
+    msg = (error_msg or "")[:300]
+
+    def _do(conn):
         _execute(conn,
             "UPDATE accounts SET consecutive_failures = consecutive_failures + 1, "
             "last_error_msg = %s "
             "WHERE user_id = %s AND username = %s AND platform = %s",
             (msg, user_id, username, platform))
-        conn.commit()
-    finally:
-        conn.close()
+
+    if DATABASE_URL:
+        _db_retry(_do, label=f"record_scrape_failure:{platform}:{username}")
+    else:
+        conn = get_connection()
+        try:
+            _do(conn)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def _migrate_video_analysis_table(conn):
@@ -1086,103 +1216,138 @@ def get_account_usernames_for_project(user_id, project_id):
 # ==================== Data functions (all filtered by user_id) ====================
 
 def upsert_account(username, display_name=None, avatar_url=None, followers=0, following=0, total_likes=0, total_views=0, total_comments=0, last_media_count=0, friend_count=0, verified=None, private_account=None, region=None, bio=None, user_id=None, platform="tiktok"):
-    conn = get_connection()
     # On conflict, only overwrite numeric stats if the new value is non-zero —
     # otherwise an empty/error scrape (e.g. transient 404) wipes good data.
     # Genuine "0 followers" still gets persisted on the initial INSERT path.
     # Booleans (verified, private_account) and TEXT (region) only overwrite
     # when the new value is provided (None == "no signal" = preserve old).
-    _execute(conn, """
-        INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, friend_count, verified, private_account, region, bio, last_updated, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT(username, user_id, platform) DO UPDATE SET
-            display_name     = COALESCE(excluded.display_name, accounts.display_name),
-            avatar_url       = COALESCE(excluded.avatar_url, accounts.avatar_url),
-            followers        = CASE WHEN excluded.followers        > 0 THEN excluded.followers        ELSE accounts.followers        END,
-            following        = CASE WHEN excluded.following        > 0 THEN excluded.following        ELSE accounts.following        END,
-            total_likes      = CASE WHEN excluded.total_likes      > 0 THEN excluded.total_likes      ELSE accounts.total_likes      END,
-            total_views      = CASE WHEN excluded.total_views      > 0 THEN excluded.total_views      ELSE accounts.total_views      END,
-            total_comments   = CASE WHEN excluded.total_comments   > 0 THEN excluded.total_comments   ELSE accounts.total_comments   END,
-            last_media_count = CASE WHEN excluded.last_media_count > 0 THEN excluded.last_media_count ELSE accounts.last_media_count END,
-            friend_count     = CASE WHEN excluded.friend_count     > 0 THEN excluded.friend_count     ELSE accounts.friend_count     END,
-            verified         = COALESCE(excluded.verified, accounts.verified),
-            private_account  = COALESCE(excluded.private_account, accounts.private_account),
-            region           = COALESCE(excluded.region, accounts.region),
-            bio = COALESCE(excluded.bio, accounts.bio),
-            last_updated = excluded.last_updated
-    """, (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, friend_count, verified, private_account, region, bio, datetime.now().isoformat(), user_id, platform))
-    conn.commit()
-    conn.close()
+    # Wrapped in _db_retry: if the SSL stream drops mid-statement, the entire
+    # INSERT/UPDATE is replayed on a fresh connection.
+    now_iso = datetime.now().isoformat()
+    params = (username, display_name, avatar_url, followers, following, total_likes,
+              total_views, total_comments, last_media_count, friend_count, verified,
+              private_account, region, bio, now_iso, user_id, platform)
+
+    def _do(conn):
+        _execute(conn, """
+            INSERT INTO accounts (username, display_name, avatar_url, followers, following, total_likes, total_views, total_comments, last_media_count, friend_count, verified, private_account, region, bio, last_updated, user_id, platform)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(username, user_id, platform) DO UPDATE SET
+                display_name     = COALESCE(excluded.display_name, accounts.display_name),
+                avatar_url       = COALESCE(excluded.avatar_url, accounts.avatar_url),
+                followers        = CASE WHEN excluded.followers        > 0 THEN excluded.followers        ELSE accounts.followers        END,
+                following        = CASE WHEN excluded.following        > 0 THEN excluded.following        ELSE accounts.following        END,
+                total_likes      = CASE WHEN excluded.total_likes      > 0 THEN excluded.total_likes      ELSE accounts.total_likes      END,
+                total_views      = CASE WHEN excluded.total_views      > 0 THEN excluded.total_views      ELSE accounts.total_views      END,
+                total_comments   = CASE WHEN excluded.total_comments   > 0 THEN excluded.total_comments   ELSE accounts.total_comments   END,
+                last_media_count = CASE WHEN excluded.last_media_count > 0 THEN excluded.last_media_count ELSE accounts.last_media_count END,
+                friend_count     = CASE WHEN excluded.friend_count     > 0 THEN excluded.friend_count     ELSE accounts.friend_count     END,
+                verified         = COALESCE(excluded.verified, accounts.verified),
+                private_account  = COALESCE(excluded.private_account, accounts.private_account),
+                region           = COALESCE(excluded.region, accounts.region),
+                bio = COALESCE(excluded.bio, accounts.bio),
+                last_updated = excluded.last_updated
+        """, params)
+
+    if DATABASE_URL:
+        _db_retry(_do, label=f"upsert_account:{platform}:{username}")
+    else:
+        conn = get_connection()
+        try:
+            _do(conn)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def upsert_video(video_id, account_username, description="", create_time=None, duration=0,
                  views=0, likes=0, comments=0, shares=0, saves=0, thumbnail_url=None, video_url=None, user_id=None, platform="tiktok"):
-    conn = get_connection()
-    _execute(conn, """
-        INSERT INTO videos (video_id, account_username, description, create_time, duration,
-                           views, likes, comments, shares, saves, thumbnail_url, video_url, last_updated, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT(video_id, user_id) DO UPDATE SET
-            -- DB constraint is (user_id, video_id) without platform. We rely on
-            -- the fact that platform-specific video IDs don't collide in practice
-            -- (TikTok IDs ≠ YouTube IDs ≠ Instagram IDs by construction).
-            description = COALESCE(excluded.description, videos.description),
-            views = excluded.views,
-            likes = excluded.likes,
-            comments = excluded.comments,
-            shares = excluded.shares,
-            saves = excluded.saves,
-            thumbnail_url = COALESCE(excluded.thumbnail_url, videos.thumbnail_url),
-            last_updated = excluded.last_updated
-    """, (video_id, account_username, description, create_time, duration,
-          views, likes, comments, shares, saves, thumbnail_url, video_url, datetime.now().isoformat(), user_id, platform))
-    conn.commit()
-    conn.close()
+    now_iso = datetime.now().isoformat()
+    params = (video_id, account_username, description, create_time, duration,
+              views, likes, comments, shares, saves, thumbnail_url, video_url,
+              now_iso, user_id, platform)
+
+    def _do(conn):
+        _execute(conn, """
+            INSERT INTO videos (video_id, account_username, description, create_time, duration,
+                               views, likes, comments, shares, saves, thumbnail_url, video_url, last_updated, user_id, platform)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(video_id, user_id) DO UPDATE SET
+                -- DB constraint is (user_id, video_id) without platform. We rely on
+                -- the fact that platform-specific video IDs don't collide in practice
+                -- (TikTok IDs ≠ YouTube IDs ≠ Instagram IDs by construction).
+                description = COALESCE(excluded.description, videos.description),
+                views = excluded.views,
+                likes = excluded.likes,
+                comments = excluded.comments,
+                shares = excluded.shares,
+                saves = excluded.saves,
+                thumbnail_url = COALESCE(excluded.thumbnail_url, videos.thumbnail_url),
+                last_updated = excluded.last_updated
+        """, params)
+
+    if DATABASE_URL:
+        _db_retry(_do, label=f"upsert_video:{platform}:{video_id}")
+    else:
+        conn = get_connection()
+        try:
+            _do(conn)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def save_daily_snapshot(account_username, user_id=None, platform="tiktok"):
-    conn = get_connection()
     today = datetime.now().strftime("%Y-%m-%d")
 
-    query = "SELECT COUNT(*) as total_videos, COALESCE(SUM(views), 0) as total_views, COALESCE(SUM(likes), 0) as total_likes, COALESCE(SUM(comments), 0) as total_comments, COALESCE(SUM(shares), 0) as total_shares, COALESCE(SUM(saves), 0) as total_saves FROM videos WHERE account_username = %s AND platform = %s"
-    params = [account_username, platform]
-    if user_id is not None:
-        query += " AND user_id = %s"
-        params.append(user_id)
+    def _do(conn):
+        query = "SELECT COUNT(*) as total_videos, COALESCE(SUM(views), 0) as total_views, COALESCE(SUM(likes), 0) as total_likes, COALESCE(SUM(comments), 0) as total_comments, COALESCE(SUM(shares), 0) as total_shares, COALESCE(SUM(saves), 0) as total_saves FROM videos WHERE account_username = %s AND platform = %s"
+        params = [account_username, platform]
+        if user_id is not None:
+            query += " AND user_id = %s"
+            params.append(user_id)
 
-    stats = _fetchone(conn, query, params)
+        stats = _fetchone(conn, query, params)
 
-    acc_query = "SELECT followers FROM accounts WHERE username = %s AND platform = %s"
-    acc_params = [account_username, platform]
-    if user_id is not None:
-        acc_query += " AND user_id = %s"
-        acc_params.append(user_id)
+        acc_query = "SELECT followers FROM accounts WHERE username = %s AND platform = %s"
+        acc_params = [account_username, platform]
+        if user_id is not None:
+            acc_query += " AND user_id = %s"
+            acc_params.append(user_id)
 
-    account = _fetchone(conn, acc_query, acc_params)
-    followers = account["followers"] if account else 0
+        account = _fetchone(conn, acc_query, acc_params)
+        followers = account["followers"] if account else 0
 
-    total_views = stats["total_views"]
-    total_engagement = stats["total_likes"] + stats["total_comments"] + stats["total_shares"] + stats["total_saves"]
-    engagement_rate = (total_engagement / total_views * 100) if total_views > 0 else 0
+        total_views = stats["total_views"]
+        total_engagement = stats["total_likes"] + stats["total_comments"] + stats["total_shares"] + stats["total_saves"]
+        engagement_rate = (total_engagement / total_views * 100) if total_views > 0 else 0
 
-    _execute(conn, """
-        INSERT INTO daily_snapshots (account_username, snapshot_date, total_videos, total_views,
-                                    total_likes, total_comments, total_shares, total_saves, followers, engagement_rate, user_id, platform)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT(account_username, platform, snapshot_date, user_id) DO UPDATE SET
-            total_videos = excluded.total_videos,
-            total_views = excluded.total_views,
-            total_likes = excluded.total_likes,
-            total_comments = excluded.total_comments,
-            total_shares = excluded.total_shares,
-            total_saves = excluded.total_saves,
-            followers = excluded.followers,
-            engagement_rate = excluded.engagement_rate
-    """, (account_username, today, stats["total_videos"], total_views,
-          stats["total_likes"], stats["total_comments"], stats["total_shares"],
-          stats["total_saves"], followers, engagement_rate, user_id, platform))
-    conn.commit()
-    conn.close()
+        _execute(conn, """
+            INSERT INTO daily_snapshots (account_username, snapshot_date, total_videos, total_views,
+                                        total_likes, total_comments, total_shares, total_saves, followers, engagement_rate, user_id, platform)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(account_username, platform, snapshot_date, user_id) DO UPDATE SET
+                total_videos = excluded.total_videos,
+                total_views = excluded.total_views,
+                total_likes = excluded.total_likes,
+                total_comments = excluded.total_comments,
+                total_shares = excluded.total_shares,
+                total_saves = excluded.total_saves,
+                followers = excluded.followers,
+                engagement_rate = excluded.engagement_rate
+        """, (account_username, today, stats["total_videos"], total_views,
+              stats["total_likes"], stats["total_comments"], stats["total_shares"],
+              stats["total_saves"], followers, engagement_rate, user_id, platform))
+
+    if DATABASE_URL:
+        _db_retry(_do, label=f"save_daily_snapshot:{platform}:{account_username}")
+    else:
+        conn = get_connection()
+        try:
+            _do(conn)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_all_accounts(user_id=None, is_competitor=None, with_last_post=False):

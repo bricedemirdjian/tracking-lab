@@ -1,0 +1,46 @@
+name: Health monitor (every 15 min)
+
+# Runs the in-app auto-remediation pass every 15 minutes, around the clock.
+# Cheap and idempotent — each call is <5s and consumes ~150 GitHub Actions
+# minutes/month (well under the 2000 free quota).
+#
+# What this does (see /api/cron/health-monitor in app.py):
+#   1. Resets accounts stuck on transient SSL/network errors so they re-queue.
+#   2. Emails brice.demirdjian@gmail.com if an account is stale >12h despite
+#      ≥3 retry attempts (real problem, not just a network blip).
+#   3. Backfills NULL last_updated from last_success_at (legacy rows).
+#
+# Setup: requires CRON_SECRET as a repo Action secret (same value as Vercel env).
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: health-monitor
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call /api/cron/health-monitor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET not configured in repo secrets"
+            exit 1
+          fi
+          RESPONSE=$(curl -sS -w "\nHTTP_CODE:%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://trackinglab.online/api/cron/health-monitor")
+          CODE=$(echo "$RESPONSE" | grep -oE "HTTP_CODE:[0-9]+" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:.*//')
+          echo "Response: $BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Health monitor returned HTTP $CODE"
+            exit 1
+          fi

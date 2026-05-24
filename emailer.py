@@ -86,6 +86,35 @@ def _shell(title: str, preheader: str, body_html: str) -> str:
 </html>"""
 
 
+# ── Admin alerts ────────────────────────────────────────────────────────
+def send_admin_alert(subject: str, body_text: str, severity: str = "warning") -> bool:
+    """Operational alert to ADMIN_EMAIL. Used by the cron health-monitor
+    and accuracy-check endpoints to surface stuck scrapes, data drift,
+    auth failures, etc. Returns True on send (or no-op when ADMIN_EMAIL
+    or RESEND_API_KEY isn't configured)."""
+    admin = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    if not admin:
+        print(f"[emailer] ADMIN_EMAIL not set — skipping alert '{subject}'")
+        return False
+    icon = {"info": "ℹ️", "warning": "⚠️", "critical": "🚨"}.get(severity, "⚠️")
+    full_subject = f"{icon} [Tracking Lab] {subject}"
+    safe = body_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    body = f"""
+    <h1 style="font-size:20px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em;">
+      {icon} {subject}
+    </h1>
+    <pre style="background:#f6f7f9;border:1px solid #e5e7eb;border-radius:8px;
+                padding:14px 16px;font-size:13px;line-height:1.5;color:#1a1a1f;
+                white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,
+                SFMono-Regular,Menlo,Monaco,Consolas,monospace;margin:0 0 16px 0;">{safe}</pre>
+    <p style="margin:0 0 12px 0;font-size:13px;color:#6e6e73;">
+      Alerte automatique du monitoring 24/7. Aucune action requise si l'incident
+      s'est auto-corrigé (vérifier le dashboard pour confirmation).
+    </p>
+    """
+    return _send(admin, full_subject, _shell(full_subject, subject, body))
+
+
 # ── Public senders ──────────────────────────────────────────────────────
 def send_welcome_email(to_email: str, user_name: str) -> bool:
     """Sent on first login (new account)."""

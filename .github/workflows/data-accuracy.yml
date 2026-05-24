@@ -1,0 +1,41 @@
+name: Data accuracy check (every 6h)
+
+# Compares accounts.total_views vs SUM(videos.views) every 6h to catch silent
+# drift (typically when yt-dlp returns a partial listing and overwrites a
+# correct total with a degraded SUM). Auto-reconciles + emails the admin
+# whenever drifts are caught.
+#
+# Cost: 4 calls/day × <5s each = ~10 min/month of Actions budget.
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'   # offset minute :17 to avoid the top-of-hour traffic spike
+  workflow_dispatch:
+
+concurrency:
+  group: data-accuracy
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call /api/cron/data-accuracy-check
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET not configured in repo secrets"
+            exit 1
+          fi
+          RESPONSE=$(curl -sS -w "\nHTTP_CODE:%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://trackinglab.online/api/cron/data-accuracy-check")
+          CODE=$(echo "$RESPONSE" | grep -oE "HTTP_CODE:[0-9]+" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:.*//')
+          echo "Response: $BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Accuracy check returned HTTP $CODE"
+            exit 1
+          fi
