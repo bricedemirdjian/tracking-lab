@@ -2203,6 +2203,98 @@ def api_cron_scrape_instagram():
     return _cron_scrape(platform_filter=["instagram"])
 
 
+@app.route("/api/cron/mirror-thumbs", methods=["GET"])
+@limiter.limit("20 per hour", key_func=get_remote_address)
+def api_cron_mirror_thumbs():
+    """Refresh signed TikTok/Instagram thumbnails by mirroring them to
+    Supabase Storage. Signed CDN URLs expire after 5-7 days; without this,
+    dashboard cards show empty placeholders.
+
+    Strategy: find videos with thumbnail_url pointing to a TT/IG CDN (not
+    already mirrored to Supabase Storage), mirror them in batches of 30,
+    respect the 55s Vercel budget by exiting early with _timeout:true.
+    Idempotent: re-running is safe; already-mirrored URLs are skipped.
+    """
+    err = _cron_auth_check()
+    if err:
+        return err
+    import time, asyncio
+    started = time.monotonic()
+    BUDGET_SEC = 55
+    BATCH_LIMIT = 30
+    mirrored_count = 0
+    failed_count = 0
+    timed_out = False
+
+    try:
+        from database import get_connection, _fetchall, _execute
+        from scraper_async import _mirror_thumbnail_async, _get_session
+
+        conn = get_connection()
+        # Pick videos whose thumbnail_url is a signed CDN URL (not already on
+        # Supabase Storage). Order by most-recent first so the dashboard's
+        # "best videos" view recovers thumbnails fastest.
+        rows = _fetchall(conn, """
+            SELECT id, platform, thumbnail_url
+            FROM videos
+            WHERE thumbnail_url IS NOT NULL
+              AND thumbnail_url != ''
+              AND thumbnail_url NOT LIKE '%%supabase.co/storage%%'
+              AND platform IN ('tiktok', 'instagram')
+              AND (
+                thumbnail_url LIKE '%%tiktokcdn%%'
+                OR thumbnail_url LIKE '%%cdninstagram%%'
+                OR thumbnail_url LIKE '%%fbcdn%%'
+                OR thumbnail_url LIKE '%%tiktok.com%%'
+              )
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT %s
+        """, (BATCH_LIMIT,))
+
+        if not rows:
+            conn.close()
+            return jsonify({"mirrored": 0, "remaining": 0, "_timeout": False})
+
+        async def _run_batch():
+            nonlocal mirrored_count, failed_count, timed_out
+            for r in rows:
+                if time.monotonic() - started > BUDGET_SEC:
+                    timed_out = True
+                    break
+                new_url = await _mirror_thumbnail_async(
+                    r['thumbnail_url'], str(r['id']), r['platform']
+                )
+                if new_url and new_url != r['thumbnail_url']:
+                    try:
+                        _execute(conn,
+                            "UPDATE videos SET thumbnail_url = %s WHERE id = %s",
+                            (new_url, r['id']),
+                        )
+                        mirrored_count += 1
+                    except Exception as e:
+                        print(f"[mirror-thumbs] DB update failed for {r['id']}: {e}")
+                        failed_count += 1
+                else:
+                    failed_count += 1
+            conn.commit()
+
+        asyncio.run(_run_batch())
+        conn.close()
+
+        return jsonify({
+            "mirrored": mirrored_count,
+            "failed": failed_count,
+            "examined": len(rows),
+            "_timeout": timed_out,
+            "elapsed_s": round(time.monotonic() - started, 2),
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[mirror-thumbs] error: {e}")
+        return jsonify({"error": str(e), "mirrored": mirrored_count}), 500
+
+
 @app.route("/api/cron/test-email", methods=["GET"])
 @limiter.limit("10 per hour", key_func=get_remote_address)
 def api_cron_test_email():

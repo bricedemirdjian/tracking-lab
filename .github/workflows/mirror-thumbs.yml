@@ -1,0 +1,49 @@
+name: Mirror thumbnails (every 4h)
+
+# Refreshes signed TikTok/Instagram CDN thumbnails before they expire (5-7 days).
+# Each pass handles up to 30 videos in <55s. Running every 4h = 6 passes/day
+# = up to 180 videos refreshed/day — well above the rate at which signed URLs
+# go stale across the SaaS fleet.
+#
+# Budget impact: ~12 min/day = ~360 min/month (within the 2000-min free quota).
+
+on:
+  schedule:
+    - cron: '23 */4 * * *'   # :23 offset to avoid the top-of-hour cron pile-up
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-thumbs
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call /api/cron/mirror-thumbs (up to 3 passes)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET not configured"
+            exit 1
+          fi
+          for pass in 1 2 3; do
+            echo "=== pass $pass ==="
+            RESPONSE=$(curl -sS -w "\nHTTP_CODE:%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "https://trackinglab.online/api/cron/mirror-thumbs")
+            CODE=$(echo "$RESPONSE" | grep -oE "HTTP_CODE:[0-9]+" | cut -d: -f2)
+            BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:.*//')
+            echo "Response: $BODY"
+            if [ "$CODE" != "200" ]; then
+              echo "::error::Mirror returned HTTP $CODE on pass $pass"
+              exit 1
+            fi
+            # Stop early if the endpoint says nothing left to mirror.
+            if echo "$BODY" | grep -q '"_timeout":false'; then
+              echo "queue drained — exiting"
+              break
+            fi
+          done
