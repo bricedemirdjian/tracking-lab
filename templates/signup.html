@@ -525,8 +525,11 @@
                 }
 
                 // 4. Create Stripe Subscription (returns client_secret).
+                // Canonical plan keys post-refactor: 'monthly' / 'annual'.
+                // Backend still accepts legacy 'pro'/'agency' via auto-mapping,
+                // but we send the canonical names to avoid ambiguity.
                 const period = getPeriod();
-                const plan = period === 'annual' ? 'agency' : 'pro';
+                const plan = period === 'annual' ? 'annual' : 'monthly';
                 const r2 = await fetch('/api/billing/create-subscription-intent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -660,6 +660,11 @@ def api_billing_create_subscription_intent():
     sub = get_user_subscription(current_user.id)
     customer_id = sub.get('stripe_customer_id')
 
+    # Force a tight network budget so a single slow Stripe call can't burn
+    # the whole 60s Vercel function. Also enable SDK-level retry so transient
+    # 5xx / connection drops self-heal without bubbling up as "Payment intent
+    # missing" to the user.
+    stripe.max_network_retries = 2
     try:
         # 1. Get or create the Stripe Customer.
         if not customer_id:
@@ -667,6 +672,7 @@ def api_billing_create_subscription_intent():
                 email=current_user.email,
                 name=current_user.name or current_user.email,
                 metadata={'tl_user_id': str(current_user.id)},
+                idempotency_key=f"tl-customer-{current_user.id}",
             )
             customer_id = customer.id
             # Persist so subsequent retries reuse the same customer.
