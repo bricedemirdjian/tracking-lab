@@ -2223,9 +2223,9 @@ button { font-family: inherit; cursor: pointer; }
         <!-- Period: 4 quick presets + custom toggle -->
         <div class="pill-group" id="rangePicker" aria-label="Période">
           <span class="pill" data-range="1">1j</span>
-          <span class="pill" data-range="7">7j</span>
+          <span class="pill active" data-range="7">7j</span>
           <span class="pill" data-range="30">30j</span>
-          <span class="pill active" data-range="365">365j</span>
+          <span class="pill" data-range="365">365j</span>
           <span class="pill pill-custom" data-range="custom" aria-pressed="false">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span class="pill-custom-label">Personnalisé</span>
@@ -2923,7 +2923,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
 
   // Filter state — single source of truth for /api/stats query params
   const state = {
-    range: 365,         // pill preset (days). null when custom dates used.
+    range: 7,           // pill preset (days). null when custom dates used.
     project_id: 'all',
     account: 'all',
     date_from: null,    // ISO date string YYYY-MM-DD or null
@@ -5561,9 +5561,9 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
   document.getElementById('filterReset').addEventListener('click', () => {
     state.project_id = 'all';
     state.account = 'all';
-    state.range = 365;
+    state.range = 7;
     syncDatesFromRange();
-    setActivePill(365);
+    setActivePill(7);
     showCustomDates(false);
     load();
   });
