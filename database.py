@@ -27,6 +27,10 @@ def _get_pg_pool():
     if _pg_pool is None:
         from urllib.parse import urlparse, unquote
         parsed = urlparse(DATABASE_URL)
+        # DEBUG boot logging (no password leak — just structural pieces)
+        print(f"[DB] parsing DATABASE_URL: scheme={parsed.scheme!r} host={parsed.hostname!r} port={parsed.port!r} user={parsed.username!r} dbname={(parsed.path or '/postgres').lstrip('/')!r} pwd_len={len(parsed.password or '')}")
+        if not parsed.hostname or not parsed.username:
+            raise RuntimeError(f"DATABASE_URL malformed: host={parsed.hostname!r}, user={parsed.username!r}")
         # TCP keepalives + connect_timeout fight the #1 cause of
         # "SSL connection has been closed unexpectedly" on Vercel ↔ Supabase:
         # the serverless function's egress NAT silently drops idle TCP flows
