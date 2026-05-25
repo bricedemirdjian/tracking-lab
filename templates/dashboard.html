@@ -3691,6 +3691,34 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       chartInstances[key] = null;
     }
   }
+  // upsertChart: update an existing Chart.js instance in-place if possible,
+  // otherwise create it from scratch. Avoids the destroy+create churn on
+  // every dashboard reload — destroy() unbinds DOM + canvas context (slow),
+  // and constructing a new Chart re-parses options + animates from zero.
+  // update('none') keeps everything mounted, swaps data/options, redraws
+  // without animation in ~5-15ms instead of ~80-200ms.
+  // Pass `chartType` so we can detect type changes (e.g. line → bar) and
+  // fall back to recreate when needed.
+  function upsertChart(key, canvas, chartType, data, options) {
+    const existing = chartInstances[key];
+    // Same canvas + same chart type → patch in-place
+    if (existing && existing.canvas === canvas && existing.config.type === chartType) {
+      try {
+        existing.data = data;
+        if (options) existing.options = options;
+        existing.update('none');   // 'none' = no animation, instant
+        return existing;
+      } catch (e) {
+        console.warn(`[upsertChart] update failed for ${key}, recreating:`, e);
+      }
+    }
+    if (existing) {
+      try { existing.destroy(); } catch (e) { /* noop */ }
+    }
+    const instance = new Chart(canvas, { type: chartType, data, options });
+    chartInstances[key] = instance;
+    return instance;
+  }
   function setEmpty(canvasId, emptyId, isEmpty) {
     const c = document.getElementById(canvasId);
     const e = document.getElementById(emptyId);
@@ -3927,12 +3955,10 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const badge = document.getElementById('weeklyBadge');
     if (badge) badge.textContent = total === 0 ? '—' : `${fmtCompact(total)} sur 12 sem.`;
     setEmpty('weeklyViewsChart', 'weeklyEmpty', total === 0);
-    destroyChart('weekly');
-    if (total === 0) return;
+    if (total === 0) { destroyChart('weekly'); return; }
 
-    chartInstances.weekly = new Chart(canvas, {
-      type: 'bar',
-      data: {
+    upsertChart('weekly', canvas, 'bar',
+      {
         labels,
         datasets: [{
           label: 'Vues',
@@ -3945,7 +3971,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
           categoryPercentage: 0.85,
         }]
       },
-      options: {
+      {
         responsive: true, maintainAspectRatio: false,
         layout: { padding: { top: 8, right: 4, bottom: 0, left: 0 } },
         plugins: {
@@ -3970,7 +3996,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
           y: AXIS_Y_NUM,
         }
       }
-    });
+    );
   }
 
   async function renderTableCharts(accs, stats) {
@@ -4035,12 +4061,12 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       setEmpty('chartFollowers', 'chartFollowersEmpty', isEmpty);
       const badge = document.getElementById('chartFollowersBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `${sortedDates.length} jour${sortedDates.length > 1 ? 's' : ''}`;
-      destroyChart('followers');
-      if (!isEmpty) {
-        chartInstances.followers = new Chart(document.getElementById('chartFollowers'), {
-          type: 'line',
-          data: { labels: sortedDates, datasets },
-          options: {
+      if (isEmpty) {
+        destroyChart('followers');
+      } else {
+        upsertChart('followers', document.getElementById('chartFollowers'), 'line',
+          { labels: sortedDates, datasets },
+          {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
@@ -4060,7 +4086,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
             },
             scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
-        });
+        );
       }
     }
 
@@ -4094,11 +4120,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       setEmpty('chartViews', 'chartViewsEmpty', isEmpty);
       const badge = document.getElementById('chartViewsBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `${fmtCompact(total)} vues totales`;
-      destroyChart('views');
-      if (!isEmpty) {
-        chartInstances.views = new Chart(document.getElementById('chartViews'), {
-          type: 'line',
-          data: {
+      if (isEmpty) {
+        destroyChart('views');
+      } else {
+        upsertChart('views', document.getElementById('chartViews'), 'line',
+          {
             labels: sortedDates,
             datasets: [{
               label: 'Vues',
@@ -4124,7 +4150,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               pointHoverBorderWidth: 2,
             }]
           },
-          options: {
+          {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
@@ -4143,7 +4169,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
             },
             scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
-        });
+        );
       }
     }
 
@@ -4163,11 +4189,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       if (center) center.textContent = isEmpty ? '—' : fmtCompact(total);
       const badge = document.getElementById('chartDonutBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `${platforms.length} plateforme${platforms.length > 1 ? 's' : ''}`;
-      destroyChart('donut');
-      if (!isEmpty) {
-        chartInstances.donut = new Chart(document.getElementById('chartDonut'), {
-          type: 'doughnut',
-          data: {
+      if (isEmpty) {
+        destroyChart('donut');
+      } else {
+        upsertChart('donut', document.getElementById('chartDonut'), 'doughnut',
+          {
             labels: platforms.map(p => PLATFORM_LABEL[p]),
             datasets: [{
               data,
@@ -4176,7 +4202,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               hoverOffset: 8,
             }]
           },
-          options: {
+          {
             responsive: true,
             maintainAspectRatio: false,
             cutout: '68%',
@@ -4195,7 +4221,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               }
             }
           }
-        });
+        );
       }
     }
 
@@ -4213,11 +4239,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       setEmpty('chartTop', 'chartTopEmpty', isEmpty);
       const badge = document.getElementById('chartTopBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `Top ${top5.length}`;
-      destroyChart('top');
-      if (!isEmpty) {
-        chartInstances.top = new Chart(document.getElementById('chartTop'), {
-          type: 'bar',
-          data: {
+      if (isEmpty) {
+        destroyChart('top');
+      } else {
+        upsertChart('top', document.getElementById('chartTop'), 'bar',
+          {
             labels,
             datasets: [{
               label: 'Vues',
@@ -4228,7 +4254,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               barThickness: 18,
             }]
           },
-          options: {
+          {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
@@ -4245,7 +4271,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11 }, color: '#33373d' } }
             }
           }
-        });
+        );
       }
     }
 
@@ -5047,11 +5073,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
           : `Moy ${(data.reduce((s,v)=>s+v,0)/data.length).toFixed(2).replace('.',',')} %`;
       }
       setEmpty('adviceRadar', 'adviceRadarEmpty', isEmpty);
-      destroyChart('adviceRadar');
-      if (!isEmpty) {
-        chartInstances.adviceRadar = new Chart(document.getElementById('adviceRadar'), {
-          type: 'radar',
-          data: {
+      if (isEmpty) {
+        destroyChart('adviceRadar');
+      } else {
+        upsertChart('adviceRadar', document.getElementById('adviceRadar'), 'radar',
+          {
             labels,
             datasets: [{
               label: 'Engagement (%)',
@@ -5063,7 +5089,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               pointRadius: 4,
             }]
           },
-          options: {
+          {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { display: false },
@@ -5082,7 +5108,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               }
             }
           }
-        });
+        );
       }
     }
 
@@ -5121,11 +5147,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
           : `Moy ${(valid.reduce((s,v)=>s+v,0)/valid.length).toFixed(2).replace('.',',')} %`;
       }
       setEmpty('adviceEngEvo', 'adviceEngEvoEmpty', isEmpty);
-      destroyChart('adviceEngEvo');
-      if (!isEmpty) {
-        chartInstances.adviceEngEvo = new Chart(document.getElementById('adviceEngEvo'), {
-          type: 'line',
-          data: { labels: dates, datasets: [{
+      if (isEmpty) {
+        destroyChart('adviceEngEvo');
+      } else {
+        upsertChart('adviceEngEvo', document.getElementById('adviceEngEvo'), 'line',
+          { labels: dates, datasets: [{
             label: 'Engagement %', data,
             borderColor: '#FF69B4',
             backgroundColor: (ctx) => {
@@ -5142,7 +5168,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
             pointBackgroundColor: '#FF69B4', pointBorderColor: '#fff',
             pointBorderWidth: 1.5, pointHoverRadius: 6, pointHoverBorderWidth: 2,
           }] },
-          options: {
+          {
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
@@ -5163,7 +5189,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               y: { ...AXIS_Y_NUM, ticks: { ...AXIS_Y_NUM.ticks, callback: v => v + '%' } }
             }
           }
-        });
+        );
       }
     }
 
@@ -5173,8 +5199,9 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const badge = document.getElementById('adviceCompBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `${activePlatforms.length} plateforme${activePlatforms.length > 1 ? 's' : ''}`;
       setEmpty('adviceComp', 'adviceCompEmpty', isEmpty);
-      destroyChart('adviceComp');
-      if (!isEmpty) {
+      if (isEmpty) {
+        destroyChart('adviceComp');
+      } else {
         const labels = activePlatforms.map(p => PLATFORM_LABEL[p]);
         // 'Sauvegardes' (saves) series dropped until we switch off yt-dlp
         // for TikTok — yt-dlp's TT extractor strips collect_count, so saves
@@ -5194,10 +5221,9 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
           borderRadius: 4,
           borderSkipped: false,
         }));
-        chartInstances.adviceComp = new Chart(document.getElementById('adviceComp'), {
-          type: 'bar',
-          data: { labels, datasets },
-          options: {
+        upsertChart('adviceComp', document.getElementById('adviceComp'), 'bar',
+          { labels, datasets },
+          {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: {
@@ -5232,7 +5258,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               y: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { font: { size: 10 }, color: '#9aa0a6', callback: v => fmtCompact(v) } }
             }
           }
-        });
+        );
       }
     }
   }
@@ -5263,11 +5289,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       const badge = document.getElementById('adviceDistBadge');
       if (badge) badge.textContent = isEmpty ? '—' : `${total} vidéo${total > 1 ? 's' : ''}`;
       setEmpty('adviceDist', 'adviceDistEmpty', isEmpty);
-      destroyChart('adviceDist');
-      if (!isEmpty) {
-        chartInstances.adviceDist = new Chart(document.getElementById('adviceDist'), {
-          type: 'bar',
-          data: {
+      if (isEmpty) {
+        destroyChart('adviceDist');
+      } else {
+        upsertChart('adviceDist', document.getElementById('adviceDist'), 'bar',
+          {
             labels: BUCKETS.map(b => b.label),
             datasets: [{
               label: 'Vidéos', data: counts,
@@ -5275,7 +5301,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               borderRadius: 6, borderSkipped: false,
             }]
           },
-          options: {
+          {
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { display: false },
@@ -5295,7 +5321,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
               y: { beginAtZero: true, grid: { color: '#f0f0f2' }, border: { display: false }, ticks: { stepSize: 1, font: { size: 10 }, color: '#9aa0a6' } }
             }
           }
-        });
+        );
       }
     }
 
@@ -5320,11 +5346,11 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
         badge.textContent = isEmpty ? '—' : `Moy ${fmtCompact(overall)}`;
       }
       setEmpty('adviceAvg', 'adviceAvgEmpty', isEmpty);
-      destroyChart('adviceAvg');
-      if (!isEmpty) {
-        chartInstances.adviceAvg = new Chart(document.getElementById('adviceAvg'), {
-          type: 'line',
-          data: { labels: days, datasets: [{
+      if (isEmpty) {
+        destroyChart('adviceAvg');
+      } else {
+        upsertChart('adviceAvg', document.getElementById('adviceAvg'), 'line',
+          { labels: days, datasets: [{
             label: 'Vues moyennes', data,
             borderColor: '#FF69B4',
             backgroundColor: (ctx) => {
@@ -5341,7 +5367,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
             pointBackgroundColor: '#FF69B4', pointBorderColor: '#fff',
             pointBorderWidth: 1.5, pointHoverRadius: 6, pointHoverBorderWidth: 2,
           }] },
-          options: {
+          {
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
@@ -5359,7 +5385,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
             },
             scales: { x: AXIS_X_DATE, y: AXIS_Y_NUM }
           }
-        });
+        );
       }
     }
   }
