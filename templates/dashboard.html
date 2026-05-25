@@ -5783,11 +5783,13 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
   // Builds the URLs that view will need and warms them through cachedJSON.
   // Called on hover (start of click intent — usually 100-300ms before the
   // actual click) and once after initial load to warm "the other views".
-  // All buildXURL helpers read isCompetitorScope from closure, so we
-  // temporarily swap it for cross-scope hover prefetches and restore.
-  function prefetchForView(view, isComp) {
+  // All buildXURL helpers read isCompetitorScope/navPlatform from closure,
+  // so we temporarily swap them for cross-context prefetches and restore.
+  function prefetchForView(view, isComp, platform) {
     const prevComp = isCompetitorScope;
+    const prevPlat = navPlatform;
     isCompetitorScope = !!isComp;
+    if (platform !== undefined) navPlatform = platform;
     try {
       // Common to all views
       cachedJSON(buildStatsURL());
@@ -5805,6 +5807,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       }
     } finally {
       isCompetitorScope = prevComp;
+      navPlatform = prevPlat;
     }
   }
 
@@ -5846,7 +5849,48 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       window.scrollTo({ top: 0, behavior: 'instant' });
       load();
     });
+    // Hover-prefetch: when the user mouses over a platform item, warm the
+    // cache with that platform's stats so the click feels instant.
+    a.addEventListener('mouseenter', () => {
+      const target = a.dataset.platformNav;
+      const plat = target === 'all' ? null : target;
+      if (plat === navPlatform) return;
+      prefetchForView(navView, isCompetitorScope, plat);
+    }, { passive: true });
   });
+
+  // ─── Idle prefetch of cross-cutting nav combinations ────────────────
+  // After the initial paint, warm the cache for:
+  //   - the OPPOSITE scope (Analytics ↔ Concurrents)
+  //   - each platform filter for the current view+scope
+  // So any sidebar click resolves from cache. Staggered to spare the DB.
+  function prefetchAllSidebarTargets() {
+    const tasks = [];
+    // Opposite scope, same view
+    tasks.push(() => prefetchForView(navView, !isCompetitorScope, navPlatform));
+    // Each platform for the active scope+view
+    ['tiktok', 'instagram', 'youtube', 'linkedin'].forEach(p => {
+      if (p !== navPlatform) tasks.push(() => prefetchForView(navView, isCompetitorScope, p));
+    });
+    // "All platforms" (navPlatform=null) if we're currently filtered
+    if (navPlatform) tasks.push(() => prefetchForView(navView, isCompetitorScope, null));
+    // Other views in the current scope (already partially handled by
+    // hover-prefetch, but warm them once now for first-click speed too).
+    [null, 'accounts', 'videos', 'table'].forEach(v => {
+      if (v !== navView) tasks.push(() => prefetchForView(v, isCompetitorScope, navPlatform));
+    });
+    // Stagger 300ms each so we don't blow through the DB pool. 12 tasks
+    // × 300ms = ~4s of background traffic, all idle.
+    const fire = () => tasks.forEach((fn, i) => setTimeout(fn, i * 300));
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(fire, { timeout: 6000 });
+    } else {
+      setTimeout(fire, 1500);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => setTimeout(prefetchAllSidebarTargets, 2500));
+  }
 
   // Browser back/forward should also restore navPlatform — extend the
   // existing popstate handler below by re-reading the param.
