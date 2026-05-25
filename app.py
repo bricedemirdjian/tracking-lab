@@ -225,6 +225,29 @@ def _security_headers(response):
 import sys as _sys
 import traceback as _tb
 
+
+def _oneline_tb(label: str, exc: BaseException) -> str:
+    """Emit a full traceback on a SINGLE Vercel log line.
+
+    Vercel's runtime log viewer truncates each entry to the first line. A
+    standard `traceback.print_exc()` therefore loses everything past
+    "Exception on /api/...". We collapse the entire stack into one line so
+    `vercel logs` shows the real psycopg2/SQL error + frame chain in one
+    go — no shell-into-the-function-instance required.
+    """
+    try:
+        tb_str = "".join(_tb.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:
+        tb_str = repr(exc)
+    flat = tb_str.replace("\n", " \\n ").strip()
+    msg = f"[TRACE] {label} :: {type(exc).__name__}: {exc} :: {flat}"
+    try:
+        print(msg, flush=True)
+    except Exception:
+        pass
+    return msg
+
+
 BOOT_DB_OK = False
 BOOT_AUTH_OK = False
 BOOT_DB_ERROR = None
@@ -261,6 +284,28 @@ except Exception as _e:
     _sys.stdout.flush()
 
 
+# Catch-all 500 handler so ANY unhandled exception lands a full single-line
+# traceback in Vercel runtime logs. Without this, Flask's default handler
+# emits a multi-line "Exception on /api/..." record that gets truncated to
+# just the first line by Vercel's log viewer — useless for diagnosis.
+# Note: this fires AFTER route-level except blocks, so well-behaved routes
+# that already return jsonify({"error": ...}, 500) skip this path entirely.
+@app.errorhandler(Exception)
+def _unhandled_exception(e):
+    from werkzeug.exceptions import HTTPException
+    # Pass through Flask/Werkzeug's structured HTTP errors (404, 401, 429
+    # rate limits, etc.) — they're not bugs and have their own renderers.
+    if isinstance(e, HTTPException):
+        return e
+    try:
+        path = request.path
+    except Exception:
+        path = "?"
+    _oneline_tb(f"unhandled_exception:{path}", e)
+    return jsonify({
+        "error": str(e)[:200],
+        "error_type": type(e).__name__,
+    }), 500
 
 
 def admin_required(f):
@@ -1715,7 +1760,9 @@ def api_stats():
         # minute — the "stats à 0 desfois" bug. Now we return HTTP 500 with
         # the error message, cachedJSON refuses to cache, and the dashboard
         # keeps the previous values instead of flashing zeros.
-        app.logger.exception("api_stats_failed")
+        # Use _oneline_tb so the full stack survives Vercel's per-line log
+        # truncation; app.logger.exception writes multi-line which gets cut.
+        _oneline_tb("api_stats_failed", e)
         return jsonify({"error": str(e)[:200]}), 500
 
     # Ensure all values are numeric (PostgreSQL may return None)
@@ -2053,6 +2100,23 @@ def _cron_scrape(platform_filter=None):
     Admins (role='admin') always get 1h regardless of plan. Accounts with
     last_updated NULL are always due (first-time scrape).
     """
+    try:
+        return _cron_scrape_inner(platform_filter)
+    except Exception as e:
+        # Any unhandled crash (PoolError from get_connection, psycopg2
+        # backend disconnect, ThreadPoolExecutor barf) lands here. Emit one
+        # log line with the full traceback so we can diagnose from Vercel
+        # runtime logs without shelling into the function instance.
+        label = ",".join(platform_filter) if platform_filter else "all"
+        _oneline_tb(f"cron_scrape_failed:{label}", e)
+        return jsonify({
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "platforms": label,
+        }), 500
+
+
+def _cron_scrape_inner(platform_filter=None):
     from database import get_connection, _fetchall
     from stripe_billing import get_scrape_cadence_hours
 
@@ -2088,7 +2152,12 @@ def _cron_scrape(platform_filter=None):
             r = scrape_single_account_for_user(uname, uid, platform=plat)
             return uid, uname, r.get("status", "error")
         except Exception as e:
-            return uid, uname, f"error: {str(e)[:100]}"
+            # Surface the full stack in Vercel logs so we can pinpoint which
+            # call site under tiktok_scraper.scrape_single_account_for_user
+            # is throwing — previously the truncated f"error: {str(e)[:100]}"
+            # was the only signal and it dropped the traceback entirely.
+            _oneline_tb(f"scrape_one_failed:{plat}:{uname}", e)
+            return uid, uname, f"error: {type(e).__name__}: {str(e)[:100]}"
 
     # Resolve each user's plan + admin status once. Cron runs without an
     # authenticated user, so we look it up from the DB. The cadence below
@@ -2195,8 +2264,11 @@ def _cron_scrape(platform_filter=None):
                         bucket["scraped"] += 1
                         bucket["by_status"][status] = bucket["by_status"].get(status, 0) + 1
                 except Exception as e:
-                    # Future raised or timed out — record but don't crash the whole cron
-                    print(f"[cron] future error: {e}")
+                    # Future raised or timed out — record but don't crash the
+                    # whole cron. Use _oneline_tb so the full per-account
+                    # stack (which usually points at a specific upsert/SQL
+                    # failure) is visible in Vercel runtime logs.
+                    _oneline_tb("cron_future_failed", e)
 
     elapsed = round(time.time() - started, 1)
     label = ", ".join(platform_filter) if platform_filter else "all"
@@ -2345,10 +2417,12 @@ def api_cron_mirror_thumbs():
             "elapsed_s": round(time.monotonic() - started, 2),
         })
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"[mirror-thumbs] error: {e}")
-        return jsonify({"error": str(e), "mirrored": mirrored_count}), 500
+        _oneline_tb("cron_mirror_thumbs_failed", e)
+        return jsonify({
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "mirrored": mirrored_count,
+        }), 500
 
 
 @app.route("/api/cron/test-email", methods=["GET"])
@@ -2487,8 +2561,9 @@ def api_cron_health_monitor():
 
         return jsonify(result)
     except Exception as e:
-        print(f"[health-monitor] error: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Full single-line traceback for Vercel logs (multi-line gets cut).
+        _oneline_tb("cron_health_monitor_failed", e)
+        return jsonify({"error": str(e), "error_type": type(e).__name__}), 500
 
 
 @app.route("/api/cron/data-accuracy-check", methods=["GET"])

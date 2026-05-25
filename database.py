@@ -4,6 +4,36 @@ import sys
 import traceback
 from datetime import datetime, timedelta
 
+
+def _oneline_tb(label: str, exc: BaseException) -> str:
+    """Format a full Python traceback as a SINGLE log line.
+
+    Vercel's runtime log viewer truncates each log entry's `message` field
+    to the first line (~150 chars). Multi-line `traceback.print_exc()` output
+    therefore loses everything past the first frame — we only see
+    "Exception on /api/..." with no stack. This helper flattens the entire
+    traceback into one line (newlines replaced with `\\n`), prefixes a label,
+    and emits it via a single `print(..., flush=True)` so the whole stack
+    survives the truncation and shows up in `vercel logs`.
+
+    The returned string is also returned so callers can include it in error
+    response bodies for additional surfaces (curl debugging, GitHub Actions
+    cron logs).
+    """
+    try:
+        tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:
+        tb_str = repr(exc)
+    flat = tb_str.replace("\n", " \\n ").strip()
+    msg = f"[TRACE] {label} :: {type(exc).__name__}: {exc} :: {flat}"
+    try:
+        print(msg, flush=True)
+    except Exception:
+        # Never let logging itself crash the request path.
+        pass
+    return msg
+
+
 # ==================== Dual backend: PostgreSQL (Supabase) or SQLite ====================
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -102,10 +132,16 @@ def _get_pg_pool():
             # (see init_db gate below). The pooler handles idle timeouts itself.
             print("[DB] pgbouncer pooler mode → stripping keepalives_* (unsupported)", flush=True)
 
+        # Pool sizing: on pgbouncer the upstream pgbouncer side multiplexes
+        # client conns over a much smaller backend pool, so a 3-conn cap here
+        # was strangling cron concurrency (16 worker threads → PoolError
+        # cascades). 8 is comfortable: 16 cron workers serialise gracefully
+        # via the get_connection retry loop instead of bouncing.
+        default_max = "8" if is_pooler else "3"
         try:
             _pg_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=int(os.environ.get("DB_POOL_MIN", "1")),
-                maxconn=int(os.environ.get("DB_POOL_MAX", "3")),
+                maxconn=int(os.environ.get("DB_POOL_MAX", default_max)),
                 **conn_kwargs,
             )
         except Exception as e:
@@ -113,6 +149,7 @@ def _get_pg_pool():
                 f"[DB] FATAL ThreadedConnectionPool init failed: {type(e).__name__}: {e}",
                 flush=True,
             )
+            _oneline_tb("pool_init_failed", e)
             traceback.print_exc(file=sys.stdout)
             sys.stdout.flush()
             raise
@@ -207,11 +244,19 @@ def _db_retry(fn, *, label="db", retries=3):
                 except Exception:
                     pass
             if not transient or attempt >= attempts - 1:
+                # Fail-loud: dump the full traceback as a SINGLE log line so
+                # Vercel runtime logs preserve it instead of truncating after
+                # "Exception on /api/...". This is the canonical place to see
+                # the real psycopg2 error class + message + stack — every write
+                # path (upsert_account, upsert_video, save_daily_snapshot,
+                # record_scrape_success, record_scrape_failure) funnels here.
+                _oneline_tb(f"db_retry_giving_up:{label}", e)
                 raise
             delay = delays[min(attempt, len(delays) - 1)]
             delay += random.uniform(0, delay * 0.25)  # +0-25% jitter
             print(f"[DB Retry] attempt={attempt + 1}/{attempts - 1} "
-                  f"label={label} error={str(e)[:160]!r} sleep={int(delay * 1000)}ms")
+                  f"label={label} error={str(e)[:160]!r} sleep={int(delay * 1000)}ms",
+                  flush=True)
             _time.sleep(delay)
     # Unreachable — loop either returns or raises — but keeps linters happy.
     if last_exc:
@@ -287,6 +332,10 @@ def get_connection():
                 if sleep_ms > 2000:
                     break
                 time.sleep(sleep_ms / 1000)
+        # Pool exhausted across all retry attempts — emit a single-line
+        # traceback so we can tell pool exhaustion apart from connection-
+        # level failures (TLS/DNS/auth) in Vercel logs.
+        _oneline_tb("get_connection_pool_exhausted", last_err)
         raise last_err
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
