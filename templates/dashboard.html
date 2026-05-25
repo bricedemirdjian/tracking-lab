@@ -2013,6 +2013,37 @@ button { font-family: inherit; cursor: pointer; }
 @media (max-width: 900px) {
   html, body { overflow-x: hidden; }
 }
+
+/* ─── Top progress bar during load() ──────────────────────────────────
+   Indeterminate animation, ~2px thin, in the brand accent color. Shows
+   any time load() is in flight so date-pill / sidebar clicks give
+   instant visual feedback even when the actual data fetch + render
+   takes 500ms-2s. */
+body.is-loading::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--accent, #FF69B4) 30%,
+    var(--accent, #FF69B4) 70%,
+    transparent 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: tl-progress-slide 1.1s cubic-bezier(.4, 0, .2, 1) infinite;
+  z-index: 9999;
+  pointer-events: none;
+}
+@keyframes tl-progress-slide {
+  0%   { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+/* Slight dim on the active pill while loading so the click feels
+   acknowledged even if the rerender takes longer than the click. */
+body.is-loading #rangePicker .pill.active {
+  opacity: .65;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -3081,7 +3112,21 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     $('#filterReset').hidden = !isAnyActive;
   }
 
+  // Top-of-page progress bar — visual feedback that something is happening
+  // even when the data fetch is instant (cached) but rendering takes a
+  // perceptible moment. Tracks load() entry/exit via document.body class.
+  let _loadDepth = 0;
+  function _startLoadingIndicator() {
+    _loadDepth++;
+    document.body.classList.add('is-loading');
+  }
+  function _stopLoadingIndicator() {
+    _loadDepth = Math.max(0, _loadDepth - 1);
+    if (_loadDepth === 0) document.body.classList.remove('is-loading');
+  }
+
   async function load() {
+    _startLoadingIndicator();
     setSubtitle();
     refreshFilterChipStates();
     let stats = null;
@@ -3103,6 +3148,7 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       if (!stats) throw new Error('stats fetch failed');
     } catch (e) {
       console.error('[load] fetch failed:', e);
+      _stopLoadingIndicator();
       return;
     }
 
@@ -3269,6 +3315,8 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
 
     // Today card (posts + views for current day, dashboard view only).
     try { renderTodayCard(evolution); } catch (e) { console.error('[load] today:', e); }
+
+    _stopLoadingIndicator();
   }
 
   // ─── View renderers ─────────────────────────────────────────────────
@@ -5512,20 +5560,33 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
     const from = new Date(to.getTime() - days * 86400000);
     const dateFrom = fmtDate(from);
     const dateTo = fmtDate(to);
-    // Build URL with these specific dates (not state's), reusing existing
-    // URL builders so any future query-param additions auto-propagate.
-    const statsURL = buildStatsURLForPeriod(dateFrom, dateTo);
-    // Evolution doesn't have a "ForPeriod" variant — inline it.
-    const evoP = new URLSearchParams();
-    if (state.project_id && state.project_id !== 'all') evoP.set('project_id', state.project_id);
-    if (state.account && state.account !== 'all') evoP.set('account', state.account);
-    evoP.set('date_from', dateFrom);
-    evoP.set('date_to', dateTo);
-    evoP.set('competitor', isCompetitorScope ? 'true' : 'false');
-    if (navPlatform) evoP.set('platform', navPlatform);
-    const evoURL = '/api/evolution?' + evoP.toString();
-    cachedJSON(statsURL);
-    cachedJSON(evoURL, []);
+    // Build URLs for this specific range by temporarily swapping state.
+    // Restore immediately so the current view's URLs stay intact.
+    const prevFrom = state.date_from;
+    const prevTo = state.date_to;
+    state.date_from = dateFrom;
+    state.date_to = dateTo;
+    try {
+      cachedJSON(buildStatsURL());
+      cachedJSON(buildEvolutionURL(), []);
+      // Video endpoints also vary with date range — warm them so the
+      // dashboard's "Meilleures vidéos" / "Dernières vidéos" sections
+      // and the table view render instantly on range switch.
+      cachedJSON(buildVideoEndpointURL('best-videos',   COUNT_LIMIT(state.bestCount)), []);
+      cachedJSON(buildVideoEndpointURL('latest-videos', COUNT_LIMIT(state.latestCount)), []);
+      cachedJSON(buildVideosAllURL(), []);
+      // Period-over-period: the trend chips fetch the PRECEDING window.
+      // Pre-warm that too.
+      const lengthDays = Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
+      const prevEnd = new Date(dateFrom + 'T00:00:00');
+      prevEnd.setDate(prevEnd.getDate() - 1);
+      const prevStart = new Date(prevEnd);
+      prevStart.setDate(prevStart.getDate() - lengthDays + 1);
+      cachedJSON(buildStatsURLForPeriod(fmtDate(prevStart), fmtDate(prevEnd)));
+    } finally {
+      state.date_from = prevFrom;
+      state.date_to = prevTo;
+    }
   }
   function prefetchOtherRanges() {
     const all = [1, 7, 30, 365];
