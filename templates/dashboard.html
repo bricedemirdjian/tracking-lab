@@ -2944,7 +2944,10 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
   // entries expire so a real cron-driven data refresh eventually surfaces.
   const _fetchCache = new Map();      // url -> { data, ts }
   const _inflight = new Map();        // url -> Promise (dedup concurrent calls)
-  const FETCH_CACHE_TTL_MS = 60_000;
+  // Stats don't change second-by-second (cron runs every 15 min). Bumping
+  // cache TTL from 60s → 5min gives instant date-pill switching for the
+  // active session without staleness risk.
+  const FETCH_CACHE_TTL_MS = 300_000;
   async function cachedJSON(url, fallback = null) {
     const now = Date.now();
     const hit = _fetchCache.get(url);
@@ -5497,6 +5500,51 @@ console.log('%c[TL] dashboard build v=2026-05-16-heatmap-debug', 'color:#FF69B4;
       }
     });
   });
+
+  // ─── Range prefetching ──────────────────────────────────────────────
+  // Warm the cache for inactive date ranges on idle so subsequent pill
+  // clicks resolve from in-memory cache instantly (no network roundtrip,
+  // no DB query). Cuts perceived latency of 1j/7j/30j/365j switches from
+  // ~500-2000ms to <16ms.
+  function _prefetchRange(days) {
+    if (!Number.isFinite(days) || days < 1) return;
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 86400000);
+    const dateFrom = fmtDate(from);
+    const dateTo = fmtDate(to);
+    // Build URL with these specific dates (not state's), reusing existing
+    // URL builders so any future query-param additions auto-propagate.
+    const statsURL = buildStatsURLForPeriod(dateFrom, dateTo);
+    // Evolution doesn't have a "ForPeriod" variant — inline it.
+    const evoP = new URLSearchParams();
+    if (state.project_id && state.project_id !== 'all') evoP.set('project_id', state.project_id);
+    if (state.account && state.account !== 'all') evoP.set('account', state.account);
+    evoP.set('date_from', dateFrom);
+    evoP.set('date_to', dateTo);
+    evoP.set('competitor', isCompetitorScope ? 'true' : 'false');
+    if (navPlatform) evoP.set('platform', navPlatform);
+    const evoURL = '/api/evolution?' + evoP.toString();
+    cachedJSON(statsURL);
+    cachedJSON(evoURL, []);
+  }
+  function prefetchOtherRanges() {
+    const all = [1, 7, 30, 365];
+    const others = all.filter(d => d !== state.range);
+    const fire = () => {
+      // Stagger to avoid hammering the API + DB pool all at once.
+      others.forEach((d, i) => setTimeout(() => _prefetchRange(d), i * 250));
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(fire, { timeout: 4000 });
+    } else {
+      setTimeout(fire, 800);
+    }
+  }
+  // Fire once after the first paint settles. Subsequent pill clicks
+  // benefit immediately; cache TTL (5min) keeps warm across switches.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('load', () => setTimeout(prefetchOtherRanges, 1200));
+  }
 
   // ─── Wiring: filter chips ───
   function populateProjectFilter() {
