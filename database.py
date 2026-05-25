@@ -133,11 +133,13 @@ def _get_pg_pool():
             print("[DB] pgbouncer pooler mode → stripping keepalives_* (unsupported)", flush=True)
 
         # Pool sizing: on pgbouncer the upstream pgbouncer side multiplexes
-        # client conns over a much smaller backend pool, so a 3-conn cap here
-        # was strangling cron concurrency (16 worker threads → PoolError
-        # cascades). 8 is comfortable: 16 cron workers serialise gracefully
-        # via the get_connection retry loop instead of bouncing.
-        default_max = "8" if is_pooler else "3"
+        # client conns over a much smaller backend pool. The scraper uses
+        # ThreadPoolExecutor(max_workers=16 for IG, 12 for TT/YT) — pool must
+        # be ≥ max concurrent workers to avoid PoolError cascades. 20 covers
+        # the worst case (16 IG workers + a couple of dashboard reads
+        # happening concurrently). Supabase 200-client cap easily absorbs
+        # this across multiple Vercel instances.
+        default_max = "20" if is_pooler else "3"
         try:
             _pg_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=int(os.environ.get("DB_POOL_MIN", "1")),
