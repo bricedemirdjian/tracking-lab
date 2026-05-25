@@ -1,5 +1,7 @@
 import os
 import json
+import sys
+import traceback
 from datetime import datetime, timedelta
 
 # ==================== Dual backend: PostgreSQL (Supabase) or SQLite ====================
@@ -10,10 +12,35 @@ if DATABASE_URL:
     import psycopg2
     import psycopg2.extras
     import psycopg2.pool
-    print("[DB] Using PostgreSQL (Supabase)")
+    print("[DB] Using PostgreSQL (Supabase)", flush=True)
 else:
     import sqlite3
-    print("[DB] Using SQLite (local)")
+    print("[DB] Using SQLite (local)", flush=True)
+
+
+def _is_pgbouncer_url(hostname: str) -> bool:
+    """True if hostname points at a Supabase PgBouncer pooler endpoint.
+
+    PgBouncer in Transaction mode rejects a handful of libpq startup params
+    (keepalives_*) and breaks server-side prepared statements — we have to
+    detune the connection kwargs when we detect this. Detected by the
+    `pooler.supabase.com` suffix used by all Supabase pooler endpoints.
+    """
+    if not hostname:
+        return False
+    return "pooler.supabase.com" in hostname.lower()
+
+
+# Module-level cache so callers that need to gate behavior on pooler-vs-direct
+# (e.g. init_db skipping DDL on pooler) don't have to re-parse the URL.
+IS_PGBOUNCER = False
+if DATABASE_URL:
+    try:
+        from urllib.parse import urlparse as _urlparse_boot
+        IS_PGBOUNCER = _is_pgbouncer_url(_urlparse_boot(DATABASE_URL).hostname or "")
+        print(f"[DB] Pooler mode detected: IS_PGBOUNCER={IS_PGBOUNCER}", flush=True)
+    except Exception as _e:
+        print(f"[DB] Could not detect pooler mode: {_e!r}", flush=True)
 
 
 # Lazy-initialized connection pool. Each get_connection() borrows; .close() returns.
@@ -26,42 +53,74 @@ def _get_pg_pool():
     global _pg_pool
     if _pg_pool is None:
         from urllib.parse import urlparse, unquote
-        parsed = urlparse(DATABASE_URL)
+        try:
+            parsed = urlparse(DATABASE_URL)
+        except Exception as e:
+            print(f"[DB] FATAL urlparse failed: {e!r}", flush=True)
+            raise
         # DEBUG boot logging (no password leak — just structural pieces)
-        print(f"[DB] parsing DATABASE_URL: scheme={parsed.scheme!r} host={parsed.hostname!r} port={parsed.port!r} user={parsed.username!r} dbname={(parsed.path or '/postgres').lstrip('/')!r} pwd_len={len(parsed.password or '')}")
+        print(
+            f"[DB] parsing DATABASE_URL: scheme={parsed.scheme!r} host={parsed.hostname!r} "
+            f"port={parsed.port!r} user={parsed.username!r} "
+            f"dbname={(parsed.path or '/postgres').lstrip('/')!r} "
+            f"pwd_len={len(parsed.password or '')}",
+            flush=True,
+        )
         if not parsed.hostname or not parsed.username:
             raise RuntimeError(f"DATABASE_URL malformed: host={parsed.hostname!r}, user={parsed.username!r}")
+
+        is_pooler = _is_pgbouncer_url(parsed.hostname)
         # TCP keepalives + connect_timeout fight the #1 cause of
-        # "SSL connection has been closed unexpectedly" on Vercel ↔ Supabase:
-        # the serverless function's egress NAT silently drops idle TCP flows
-        # after ~30-60s, and the next query trips an EOF on the SSL stream.
-        # With keepalives, the kernel pings the peer every keepalives_idle
-        # seconds; the connection stays alive across batch pauses.
-        # Pool sizing on Vercel serverless: each function instance gets its
-        # own pool. With ~4-6 instances spawned concurrently by the 15-min
-        # cron cadence × per-platform threads, total connections =
-        # instances × maxconn. Supabase Pro caps at 60 direct connections;
-        # we keep maxconn=5 so 6 instances × 5 = 30 (well under the cap)
-        # leaving headroom for dashboard reads. The retry layer + SSL keepalives
-        # handle transient closes. For higher scale, migrate DATABASE_URL to
-        # the Supabase PgBouncer pooler (port 6543) which multiplexes infinite
-        # logical conns over a small server-side pool.
-        _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=int(os.environ.get("DB_POOL_MIN", "1")),
-            maxconn=int(os.environ.get("DB_POOL_MAX", "3")),
+        # "SSL connection has been closed unexpectedly" on Vercel ↔ Supabase
+        # over direct connections. PgBouncer's pooler.supabase.com endpoint
+        # rejects the libpq keepalives_* startup params as unknown options,
+        # so we strip them in pooler mode and rely on the pooler's own
+        # connection management instead.
+        conn_kwargs = dict(
             user=unquote(parsed.username or ''),
             password=unquote(parsed.password or ''),
             host=parsed.hostname or '',
-            port=parsed.port or 5432,
+            port=parsed.port or (6543 if is_pooler else 5432),
             dbname=(parsed.path or '/postgres').lstrip('/'),
             sslmode='require',
             connect_timeout=int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
-            keepalives=1,
-            keepalives_idle=int(os.environ.get("DB_KEEPALIVES_IDLE", "30")),
-            keepalives_interval=int(os.environ.get("DB_KEEPALIVES_INTERVAL", "10")),
-            keepalives_count=int(os.environ.get("DB_KEEPALIVES_COUNT", "5")),
+            application_name='trackinglab-vercel',
         )
-        print(f"[DB] Pool initialized (min={_pg_pool.minconn}, max={_pg_pool.maxconn}, keepalives on) → {parsed.hostname}:{parsed.port}")
+        if not is_pooler:
+            conn_kwargs.update(
+                keepalives=1,
+                keepalives_idle=int(os.environ.get("DB_KEEPALIVES_IDLE", "30")),
+                keepalives_interval=int(os.environ.get("DB_KEEPALIVES_INTERVAL", "10")),
+                keepalives_count=int(os.environ.get("DB_KEEPALIVES_COUNT", "5")),
+            )
+            print("[DB] direct-connection mode → keepalives ON", flush=True)
+        else:
+            # PgBouncer transaction mode breaks server-side prepared statements
+            # because each transaction may land on a different backend conn.
+            # psycopg2 has no top-level prepare_threshold like psycopg3, but
+            # we explicitly avoid issuing any DDL/multi-stmt work in this mode
+            # (see init_db gate below). The pooler handles idle timeouts itself.
+            print("[DB] pgbouncer pooler mode → stripping keepalives_* (unsupported)", flush=True)
+
+        try:
+            _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=int(os.environ.get("DB_POOL_MIN", "1")),
+                maxconn=int(os.environ.get("DB_POOL_MAX", "3")),
+                **conn_kwargs,
+            )
+        except Exception as e:
+            print(
+                f"[DB] FATAL ThreadedConnectionPool init failed: {type(e).__name__}: {e}",
+                flush=True,
+            )
+            traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
+            raise
+        print(
+            f"[DB] Pool initialized (min={_pg_pool.minconn}, max={_pg_pool.maxconn}, "
+            f"pooler={is_pooler}) → {parsed.hostname}:{conn_kwargs['port']}",
+            flush=True,
+        )
     return _pg_pool
 
 
@@ -319,6 +378,31 @@ def _mark_schema_current(conn):
 
 
 def init_db():
+    # PgBouncer Transaction-mode gate: DDL across multiple _execute() calls
+    # is unsafe through the pooler (each statement may land on a different
+    # backend connection, and the pooler rejects libpq startup params we
+    # used to set). The schema was already provisioned via the direct
+    # connection, so on the pooler we just verify connectivity and bail.
+    # To force a re-run (e.g. after deliberately migrating via the pooler),
+    # set FORCE_INIT_DB=1 in env.
+    if DATABASE_URL and IS_PGBOUNCER and os.environ.get('FORCE_INIT_DB') != '1':
+        print("[DB] init_db: skipping DDL (pgbouncer pooler detected; schema is already migrated via direct connection)", flush=True)
+        try:
+            conn = get_connection()
+            cur = _cur(conn)
+            cur.execute("SELECT 1")
+            cur.fetchone()
+            conn.close()
+            print("[DB] init_db: connectivity OK via pooler", flush=True)
+        except Exception as e:
+            # Re-raise so the outer boot try/except in app.py logs it and
+            # decides what to do — we still want visibility on failure.
+            print(f"[DB] init_db: pooler connectivity FAILED: {type(e).__name__}: {e}", flush=True)
+            traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
+            raise
+        return
+
     conn = get_connection()
 
     # Fast path: schema_meta says we're already at the current version.

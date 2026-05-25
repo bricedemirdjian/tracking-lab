@@ -70,9 +70,10 @@ app.config['SESSION_COOKIE_SECURE'] = IS_PRODUCTION
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # Debug: log OAuth config status at startup
-print(f"[Config] GOOGLE_CLIENT_ID present: {app.config['GOOGLE_CLIENT_ID'] is not None}")
-print(f"[Config] GOOGLE_CLIENT_SECRET present: {app.config['GOOGLE_CLIENT_SECRET'] is not None}")
-print(f"[Config] SECRET_KEY length: {len(app.config['SECRET_KEY'])}")
+print(f"[Config] GOOGLE_CLIENT_ID present: {app.config['GOOGLE_CLIENT_ID'] is not None}", flush=True)
+print(f"[Config] GOOGLE_CLIENT_SECRET present: {app.config['GOOGLE_CLIENT_SECRET'] is not None}", flush=True)
+print(f"[Config] SECRET_KEY length: {len(app.config['SECRET_KEY'])}", flush=True)
+print(f"[Config] DATABASE_URL present: {os.environ.get('DATABASE_URL') is not None}", flush=True)
 
 # Trust Render's load balancer (1 proxy hop) so request.remote_addr is the
 # real client IP — required for Flask-Limiter keying on IP.
@@ -210,10 +211,54 @@ def _security_headers(response):
         )
     return response
 
-# Initialize database and auth
-init_db()
-init_auth(app)
-app.register_blueprint(auth_bp)
+# Initialize database and auth.
+#
+# Both calls are wrapped in defensive try/except so a transient DB issue
+# (bad DATABASE_URL, network glitch, pooler hiccup) does NOT take down the
+# entire serverless function. Without this, a boot-time exception inside
+# init_db() escapes the module import and Vercel returns
+# FUNCTION_INVOCATION_FAILED on every route — including /healthz, /login,
+# and the static landing page, all of which should still work in degraded
+# mode. We surface a clear traceback to stdout (flushed) so we can diagnose
+# from Vercel runtime logs, and stamp BOOT_DB_OK / BOOT_AUTH_OK flags that
+# health checks consume.
+import sys as _sys
+import traceback as _tb
+
+BOOT_DB_OK = False
+BOOT_AUTH_OK = False
+BOOT_DB_ERROR = None
+BOOT_AUTH_ERROR = None
+
+try:
+    print("[Boot] calling init_db()...", flush=True)
+    init_db()
+    BOOT_DB_OK = True
+    print("[Boot] init_db() OK", flush=True)
+except Exception as _e:
+    BOOT_DB_ERROR = f"{type(_e).__name__}: {_e}"
+    print(f"[Boot] init_db() FAILED: {BOOT_DB_ERROR}", flush=True)
+    _tb.print_exc(file=_sys.stdout)
+    _sys.stdout.flush()
+
+try:
+    print("[Boot] calling init_auth()...", flush=True)
+    init_auth(app)
+    BOOT_AUTH_OK = True
+    print("[Boot] init_auth() OK", flush=True)
+except Exception as _e:
+    BOOT_AUTH_ERROR = f"{type(_e).__name__}: {_e}"
+    print(f"[Boot] init_auth() FAILED: {BOOT_AUTH_ERROR}", flush=True)
+    _tb.print_exc(file=_sys.stdout)
+    _sys.stdout.flush()
+
+try:
+    app.register_blueprint(auth_bp)
+    print("[Boot] auth_bp registered", flush=True)
+except Exception as _e:
+    print(f"[Boot] auth_bp registration FAILED: {type(_e).__name__}: {_e}", flush=True)
+    _tb.print_exc(file=_sys.stdout)
+    _sys.stdout.flush()
 
 
 
@@ -232,18 +277,30 @@ def admin_required(f):
 @limiter.exempt
 def healthz():
     """Lightweight liveness probe for Render / uptime monitors.
-    Checks DB connectivity. Returns 200 only if the DB round-trips."""
+    Checks DB connectivity AND surfaces boot-time init status so we can
+    diagnose pooler/DSN issues without shelling into Vercel logs."""
+    boot = {
+        "db_init_ok": BOOT_DB_OK,
+        "auth_init_ok": BOOT_AUTH_OK,
+        "db_init_error": BOOT_DB_ERROR,
+        "auth_init_error": BOOT_AUTH_ERROR,
+    }
     try:
-        from database import get_connection
+        from database import get_connection, IS_PGBOUNCER
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("SELECT 1")
         cur.fetchone()
         cur.close()
         conn.close()
-        return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "ok", "pooler": IS_PGBOUNCER, "boot": boot}), 200
     except Exception as e:
-        return jsonify({"status": "error", "error": str(e)[:200]}), 503
+        return jsonify({
+            "status": "error",
+            "error": str(e)[:200],
+            "error_type": type(e).__name__,
+            "boot": boot,
+        }), 503
 
 
 @app.route("/")
