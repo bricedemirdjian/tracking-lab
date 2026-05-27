@@ -2490,51 +2490,54 @@ def api_cron_health_monitor():
     try:
         from database import get_connection, _execute, _fetchall
         from emailer import send_admin_alert
-        conn = get_connection()
 
-        # 1. Reset transient SSL/network failures (safe — retry layer covers it).
-        # psycopg2 treats `%` as the start of a parameter placeholder, so any
-        # literal `%` inside LIKE patterns must be doubled.
-        reset_rows = _fetchall(conn, """
-            SELECT id, username, platform, last_error_msg
-            FROM accounts
-            WHERE consecutive_failures BETWEEN 1 AND 2
-              AND (
-                LOWER(last_error_msg) LIKE '%%ssl connection has been closed%%'
-                OR LOWER(last_error_msg) LIKE '%%server closed the connection%%'
-                OR LOWER(last_error_msg) LIKE '%%eof detected%%'
-                OR LOWER(last_error_msg) LIKE '%%bad connection%%'
-              )
-        """)
-        if reset_rows:
+        # Wrap in `with` so the conn is RETURNED to the pool even if an
+        # exception fires mid-query. Previously the `conn = get_connection()`
+        # + late `conn.close()` pattern leaked the conn on any raised
+        # exception, slowly exhausting the pool over hours of cron runs.
+        with get_connection() as conn:
+            # 1. Reset transient SSL/network failures (safe — retry layer covers it).
+            # psycopg2 treats `%` as the start of a parameter placeholder, so any
+            # literal `%` inside LIKE patterns must be doubled.
+            reset_rows = _fetchall(conn, """
+                SELECT id, username, platform, last_error_msg
+                FROM accounts
+                WHERE consecutive_failures BETWEEN 1 AND 2
+                  AND (
+                    LOWER(last_error_msg) LIKE '%%ssl connection has been closed%%'
+                    OR LOWER(last_error_msg) LIKE '%%server closed the connection%%'
+                    OR LOWER(last_error_msg) LIKE '%%eof detected%%'
+                    OR LOWER(last_error_msg) LIKE '%%bad connection%%'
+                  )
+            """)
+            if reset_rows:
+                _execute(conn, """
+                    UPDATE accounts
+                    SET consecutive_failures = 0,
+                        last_error_msg = NULL,
+                        last_updated = NULL
+                    WHERE id = ANY(%s)
+                """, ([r['id'] for r in reset_rows],))
+                conn.commit()
+
+            # 2. Detect accounts stale >12h despite healthy scraper
+            stale = _fetchall(conn, """
+                SELECT username, platform, last_updated, consecutive_failures, last_error_msg
+                FROM accounts
+                WHERE last_updated IS NOT NULL
+                  AND EXTRACT(EPOCH FROM (NOW() - last_updated)) / 3600 > 12
+                  AND consecutive_failures >= 3
+                ORDER BY last_updated ASC
+                LIMIT 20
+            """)
+
+            # 3. Backfill NULL last_updated from last_success_at (legacy rows)
             _execute(conn, """
                 UPDATE accounts
-                SET consecutive_failures = 0,
-                    last_error_msg = NULL,
-                    last_updated = NULL
-                WHERE id = ANY(%s)
-            """, ([r['id'] for r in reset_rows],))
+                SET last_updated = last_success_at
+                WHERE last_updated IS NULL AND last_success_at IS NOT NULL
+            """)
             conn.commit()
-
-        # 2. Detect accounts stale >12h despite healthy scraper
-        stale = _fetchall(conn, """
-            SELECT username, platform, last_updated, consecutive_failures, last_error_msg
-            FROM accounts
-            WHERE last_updated IS NOT NULL
-              AND EXTRACT(EPOCH FROM (NOW() - last_updated)) / 3600 > 12
-              AND consecutive_failures >= 3
-            ORDER BY last_updated ASC
-            LIMIT 20
-        """)
-
-        # 3. Backfill NULL last_updated from last_success_at (legacy rows)
-        _execute(conn, """
-            UPDATE accounts
-            SET last_updated = last_success_at
-            WHERE last_updated IS NULL AND last_success_at IS NOT NULL
-        """)
-        conn.commit()
-        conn.close()
 
         result = {
             "transient_reset": len(reset_rows),
