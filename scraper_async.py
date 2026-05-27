@@ -254,14 +254,13 @@ def _get_ig_account_baseline_sync(username: str, user_id: int) -> Optional[dict]
     """Returns {followers, last_media_count} for cache-diff comparison, or None."""
     try:
         from database import get_connection, _fetchone
-        conn = get_connection()
-        row = _fetchone(
-            conn,
-            "SELECT followers, last_media_count FROM accounts "
-            "WHERE user_id = %s AND username = %s AND platform = 'instagram'",
-            (user_id, username),
-        )
-        conn.close()
+        with get_connection() as conn:
+            row = _fetchone(
+                conn,
+                "SELECT followers, last_media_count FROM accounts "
+                "WHERE user_id = %s AND username = %s AND platform = 'instagram'",
+                (user_id, username),
+            )
         if not row:
             return None
         return {
@@ -465,14 +464,13 @@ def _count_videos_in_db_sync(username: str, user_id: int, platform: str) -> int:
     Used by the cache-hit fast path that skips yt-dlp when nothing has changed."""
     try:
         from database import get_connection, _fetchone
-        conn = get_connection()
-        row = _fetchone(
-            conn,
-            "SELECT COUNT(*) AS n FROM videos "
-            "WHERE user_id = %s AND account_username = %s AND platform = %s",
-            (user_id, username, platform),
-        )
-        conn.close()
+        with get_connection() as conn:
+            row = _fetchone(
+                conn,
+                "SELECT COUNT(*) AS n FROM videos "
+                "WHERE user_id = %s AND account_username = %s AND platform = %s",
+                (user_id, username, platform),
+            )
         return int(row["n"]) if row else 0
     except Exception:
         return 0
@@ -618,8 +616,7 @@ def _refresh_youtube_last_updated(username: str, user_id: int):
     every cron cycle. Followers update on the next pass-2 (triggered when
     a new video is detected)."""
     from database import get_connection, _execute
-    conn = get_connection()
-    try:
+    with get_connection() as conn:
         _execute(
             conn,
             "UPDATE accounts SET last_updated = NOW() "
@@ -627,8 +624,6 @@ def _refresh_youtube_last_updated(username: str, user_id: int):
             (username, user_id, 'youtube')
         )
         conn.commit()  # _execute() does NOT auto-commit — same pattern as TT/IG refreshers
-    finally:
-        conn.close()
 
 
 # ── YouTube (yt-dlp wrapped, 2-pass: listing + parallel details) ─────

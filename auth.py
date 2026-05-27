@@ -200,10 +200,9 @@ def auth_callback():
             # set_user_plan() only accepts paid tiers.
             try:
                 from database import get_connection, _execute
-                conn = get_connection()
-                _execute(conn, "UPDATE users SET plan = %s WHERE id = %s", ('pending', user_dict['id']))
-                conn.commit()
-                conn.close()
+                with get_connection() as conn:
+                    _execute(conn, "UPDATE users SET plan = %s WHERE id = %s", ('pending', user_dict['id']))
+                    conn.commit()
                 user.plan = 'pending'
             except Exception as e:
                 print(f"[Auth] failed to mark new Google signup as pending: {e}")

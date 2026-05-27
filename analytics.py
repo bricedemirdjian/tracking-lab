@@ -39,17 +39,16 @@ def compute_hashtag_stats(user_id, days=30):
     Calcule les stats de chaque hashtag sur les N derniers jours.
     Retourne une liste triée par score (usage × engagement moyen).
     """
-    conn = get_connection()
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    videos = _fetchall(conn, """
-        SELECT description, views, likes, comments, shares, saves, platform,
-               create_time, video_id
-        FROM videos
-        WHERE user_id = %s AND create_time >= %s AND description IS NOT NULL
-        ORDER BY create_time DESC
-    """, (user_id, cutoff))
-    conn.close()
+    with get_connection() as conn:
+        videos = _fetchall(conn, """
+            SELECT description, views, likes, comments, shares, saves, platform,
+                   create_time, video_id
+            FROM videos
+            WHERE user_id = %s AND create_time >= %s AND description IS NOT NULL
+            ORDER BY create_time DESC
+        """, (user_id, cutoff))
 
     hashtag_data = {}  # tag -> {count, total_views, total_engagement, platforms, videos}
 
@@ -165,22 +164,21 @@ def compute_virality_score(video):
 
 def get_viral_videos(user_id, limit=20, days=30):
     """Retourne les vidéos triées par score de viralité."""
-    conn = get_connection()
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    videos = _fetchall(conn, """
-        SELECT v.video_id, v.account_username, v.description, v.create_time,
-               v.views, v.likes, v.comments, v.shares, v.saves,
-               v.thumbnail_url, v.platform, v.duration,
-               a.followers
-        FROM videos v
-        LEFT JOIN accounts a ON a.username = v.account_username
-            AND a.user_id = v.user_id AND a.platform = v.platform
-        WHERE v.user_id = %s AND v.create_time >= %s
-        ORDER BY v.views DESC
-        LIMIT 200
-    """, (user_id, cutoff))
-    conn.close()
+    with get_connection() as conn:
+        videos = _fetchall(conn, """
+            SELECT v.video_id, v.account_username, v.description, v.create_time,
+                   v.views, v.likes, v.comments, v.shares, v.saves,
+                   v.thumbnail_url, v.platform, v.duration,
+                   a.followers
+            FROM videos v
+            LEFT JOIN accounts a ON a.username = v.account_username
+                AND a.user_id = v.user_id AND a.platform = v.platform
+            WHERE v.user_id = %s AND v.create_time >= %s
+            ORDER BY v.views DESC
+            LIMIT 200
+        """, (user_id, cutoff))
 
     for v in videos:
         v['virality_score'] = compute_virality_score(v)
@@ -198,27 +196,26 @@ def detect_trends(user_id):
     Détecte les tendances émergentes en comparant les 7 derniers jours
     aux 7 jours précédents. Retourne hashtags, formats et métriques en hausse.
     """
-    conn = get_connection()
     now = datetime.utcnow()
     week_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
     two_weeks_ago = (now - timedelta(days=14)).strftime('%Y-%m-%d')
 
-    # Vidéos semaine courante
-    recent = _fetchall(conn, """
-        SELECT description, views, likes, comments, shares, saves, platform,
-               duration, create_time
-        FROM videos
-        WHERE user_id = %s AND create_time >= %s
-    """, (user_id, week_ago))
+    with get_connection() as conn:
+        # Vidéos semaine courante
+        recent = _fetchall(conn, """
+            SELECT description, views, likes, comments, shares, saves, platform,
+                   duration, create_time
+            FROM videos
+            WHERE user_id = %s AND create_time >= %s
+        """, (user_id, week_ago))
 
-    # Vidéos semaine précédente
-    previous = _fetchall(conn, """
-        SELECT description, views, likes, comments, shares, saves, platform,
-               duration, create_time
-        FROM videos
-        WHERE user_id = %s AND create_time >= %s AND create_time < %s
-    """, (user_id, two_weeks_ago, week_ago))
-    conn.close()
+        # Vidéos semaine précédente
+        previous = _fetchall(conn, """
+            SELECT description, views, likes, comments, shares, saves, platform,
+                   duration, create_time
+            FROM videos
+            WHERE user_id = %s AND create_time >= %s AND create_time < %s
+        """, (user_id, two_weeks_ago, week_ago))
 
     # --- Hashtag trends ---
     def count_hashtags(videos_list):
@@ -338,18 +335,17 @@ def get_growth_metrics(user_id, days=30):
     - Taux de publication
     - Meilleur jour de publication
     """
-    conn = get_connection()
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    snapshots = _fetchall(conn, """
-        SELECT account_username, platform, snapshot_date,
-               followers, total_views, total_likes, total_comments,
-               total_shares, total_saves, total_videos, engagement_rate
-        FROM daily_snapshots
-        WHERE user_id = %s AND snapshot_date >= %s
-        ORDER BY account_username, platform, snapshot_date ASC
-    """, (user_id, cutoff))
-    conn.close()
+    with get_connection() as conn:
+        snapshots = _fetchall(conn, """
+            SELECT account_username, platform, snapshot_date,
+                   followers, total_views, total_likes, total_comments,
+                   total_shares, total_saves, total_videos, engagement_rate
+            FROM daily_snapshots
+            WHERE user_id = %s AND snapshot_date >= %s
+            ORDER BY account_username, platform, snapshot_date ASC
+        """, (user_id, cutoff))
 
     # Grouper par compte
     accounts = {}
@@ -418,21 +414,20 @@ def get_top_content(user_id, days=30, limit=10):
     Identifie les contenus les plus performants et les moins performants.
     Permet de comprendre ce qui marche et ce qui ne marche pas.
     """
-    conn = get_connection()
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    videos = _fetchall(conn, """
-        SELECT v.video_id, v.account_username, v.description, v.create_time,
-               v.views, v.likes, v.comments, v.shares, v.saves,
-               v.thumbnail_url, v.platform, v.duration,
-               a.followers
-        FROM videos v
-        LEFT JOIN accounts a ON a.username = v.account_username
-            AND a.user_id = v.user_id AND a.platform = v.platform
-        WHERE v.user_id = %s AND v.create_time >= %s AND v.views > 0
-        ORDER BY v.views DESC
-    """, (user_id, cutoff))
-    conn.close()
+    with get_connection() as conn:
+        videos = _fetchall(conn, """
+            SELECT v.video_id, v.account_username, v.description, v.create_time,
+                   v.views, v.likes, v.comments, v.shares, v.saves,
+                   v.thumbnail_url, v.platform, v.duration,
+                   a.followers
+            FROM videos v
+            LEFT JOIN accounts a ON a.username = v.account_username
+                AND a.user_id = v.user_id AND a.platform = v.platform
+            WHERE v.user_id = %s AND v.create_time >= %s AND v.views > 0
+            ORDER BY v.views DESC
+        """, (user_id, cutoff))
 
     for v in videos:
         views = v.get('views', 0) or 0

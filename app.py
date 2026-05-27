@@ -332,12 +332,11 @@ def healthz():
     }
     try:
         from database import get_connection, IS_PGBOUNCER
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT 1")
-        cur.fetchone()
-        cur.close()
-        conn.close()
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+            cur.close()
         return jsonify({"status": "ok", "pooler": IS_PGBOUNCER, "boot": boot}), 200
     except Exception as e:
         return jsonify({
@@ -477,8 +476,7 @@ def api_admin_scraping_health():
     in_business = 9 <= paris_hour <= 21
     stale_threshold_h = cadence_h * 2 if in_business else 14
 
-    conn = get_connection()
-    try:
+    with get_connection() as conn:
         rows = _fetchall(conn, """
             SELECT
                 a.user_id, a.username, a.platform,
@@ -493,8 +491,6 @@ def api_admin_scraping_health():
             WHERE a.user_id = %s
             ORDER BY a.consecutive_failures DESC, a.last_updated ASC NULLS FIRST
         """, (current_user.data_user_id,))
-    finally:
-        conn.close()
 
     healthy = []
     stale = []
@@ -716,30 +712,29 @@ def api_account_delete():
     # 2. Hard-delete DB rows in FK-safe order.
     try:
         from database import get_connection, _execute
-        conn = get_connection()
-        for sql in (
-            "DELETE FROM video_analysis WHERE user_id = %s",
-            "DELETE FROM project_accounts WHERE user_id = %s",
-            "DELETE FROM projects WHERE user_id = %s",
-            "DELETE FROM daily_snapshots WHERE user_id = %s",
-            "DELETE FROM videos WHERE user_id = %s",
-            "DELETE FROM accounts WHERE user_id = %s",
-            "DELETE FROM subscriptions WHERE user_id = %s",
-            "DELETE FROM users WHERE id = %s",
-        ):
-            try:
-                _execute(conn, sql, (uid,))
-            except Exception as inner:
-                # Some tables may not exist on older DB; ignore "missing
-                # table" errors but bubble up genuine issues.
-                msg = str(inner).lower()
-                if "does not exist" in msg or "no such table" in msg:
-                    print(f"[account/delete] skip (table missing): {sql[:50]}…")
-                    conn.rollback()
-                    continue
-                raise
-        conn.commit()
-        conn.close()
+        with get_connection() as conn:
+            for sql in (
+                "DELETE FROM video_analysis WHERE user_id = %s",
+                "DELETE FROM project_accounts WHERE user_id = %s",
+                "DELETE FROM projects WHERE user_id = %s",
+                "DELETE FROM daily_snapshots WHERE user_id = %s",
+                "DELETE FROM videos WHERE user_id = %s",
+                "DELETE FROM accounts WHERE user_id = %s",
+                "DELETE FROM subscriptions WHERE user_id = %s",
+                "DELETE FROM users WHERE id = %s",
+            ):
+                try:
+                    _execute(conn, sql, (uid,))
+                except Exception as inner:
+                    # Some tables may not exist on older DB; ignore "missing
+                    # table" errors but bubble up genuine issues.
+                    msg = str(inner).lower()
+                    if "does not exist" in msg or "no such table" in msg:
+                        print(f"[account/delete] skip (table missing): {sql[:50]}…")
+                        conn.rollback()
+                        continue
+                    raise
+            conn.commit()
         print(f"[account/delete] DB rows wiped for user_id={uid} email={user_email}")
     except Exception as e:
         import traceback
@@ -1197,14 +1192,13 @@ def stripe_webhook():
                     period_end_ts = 0
                 period_end = datetime.fromtimestamp(period_end_ts).isoformat()
                 from database import get_connection, _fetchone
-                conn = get_connection()
                 # Case-insensitive lookup to defeat Gmail/OAuth case-normalization
                 # mismatches (Stripe lowercases, our DB might have mixed case).
-                user = _fetchone(
-                    conn, "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
-                    (customer_email,),
-                )
-                conn.close()
+                with get_connection() as conn:
+                    user = _fetchone(
+                        conn, "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
+                        (customer_email,),
+                    )
                 if user:
                     upsert_subscription(
                         user['id'], plan_name, 'active',
@@ -1323,13 +1317,12 @@ def api_delete_project(project_id):
 def _assert_project_owner(project_id):
     """Raise 403/404-style tuple (body, status) if current user doesn't own project."""
     from database import get_connection, _fetchone
-    conn = get_connection()
-    row = _fetchone(
-        conn,
-        "SELECT id, user_id FROM projects WHERE id = %s",
-        (project_id,),
-    )
-    conn.close()
+    with get_connection() as conn:
+        row = _fetchone(
+            conn,
+            "SELECT id, user_id FROM projects WHERE id = %s",
+            (project_id,),
+        )
     if not row:
         return jsonify({"error": "Projet introuvable"}), 404
     if row['user_id'] != current_user.data_user_id and not current_user.is_admin:
@@ -1378,13 +1371,12 @@ def api_accounts():
             usernames = list({a["username"] for a in accounts})
             ph = ", ".join(["%s"] * len(usernames))
             uid = current_user.data_user_id
-            conn = get_connection()
-            rows = _fetchall(conn,
-                f"SELECT account_username AS username, platform, MAX(create_time) AS last_post_at "
-                f"FROM videos WHERE account_username IN ({ph}) AND user_id = %s "
-                f"GROUP BY account_username, platform",
-                list(usernames) + [uid])
-            conn.close()
+            with get_connection() as conn:
+                rows = _fetchall(conn,
+                    f"SELECT account_username AS username, platform, MAX(create_time) AS last_post_at "
+                    f"FROM videos WHERE account_username IN ({ph}) AND user_id = %s "
+                    f"GROUP BY account_username, platform",
+                    list(usernames) + [uid])
             last_map = {(r["username"], r.get("platform") or "tiktok"): r["last_post_at"] for r in rows}
             for a in accounts:
                 lp = last_map.get((a["username"], a.get("platform") or "tiktok"))
@@ -1492,13 +1484,10 @@ def _apply_platform_filter(user_id, platform_param, project_usernames):
     if platform_param not in _SUPPORTED_PLATFORMS:
         return project_usernames
     from database import get_connection, _fetchall
-    conn = get_connection()
-    try:
+    with get_connection() as conn:
         rows = _fetchall(conn,
             "SELECT username FROM accounts WHERE user_id = %s AND platform = %s",
             (user_id, platform_param))
-    finally:
-        conn.close()
     plat_unames = [r["username"] for r in rows]
     if project_usernames:
         intersected = [u for u in project_usernames if u in plat_unames]
@@ -1559,13 +1548,10 @@ def api_video_analyze():
     # Lookup the video row to get account_username + thumbnail_url + the
     # context metadata we'll feed to Gemini's prompt.
     from database import get_connection, _fetchone
-    conn = get_connection()
-    try:
+    with get_connection() as conn:
         vrow = _fetchone(conn,
             "SELECT account_username, description, duration, views, likes, comments, shares, video_url, thumbnail_url, create_time FROM videos WHERE video_id = %s AND platform = %s AND user_id = %s",
             (video_id, platform, current_user.data_user_id))
-    finally:
-        conn.close()
     if not vrow:
         return jsonify({"error": "vidéo introuvable dans ton catalogue"}), 404
 
@@ -1834,8 +1820,7 @@ def api_today():
     project_usernames = _resolve_competitor_usernames(uid, request.args.get("competitor"), project_usernames)
     project_usernames = _apply_platform_filter(uid, request.args.get("platform"), project_usernames)
 
-    conn = get_connection()
-    try:
+    with get_connection() as conn:
         # ── 1. Posts published today (videos.create_time on today's local date) ──
         posts_q = """
             SELECT v.platform, v.account_username AS username,
@@ -1877,8 +1862,6 @@ def api_today():
             views_params.extend(project_usernames)
         views_q += " ORDER BY delta DESC"
         view_rows = _fetchall(conn, views_q, views_params)
-    finally:
-        conn.close()
 
     posts_by_platform = {"tiktok": 0, "instagram": 0, "youtube": 0, "linkedin": 0}
     posts_list = []
@@ -2126,13 +2109,11 @@ def _cron_scrape_inner(platform_filter=None):
     if platform_filter:
         placeholders = ",".join(["%s"] * len(platform_filter))
         query = f"SELECT DISTINCT user_id FROM accounts WHERE user_id IS NOT NULL AND platform IN ({placeholders})"
-        conn = get_connection()
-        users = _fetchall(conn, query, platform_filter)
-        conn.close()
+        with get_connection() as conn:
+            users = _fetchall(conn, query, platform_filter)
     else:
-        conn = get_connection()
-        users = _fetchall(conn, "SELECT DISTINCT user_id FROM accounts WHERE user_id IS NOT NULL")
-        conn.close()
+        with get_connection() as conn:
+            users = _fetchall(conn, "SELECT DISTINCT user_id FROM accounts WHERE user_id IS NOT NULL")
 
     if not users:
         label = ", ".join(platform_filter) if platform_filter else "all"
@@ -2162,19 +2143,18 @@ def _cron_scrape_inner(platform_filter=None):
     # Resolve each user's plan + admin status once. Cron runs without an
     # authenticated user, so we look it up from the DB. The cadence below
     # determines which of their accounts are "due" for re-scrape.
-    conn = get_connection()
     user_meta = {}  # uid -> { plan, role, cadence_h }
-    for u in users:
-        uid = u["user_id"]
-        row = _fetchall(conn, "SELECT plan, role FROM users WHERE id = %s", (uid,))
-        plan = (row[0]["plan"] if row else None) or "starter"
-        role = (row[0]["role"] if row else None) or "user"
-        user_meta[uid] = {
-            "plan": plan,
-            "role": role,
-            "cadence_h": get_scrape_cadence_hours(plan, is_admin=(role == "admin")),
-        }
-    conn.close()
+    with get_connection() as conn:
+        for u in users:
+            uid = u["user_id"]
+            row = _fetchall(conn, "SELECT plan, role FROM users WHERE id = %s", (uid,))
+            plan = (row[0]["plan"] if row else None) or "starter"
+            role = (row[0]["role"] if row else None) or "user"
+            user_meta[uid] = {
+                "plan": plan,
+                "role": role,
+                "cadence_h": get_scrape_cadence_hours(plan, is_admin=(role == "admin")),
+            }
 
     from datetime import datetime, timedelta
 
@@ -2359,55 +2339,53 @@ def api_cron_mirror_thumbs():
         from database import get_connection, _fetchall, _execute
         from scraper_async import _mirror_thumbnail_async, _get_session
 
-        conn = get_connection()
-        # Pick videos whose thumbnail_url is a signed CDN URL (not already on
-        # Supabase Storage). Order by most-recent first so the dashboard's
-        # "best videos" view recovers thumbnails fastest.
-        rows = _fetchall(conn, """
-            SELECT id, platform, thumbnail_url
-            FROM videos
-            WHERE thumbnail_url IS NOT NULL
-              AND thumbnail_url != ''
-              AND thumbnail_url NOT LIKE '%%supabase.co/storage%%'
-              AND platform IN ('tiktok', 'instagram')
-              AND (
-                thumbnail_url LIKE '%%tiktokcdn%%'
-                OR thumbnail_url LIKE '%%cdninstagram%%'
-                OR thumbnail_url LIKE '%%fbcdn%%'
-                OR thumbnail_url LIKE '%%tiktok.com%%'
-              )
-            LIMIT %s
-        """, (BATCH_LIMIT,))
+        with get_connection() as conn:
+            # Pick videos whose thumbnail_url is a signed CDN URL (not already on
+            # Supabase Storage). Order by most-recent first so the dashboard's
+            # "best videos" view recovers thumbnails fastest.
+            rows = _fetchall(conn, """
+                SELECT id, platform, thumbnail_url
+                FROM videos
+                WHERE thumbnail_url IS NOT NULL
+                  AND thumbnail_url != ''
+                  AND thumbnail_url NOT LIKE '%%supabase.co/storage%%'
+                  AND platform IN ('tiktok', 'instagram')
+                  AND (
+                    thumbnail_url LIKE '%%tiktokcdn%%'
+                    OR thumbnail_url LIKE '%%cdninstagram%%'
+                    OR thumbnail_url LIKE '%%fbcdn%%'
+                    OR thumbnail_url LIKE '%%tiktok.com%%'
+                  )
+                LIMIT %s
+            """, (BATCH_LIMIT,))
 
-        if not rows:
-            conn.close()
-            return jsonify({"mirrored": 0, "remaining": 0, "_timeout": False})
+            if not rows:
+                return jsonify({"mirrored": 0, "remaining": 0, "_timeout": False})
 
-        async def _run_batch():
-            nonlocal mirrored_count, failed_count, timed_out
-            for r in rows:
-                if time.monotonic() - started > BUDGET_SEC:
-                    timed_out = True
-                    break
-                new_url = await _mirror_thumbnail_async(
-                    r['thumbnail_url'], str(r['id']), r['platform']
-                )
-                if new_url and new_url != r['thumbnail_url']:
-                    try:
-                        _execute(conn,
-                            "UPDATE videos SET thumbnail_url = %s WHERE id = %s",
-                            (new_url, r['id']),
-                        )
-                        mirrored_count += 1
-                    except Exception as e:
-                        print(f"[mirror-thumbs] DB update failed for {r['id']}: {e}")
+            async def _run_batch():
+                nonlocal mirrored_count, failed_count, timed_out
+                for r in rows:
+                    if time.monotonic() - started > BUDGET_SEC:
+                        timed_out = True
+                        break
+                    new_url = await _mirror_thumbnail_async(
+                        r['thumbnail_url'], str(r['id']), r['platform']
+                    )
+                    if new_url and new_url != r['thumbnail_url']:
+                        try:
+                            _execute(conn,
+                                "UPDATE videos SET thumbnail_url = %s WHERE id = %s",
+                                (new_url, r['id']),
+                            )
+                            mirrored_count += 1
+                        except Exception as e:
+                            print(f"[mirror-thumbs] DB update failed for {r['id']}: {e}")
+                            failed_count += 1
+                    else:
                         failed_count += 1
-                else:
-                    failed_count += 1
-            conn.commit()
+                conn.commit()
 
-        asyncio.run(_run_batch())
-        conn.close()
+            asyncio.run(_run_batch())
 
         return jsonify({
             "mirrored": mirrored_count,
@@ -2587,38 +2565,37 @@ def api_cron_data_accuracy_check():
     try:
         from database import get_connection, _execute, _fetchall
         from emailer import send_admin_alert
-        conn = get_connection()
-        drifts = _fetchall(conn, """
-            SELECT a.username, a.platform, a.total_views AS account_views,
-                   vsum.sum_views AS videos_sum,
-                   CASE WHEN a.total_views > 0
-                        THEN ABS(vsum.sum_views - a.total_views)::float / a.total_views
-                        ELSE 1.0 END AS drift_pct
-            FROM accounts a
-            JOIN (
-                SELECT account_username, user_id, SUM(views) AS sum_views
-                FROM videos
-                GROUP BY account_username, user_id
-            ) vsum ON vsum.account_username = a.username AND vsum.user_id = a.user_id
-            WHERE vsum.sum_views > a.total_views * 1.05
-            ORDER BY drift_pct DESC
-            LIMIT 50
-        """)
-        if drifts:
-            _execute(conn, """
-                UPDATE accounts a SET total_views = vsum.sum_views
-                FROM (
-                    SELECT account_username, user_id, SUM(views) AS sum_views,
-                           SUM(comments) AS sum_comments
+        with get_connection() as conn:
+            drifts = _fetchall(conn, """
+                SELECT a.username, a.platform, a.total_views AS account_views,
+                       vsum.sum_views AS videos_sum,
+                       CASE WHEN a.total_views > 0
+                            THEN ABS(vsum.sum_views - a.total_views)::float / a.total_views
+                            ELSE 1.0 END AS drift_pct
+                FROM accounts a
+                JOIN (
+                    SELECT account_username, user_id, SUM(views) AS sum_views
                     FROM videos
                     GROUP BY account_username, user_id
-                ) vsum
-                WHERE a.username = vsum.account_username
-                  AND a.user_id = vsum.user_id
-                  AND vsum.sum_views > a.total_views * 1.05
+                ) vsum ON vsum.account_username = a.username AND vsum.user_id = a.user_id
+                WHERE vsum.sum_views > a.total_views * 1.05
+                ORDER BY drift_pct DESC
+                LIMIT 50
             """)
-            conn.commit()
-        conn.close()
+            if drifts:
+                _execute(conn, """
+                    UPDATE accounts a SET total_views = vsum.sum_views
+                    FROM (
+                        SELECT account_username, user_id, SUM(views) AS sum_views,
+                               SUM(comments) AS sum_comments
+                        FROM videos
+                        GROUP BY account_username, user_id
+                    ) vsum
+                    WHERE a.username = vsum.account_username
+                      AND a.user_id = vsum.user_id
+                      AND vsum.sum_views > a.total_views * 1.05
+                """)
+                conn.commit()
 
         if drifts:
             lines = [f"- @{d['username']} ({d['platform']}): "
