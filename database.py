@@ -135,11 +135,12 @@ def _get_pg_pool():
         # Pool sizing: on pgbouncer the upstream pgbouncer side multiplexes
         # client conns over a much smaller backend pool. The scraper uses
         # ThreadPoolExecutor(max_workers=16 for IG, 12 for TT/YT) — pool must
-        # be ≥ max concurrent workers to avoid PoolError cascades. 20 covers
-        # the worst case (16 IG workers + a couple of dashboard reads
-        # happening concurrently). Supabase 200-client cap easily absorbs
-        # this across multiple Vercel instances.
-        default_max = "20" if is_pooler else "3"
+        # be ≥ max concurrent workers to avoid PoolError cascades. Bumped
+        # from 20 → 30 on 2026-05-27 after seeing the IG→TT/YT cron chain
+        # exhaust 20-conn pool because IG's threads hadn't released yet
+        # when TT/YT requested its own batch. 30 + 12s workflow sleep gives
+        # bulletproof headroom under Supabase Pro's 200-client cap.
+        default_max = "30" if is_pooler else "3"
         try:
             _pg_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=int(os.environ.get("DB_POOL_MIN", "1")),

@@ -111,6 +111,14 @@ jobs:
             echo "::error::CRON_SECRET is not set in repo secrets"
             exit 1
           fi
+          # The Instagram scrape just returned HTTP 200, but its
+          # ThreadPoolExecutor(max_workers=16) may still hold DB pool
+          # connections for a few seconds after the HTTP response. If we
+          # hammer TT/YT immediately, we hit "connection pool exhausted".
+          # 12s gives the IG thread pool time to release before we open
+          # 12 more workers for TT/YT.
+          echo "Waiting 12s for Instagram pool to drain…"
+          sleep 12
           echo "── /api/cron/scrape-tiktok-youtube ──"
           # TT/YT have heavier yt-dlp work; up to 3 passes cover ~870 accounts
           # per 15-min window with 16-thread concurrency.
