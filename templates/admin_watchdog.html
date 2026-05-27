@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watchdog · Admin · Tracking Lab</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #fafafa; --surface: #fff; --border: #e5e7eb;
+      --text: #1d1d1f; --text-2: #6e6e73; --text-3: #9ca3af;
+      --green: #16a34a; --amber: #d97706; --red: #dc2626;
+      --code-bg: #0f1117; --code-fg: #e5e7eb;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 40px 24px 80px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+    header .back { font-size: 13px; color: var(--text-2); text-decoration: none; }
+    header .back:hover { color: var(--text); }
+
+    .stats {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px;
+    }
+    .stat .num { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; display: block; }
+    .stat .lbl { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 22px 24px; margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-2); margin-bottom: 14px;
+    }
+    .meta-bar {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 16px;
+      font-size: 13px; color: var(--text-2);
+    }
+    .meta-bar select {
+      font: inherit; padding: 6px 10px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+    }
+    .btn {
+      display: inline-block; padding: 8px 14px;
+      background: #0b0b0f; color: #fff;
+      border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn:hover { background: #1d1d23; }
+    .btn:disabled { opacity: 0.4; cursor: progress; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td {
+      text-align: left; padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-2); font-weight: 600;
+    }
+    td.ts { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-2); white-space: nowrap; }
+    td.check { font-weight: 600; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 980px;
+      font-size: 11px; font-weight: 600;
+    }
+    .pill.ok        { background: #dcfce7; color: var(--green); }
+    .pill.fail      { background: #fee2e2; color: var(--red); }
+    .pill.unknown   { background: #f1f5f9; color: var(--text-2); }
+    .pill.alert     { background: #fef3c7; color: var(--amber); }
+    details { margin-top: 4px; }
+    details summary { cursor: pointer; font-size: 12px; color: var(--text-3); }
+    details pre {
+      background: var(--code-bg); color: var(--code-fg);
+      padding: 10px; border-radius: 6px; margin-top: 6px;
+      font-size: 11px; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    }
+    .empty { padding: 24px; color: var(--text-3); text-align: center; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Watchdog</h1>
+      <a class="back" href="/admin">← Admin dashboard</a>
+    </header>
+
+    <div class="meta-bar">
+      <label>Fenêtre :
+        <select id="hours">
+          <option value="6">6h</option>
+          <option value="24" selected>24h</option>
+          <option value="72">72h</option>
+          <option value="168">7 jours</option>
+        </select>
+      </label>
+      <button class="btn" id="refresh">Rafraîchir</button>
+      <span id="status" style="margin-left: auto;"></span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="num" id="s_checks">·</span><div class="lbl">Vérifs</div></div>
+      <div class="stat"><span class="num" id="s_degr">·</span><div class="lbl">Dégradations</div></div>
+      <div class="stat"><span class="num" id="s_attempted">·</span><div class="lbl">Auto-heals tentés</div></div>
+      <div class="stat"><span class="num" id="s_healed">·</span><div class="lbl">Réparés</div></div>
+      <div class="stat"><span class="num" id="s_alerts">·</span><div class="lbl">Alertes</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Dernières dégradations</h2>
+      <div id="table_wrap"><div class="empty">Chargement…</div></div>
+    </div>
+
+    <p style="font-size: 12px; color: var(--text-3); margin-top: 24px; line-height: 1.7;">
+      Watchdog tick : toutes les 5 minutes via GitHub Actions →
+      <code style="background:#f1f1f3;padding:1px 6px;border-radius:4px;font-size:11px;">/api/cron/watchdog</code>.
+      Page publique : <a href="/status" style="color: var(--text-2);">/status</a>.
+    </p>
+  </div>
+
+  <script>
+    const fmtTs = (s) => {
+      if (!s) return '—';
+      try {
+        const d = new Date(s);
+        return d.toLocaleString('fr-FR', {
+          month: 'short', day: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        });
+      } catch { return s; }
+    };
+
+    const pillFor = (deg) => {
+      if (deg.healed_successfully === true)  return '<span class="pill ok">healed</span>';
+      if (deg.healed_successfully === false) return '<span class="pill fail">failed</span>';
+      if (deg.auto_heal_attempted)            return '<span class="pill unknown">attempted</span>';
+      return '<span class="pill unknown">no-heal</span>';
+    };
+
+    const fmtDetail = (d) => {
+      if (!d) return '';
+      try {
+        return JSON.stringify(d, null, 2);
+      } catch {
+        return String(d);
+      }
+    };
+
+    async function load() {
+      const hours = document.getElementById('hours').value;
+      const status = document.getElementById('status');
+      const btn = document.getElementById('refresh');
+      btn.disabled = true;
+      status.textContent = 'Chargement…';
+
+      try {
+        const [sumR, degR] = await Promise.all([
+          fetch(`/api/admin/watchdog/summary?hours=${hours}`, {credentials: 'include'}),
+          fetch(`/api/admin/watchdog/degradations?limit=50`, {credentials: 'include'}),
+        ]);
+        if (!sumR.ok || !degR.ok) throw new Error(`HTTP ${sumR.status}/${degR.status}`);
+        const sum = (await sumR.json()).summary || {};
+        const degs = (await degR.json()).degradations || [];
+
+        document.getElementById('s_checks').textContent    = sum.total_checks   ?? 0;
+        document.getElementById('s_degr').textContent      = sum.degradations   ?? 0;
+        document.getElementById('s_attempted').textContent = sum.heals_attempted ?? 0;
+        document.getElementById('s_healed').textContent    = sum.heals_succeeded ?? 0;
+        document.getElementById('s_alerts').textContent    = sum.alerts_sent    ?? 0;
+
+        const wrap = document.getElementById('table_wrap');
+        if (!degs.length) {
+          wrap.innerHTML = '<div class="empty">Aucune dégradation détectée sur cette fenêtre. Tout va bien.</div>';
+        } else {
+          const rows = degs.map(d => `
+            <tr>
+              <td class="ts">${fmtTs(d.ts)}</td>
+              <td class="check">${d.check_name}</td>
+              <td>${pillFor(d)}</td>
+              <td>${d.alert_sent ? '<span class="pill alert">sent</span>' : '<span class="pill unknown">silent</span>'}</td>
+              <td>${d.duration_ms ?? '—'} ms</td>
+              <td>
+                <details><summary>détail</summary>
+                  <pre>${fmtDetail(d.detail)}</pre>
+                </details>
+              </td>
+            </tr>
+          `).join('');
+          wrap.innerHTML = `
+            <table>
+              <thead><tr>
+                <th>Quand</th><th>Check</th><th>Résultat</th>
+                <th>Alerte</th><th>Durée</th><th></th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+        }
+        status.textContent = `Mis à jour ${new Date().toLocaleTimeString('fr-FR')}`;
+      } catch (e) {
+        status.textContent = `Erreur : ${e.message || e}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('hours').addEventListener('change', load);
+    load();
+    // Auto-refresh every 30 seconds while the tab is open.
+    setInterval(() => { if (!document.hidden) load(); }, 30000);
+  </script>
+</body>
+</html>

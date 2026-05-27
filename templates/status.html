@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status · Tracking Lab</title>
+  <meta name="description" content="État en temps réel du service Tracking Lab. Monitoring 24/7 transparent.">
+  <meta name="robots" content="noindex, follow">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #fafafa;
+      --surface: #fff;
+      --border: #e5e7eb;
+      --text: #1d1d1f;
+      --text-2: #6e6e73;
+      --text-3: #9ca3af;
+      --green: #16a34a;
+      --green-bg: #dcfce7;
+      --amber: #d97706;
+      --amber-bg: #fef3c7;
+      --red: #dc2626;
+      --red-bg: #fee2e2;
+      --r: 14px;
+      --r-sm: 10px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 56px 24px 96px 24px;
+    }
+
+    header.top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .brand {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #FF69B4;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .back {
+      font-size: 13px;
+      color: var(--text-2);
+      text-decoration: none;
+    }
+    .back:hover { color: var(--text); }
+
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 28px 28px 24px 28px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin-bottom: 6px;
+    }
+    .hero .sub {
+      font-size: 14px;
+      color: var(--text-2);
+      margin-bottom: 18px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 980px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+    .badge .pulse {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+    .badge.operational {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+    .badge.operational .pulse { background: var(--green); animation: pulse 2s ease-in-out infinite; }
+
+    .badge.degraded {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+    .badge.degraded .pulse { background: var(--amber); animation: pulse 1.4s ease-in-out infinite; }
+
+    .badge.down {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+    .badge.down .pulse { background: var(--red); animation: pulse 0.9s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.35; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 22px 24px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-2);
+      margin-bottom: 16px;
+    }
+
+    .rows { display: flex; flex-direction: column; gap: 12px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .row:last-child { border-bottom: none; padding-bottom: 0; }
+    .row .label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 500;
+      font-size: 15px;
+      text-transform: capitalize;
+    }
+    .row .meta {
+      font-size: 13px;
+      color: var(--text-2);
+      text-align: right;
+    }
+    .row .meta .age { font-weight: 600; color: var(--text); display: block; }
+    .row .state-pill {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+    .state-pill.ok       { background: var(--green); }
+    .state-pill.degraded { background: var(--amber); }
+    .state-pill.down     { background: var(--red); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .stat {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 14px 16px;
+    }
+    .stat .num {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: block;
+    }
+    .stat .lbl {
+      font-size: 11px;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+    }
+
+    .footnote {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 32px;
+      text-align: center;
+      line-height: 1.7;
+    }
+    .footnote code {
+      background: #f1f1f3;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 520px) {
+      .wrap { padding: 32px 16px 64px 16px; }
+      .hero { padding: 22px 20px; }
+      .card { padding: 18px 18px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/"><span class="dot"></span>Tracking Lab</a>
+      <a class="back" href="/">Retour au site →</a>
+    </header>
+
+    <section class="hero">
+      <h1>Status du service</h1>
+      <p class="sub">Monitoring auto-healing 24/7 · vérification toutes les 5 minutes.</p>
+
+      {% if overall == 'operational' %}
+        <span class="badge operational">
+          <span class="pulse"></span> Tous les systèmes opérationnels
+        </span>
+      {% elif overall == 'degraded' %}
+        <span class="badge degraded">
+          <span class="pulse"></span> Performance dégradée · auto-réparation en cours
+        </span>
+      {% else %}
+        <span class="badge down">
+          <span class="pulse"></span> Incident en cours · investigation
+        </span>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Fraîcheur des données par plateforme</h2>
+      {% if per_platform %}
+        <div class="rows">
+          {% for p in per_platform %}
+            <div class="row">
+              <div class="label">
+                <span class="state-pill {{ p.state }}"></span>
+                <span>{{ p.platform }}</span>
+              </div>
+              <div class="meta">
+                <span class="age">Mise à jour {{ p.age_label }}</span>
+                <span>{{ p.accounts }} compte{{ 's' if p.accounts != 1 else '' }} actif{{ 's' if p.accounts != 1 else '' }}</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color: var(--text-2); font-size: 14px;">
+          Données de fraîcheur en cours de chargement.
+        </p>
+      {% endif %}
+    </section>
+
+    {% if rollup and rollup.get('total_checks') %}
+    <section class="card">
+      <h2>Auto-réparation · dernières 24h</h2>
+      <div class="stats">
+        <div class="stat">
+          <span class="num">{{ rollup.total_checks or 0 }}</span>
+          <div class="lbl">Vérifications</div>
+        </div>
+        <div class="stat">
+          <span class="num">{{ rollup.degradations or 0 }}</span>
+          <div class="lbl">Dégradations</div>
+        </div>
+        <div class="stat">
+          <span class="num">{{ rollup.heals_succeeded or 0 }}</span>
+          <div class="lbl">Auto-réparées</div>
+        </div>
+        <div class="stat">
+          <span class="num">{{ rollup.alerts_sent or 0 }}</span>
+          <div class="lbl">Alertes émises</div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <p class="footnote">
+      Cette page se met à jour automatiquement à chaque tick du watchdog. <br>
+      Pour signaler un incident non listé ici, écrire à <code>brice.demirdjian@gmail.com</code>.
+    </p>
+  </div>
+</body>
+</html>

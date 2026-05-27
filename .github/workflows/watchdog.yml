@@ -1,0 +1,54 @@
+name: Watchdog (every 5 min)
+
+# 5-minute auto-heal pass. Detects pool corruption, stale data per
+# platform, Stripe webhook gaps, and scrape-loop quiet periods — then
+# attempts in-place repair BEFORE alerting (see watchdog.py).
+#
+# Cost envelope:
+#   - 288 ticks/day × ~3s per tick = ~14 min/day of Actions time.
+#   - Monthly: ~7 hours = well under the 2000-minute free quota.
+#   - On Vercel side: each tick is one HTTPS request to /api/cron/watchdog
+#     (counts against function invocations, but each call is <40s).
+#
+# Failure modes handled:
+#   - HTTP 5xx returned by watchdog → workflow fails (visible in Actions),
+#     watchdog's own self-alert email also fires from inside the function.
+#   - Network timeout (rare) → curl exits non-zero, workflow fails. Next
+#     tick covers; no email storm because we don't alert on workflow-level
+#     failures (those would create false positives during GitHub outages).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call /api/cron/watchdog
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET not configured in repo secrets"
+            exit 1
+          fi
+          # 50s curl ceiling (watchdog internal deadline is 40s, so the
+          # response should already be on the wire well before this).
+          RESPONSE=$(curl -sS --max-time 55 \
+            -w "\nHTTP_CODE:%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://trackinglab.online/api/cron/watchdog")
+          CODE=$(echo "$RESPONSE" | grep -oE "HTTP_CODE:[0-9]+" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:.*//')
+          echo "Response: $BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Watchdog returned HTTP $CODE"
+            exit 1
+          fi

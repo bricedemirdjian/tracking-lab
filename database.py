@@ -394,7 +394,7 @@ def _ts_cast():
 # does a single SELECT against schema_meta — if the stored version matches,
 # every CREATE / migration is skipped (saves ~640ms per cold start). On
 # version mismatch, full init runs once and writes the new value.
-SCHEMA_VERSION = "2026-05-18-video-analysis-cache"
+SCHEMA_VERSION = "2026-05-27-watchdog-events"
 
 
 def _is_schema_current(conn) -> bool:
@@ -617,6 +617,8 @@ def init_db():
     _migrate_default_projects(conn)
     # Migration: per-video AI analysis cache (agency-only feature)
     _migrate_video_analysis_table(conn)
+    # Migration: watchdog event log (auto-heal layer telemetry; see watchdog.py)
+    _migrate_watchdog_events(conn)
 
     # Stamp the version so the next cold start hits the fast-path.
     _mark_schema_current(conn)
@@ -2317,6 +2319,269 @@ def delete_user_and_data(user_id):
     _execute(conn, "DELETE FROM users WHERE id = %s", (user_id,))
     conn.commit()
     conn.close()
+
+
+# ============================================================
+# WATCHDOG layer — proactive self-healing telemetry
+# ============================================================
+#
+# The watchdog (see watchdog.py) is a 5-minute auto-heal pass that runs
+# BEFORE the customer-facing degradation window opens. Every check it
+# performs writes one row here so we can:
+#   1. Detect "auto-heal succeeded but the underlying cause keeps coming
+#      back" patterns over hours (escalates from info → critical alert).
+#   2. Show Brice a 24h rollup on /admin (X checks, Y healed, Z alerts).
+#   3. Drive a public /status page that customers can hit during outages.
+#
+# Schema is append-only; no UPDATE path. Cleanup of >30-day rows is best-
+# effort during each watchdog tick (kept simple, no separate cron needed).
+
+def _migrate_watchdog_events(conn):
+    """Create the watchdog_events table + supporting index."""
+    try:
+        if DATABASE_URL:
+            _execute(conn, """
+                CREATE TABLE IF NOT EXISTS watchdog_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    ts TIMESTAMP NOT NULL DEFAULT NOW(),
+                    check_name TEXT NOT NULL,
+                    degradation_detected BOOLEAN NOT NULL DEFAULT FALSE,
+                    auto_heal_attempted BOOLEAN NOT NULL DEFAULT FALSE,
+                    healed_successfully BOOLEAN,
+                    alert_sent BOOLEAN NOT NULL DEFAULT FALSE,
+                    duration_ms INTEGER,
+                    detail JSONB
+                )
+            """)
+            _execute(conn, """
+                CREATE INDEX IF NOT EXISTS idx_watchdog_events_ts
+                    ON watchdog_events (ts DESC)
+            """)
+            _execute(conn, """
+                CREATE INDEX IF NOT EXISTS idx_watchdog_events_check_degraded
+                    ON watchdog_events (check_name, ts DESC)
+                    WHERE degradation_detected = TRUE
+            """)
+            print("[Migration] watchdog_events table OK (PostgreSQL)")
+        else:
+            _execute(conn, """
+                CREATE TABLE IF NOT EXISTS watchdog_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    check_name TEXT NOT NULL,
+                    degradation_detected INTEGER NOT NULL DEFAULT 0,
+                    auto_heal_attempted INTEGER NOT NULL DEFAULT 0,
+                    healed_successfully INTEGER,
+                    alert_sent INTEGER NOT NULL DEFAULT 0,
+                    duration_ms INTEGER,
+                    detail TEXT
+                )
+            """)
+            _execute(conn, """
+                CREATE INDEX IF NOT EXISTS idx_watchdog_events_ts
+                    ON watchdog_events (ts DESC)
+            """)
+            print("[Migration] watchdog_events table OK (SQLite)")
+        conn.commit()
+    except Exception as e:
+        # Never let migration failure break boot — watchdog will print a clear
+        # error on its first run if the table really isn't there.
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f"[Migration] watchdog_events: {e}")
+
+
+def record_watchdog_event(check_name, *, degradation_detected=False,
+                          auto_heal_attempted=False, healed_successfully=None,
+                          alert_sent=False, duration_ms=None, detail=None):
+    """Append a single watchdog observation. Idempotent; never raises so the
+    watchdog can keep working even if telemetry writes fail."""
+    try:
+        # Inline import to avoid a circular import surface: emailer/watchdog
+        # both import from database, but database stays leaf-level.
+        import json as _json
+        detail_payload = None
+        if detail is not None:
+            try:
+                detail_payload = _json.dumps(detail, default=str)[:4000]
+            except Exception:
+                detail_payload = _json.dumps({"_unserializable": True})
+
+        def _do(conn):
+            if DATABASE_URL:
+                _execute(conn, """
+                    INSERT INTO watchdog_events
+                        (check_name, degradation_detected, auto_heal_attempted,
+                         healed_successfully, alert_sent, duration_ms, detail)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                """, (
+                    check_name,
+                    bool(degradation_detected),
+                    bool(auto_heal_attempted),
+                    None if healed_successfully is None else bool(healed_successfully),
+                    bool(alert_sent),
+                    int(duration_ms) if duration_ms is not None else None,
+                    detail_payload,
+                ))
+            else:
+                _execute(conn, """
+                    INSERT INTO watchdog_events
+                        (check_name, degradation_detected, auto_heal_attempted,
+                         healed_successfully, alert_sent, duration_ms, detail)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    check_name,
+                    1 if degradation_detected else 0,
+                    1 if auto_heal_attempted else 0,
+                    None if healed_successfully is None else (1 if healed_successfully else 0),
+                    1 if alert_sent else 0,
+                    int(duration_ms) if duration_ms is not None else None,
+                    detail_payload,
+                ))
+        _db_retry(_do, label=f"record_watchdog_event:{check_name}", retries=2)
+    except Exception as e:
+        # The watchdog must NEVER crash on its own telemetry write — that
+        # would mean the layer designed to detect breakage becomes the
+        # breakage. Just log and move on.
+        try:
+            _oneline_tb(f"record_watchdog_event_failed:{check_name}", e)
+        except Exception:
+            pass
+
+
+def get_watchdog_summary(hours=24):
+    """Return a small dict of watchdog stats for the last N hours. Used by
+    the admin dashboard widget and the public /status page (the public page
+    only renders the aggregates, never raw rows)."""
+    try:
+        def _do(conn):
+            if DATABASE_URL:
+                rows = _fetchall(conn, """
+                    SELECT
+                        COUNT(*)                                                       AS total_checks,
+                        SUM(CASE WHEN degradation_detected THEN 1 ELSE 0 END)          AS degradations,
+                        SUM(CASE WHEN auto_heal_attempted  THEN 1 ELSE 0 END)          AS heals_attempted,
+                        SUM(CASE WHEN healed_successfully  THEN 1 ELSE 0 END)          AS heals_succeeded,
+                        SUM(CASE WHEN alert_sent           THEN 1 ELSE 0 END)          AS alerts_sent,
+                        MAX(ts)                                                        AS last_tick
+                    FROM watchdog_events
+                    WHERE ts >= NOW() - (%s || ' hours')::interval
+                """, (str(int(hours)),))
+            else:
+                rows = _fetchall(conn, """
+                    SELECT
+                        COUNT(*)                                                AS total_checks,
+                        SUM(CASE WHEN degradation_detected=1 THEN 1 ELSE 0 END) AS degradations,
+                        SUM(CASE WHEN auto_heal_attempted=1  THEN 1 ELSE 0 END) AS heals_attempted,
+                        SUM(CASE WHEN healed_successfully=1  THEN 1 ELSE 0 END) AS heals_succeeded,
+                        SUM(CASE WHEN alert_sent=1           THEN 1 ELSE 0 END) AS alerts_sent,
+                        MAX(ts)                                                 AS last_tick
+                    FROM watchdog_events
+                    WHERE ts >= datetime('now', %s)
+                """, (f'-{int(hours)} hours',))
+            return rows[0] if rows else {}
+        conn = get_connection()
+        try:
+            return _do(conn) or {}
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception as e:
+        _oneline_tb("get_watchdog_summary_failed", e)
+        return {
+            "total_checks": 0, "degradations": 0,
+            "heals_attempted": 0, "heals_succeeded": 0,
+            "alerts_sent": 0, "last_tick": None,
+            "_error": str(e)[:200],
+        }
+
+
+def get_watchdog_recent_degradations(limit=20):
+    """Return the most recent degradation events for the admin widget."""
+    try:
+        conn = get_connection()
+        try:
+            return _fetchall(conn, """
+                SELECT ts, check_name, auto_heal_attempted, healed_successfully,
+                       alert_sent, duration_ms, detail
+                FROM watchdog_events
+                WHERE degradation_detected = %s
+                ORDER BY ts DESC
+                LIMIT %s
+            """, (True if DATABASE_URL else 1, int(limit)))
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception as e:
+        _oneline_tb("get_watchdog_recent_degradations_failed", e)
+        return []
+
+
+def prune_watchdog_events(older_than_days=30):
+    """Best-effort cleanup so the table doesn't grow unbounded (300 ticks/day
+    × 7 checks ≈ 2100 rows/day → ~65k rows/month, trivial but we still cap)."""
+    try:
+        def _do(conn):
+            if DATABASE_URL:
+                _execute(conn,
+                    "DELETE FROM watchdog_events WHERE ts < NOW() - (%s || ' days')::interval",
+                    (str(int(older_than_days)),)
+                )
+            else:
+                _execute(conn,
+                    "DELETE FROM watchdog_events WHERE ts < datetime('now', %s)",
+                    (f'-{int(older_than_days)} days',)
+                )
+        _db_retry(_do, label="prune_watchdog_events", retries=1)
+    except Exception as e:
+        _oneline_tb("prune_watchdog_events_failed", e)
+
+
+# ============================================================
+# Pool reset helper — last-resort recovery
+# ============================================================
+def _force_pool_reset():
+    """Tear the psycopg2 connection pool down so the NEXT get_connection()
+    call rebuilds it from scratch.
+
+    Called by the watchdog when it detects the pool is in a corrupted state
+    (e.g. every getconn() returns a connection whose first SELECT raises
+    "SSL connection has been closed unexpectedly"). closeall() closes every
+    backend socket the pool holds; setting `_pg_pool = None` ensures the
+    next caller goes through _get_pg_pool()'s full initialization path,
+    re-parsing DATABASE_URL and re-establishing fresh TLS sessions.
+
+    Safe to call concurrently — if two requests both decide to reset, one
+    closeall() wins, the other no-ops because the pool was already None.
+    Returns a dict describing what happened so the watchdog can log it.
+    """
+    global _pg_pool
+    if not DATABASE_URL:
+        return {"reset": False, "reason": "sqlite_backend"}
+    pool = _pg_pool
+    if pool is None:
+        return {"reset": False, "reason": "already_torn_down"}
+    try:
+        # closeall() iterates all idle conns + flags any in-use conns for
+        # discard on next putconn(). Some psycopg2 versions raise here if a
+        # conn is already in a broken state — swallow because we're nuking
+        # the pool anyway.
+        try:
+            pool.closeall()
+        except Exception as inner:
+            _oneline_tb("force_pool_reset_closeall", inner)
+        _pg_pool = None
+        print("[DB] _force_pool_reset: pool torn down, next request will rebuild", flush=True)
+        return {"reset": True}
+    except Exception as e:
+        _oneline_tb("force_pool_reset_failed", e)
+        return {"reset": False, "reason": f"{type(e).__name__}: {e}"}
 
 
 if __name__ == "__main__":
